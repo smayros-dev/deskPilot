@@ -1,0 +1,82 @@
+:host {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100dvh;
+}
+
+.skip-link {
+  position: absolute;
+  left: -999px;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  z-index: 30;
+  background: var(--surface);
+  padding: 0.5rem 1rem;
+}
+
+.progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  z-index: 25;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 50% 100%;
+  animation: slide 1.2s linear infinite;
+}
+@keyframes slide {
+  from { background-position: -50% 0; }
+  to { background-position: 150% 0; }
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.logo { color: var(--accent); }
+
+nav { flex: 1; overflow-x: auto; }
+nav ul { display: flex; gap: 0.25rem; list-style: none; margin: 0; padding: 0; }
+nav a {
+  display: block;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+nav a:hover { background: var(--surface-muted); color: var(--text); }
+nav a.active { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+
+main {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  min-width: 0;
+}
+main:focus { outline: none; }
+
+@media (max-width: 720px) {
+  .topbar { flex-wrap: wrap; gap: 0.5rem 1rem; padding: 0.75rem 1rem; }
+  nav { order: 3; flex-basis: 100%; }
+  main { padding: 1rem; }
+}

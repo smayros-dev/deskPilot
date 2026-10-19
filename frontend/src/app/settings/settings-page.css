@@ -1,0 +1,45 @@
+.settings { display: grid; gap: 1.25rem; max-width: 900px; }
+h2 { font-size: 1rem; margin: 0 0 1rem; }
+
+label { display: grid; gap: 0.35rem; font-weight: 600; font-size: 0.9rem; }
+label small, .hint, th small { font-weight: 400; color: var(--text-muted); font-size: 0.8rem; }
+select, input[type='number'], textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+}
+textarea { resize: vertical; font-family: ui-monospace, 'Cascadia Code', Menlo, monospace; font-size: 0.85rem; }
+input[type='range'] { width: 100%; accent-color: var(--accent); }
+output { font-variant-numeric: tabular-nums; color: var(--accent); margin-left: 0.25rem; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; }
+.toggle { grid-template-columns: auto 1fr; align-items: start; column-gap: 0.6rem; }
+.toggle small { grid-column: 2; }
+.toggle input { margin-top: 0.2rem; accent-color: var(--accent); }
+
+.capabilities { list-style: none; padding: 0; margin: 0.6rem 0 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.capabilities li { font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--accent-bg); color: var(--accent); }
+.presets { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+thead th { font-size: 0.8rem; color: var(--text-muted); }
+tbody th { font-weight: 400; display: grid; gap: 0.2rem; }
+td input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
+
+.warn { color: var(--warn); font-style: normal; font-size: 0.78rem; margin-left: 0.4rem; }
+
+.save-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  background: linear-gradient(transparent, var(--bg) 30%);
+}

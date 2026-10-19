@@ -1,0 +1,154 @@
+<header class="page-header">
+  <div>
+    <h1>Agent settings</h1>
+    <p class="muted">
+      Applied from the next message, no restart needed.
+      @if (store.settings()?.updatedAt; as updatedAt) {
+        Last saved {{ updatedAt | date: 'medium' }}.
+      }
+    </p>
+  </div>
+  <div class="actions">
+    <button type="button" class="button" (click)="reset()" [disabled]="store.saving()">Reset to defaults</button>
+  </div>
+</header>
+
+<form [formGroup]="form" (ngSubmit)="save()" class="settings">
+  <section class="card" aria-labelledby="model-title">
+    <h2 id="model-title">Model</h2>
+    <label for="chatModel">Chat model</label>
+    <select id="chatModel" formControlName="chatModel">
+      @for (model of chatModels(); track model.name) {
+        <option [value]="model.name" [disabled]="!model.supportsTools">
+          {{ model.name }}
+          @if (model.parameterSize) { · {{ model.parameterSize }} }
+          · {{ model.sizeBytes / gib | number: '1.1-1' }} GB
+          @if (!model.supportsTools) { (no tool calling) }
+        </option>
+      } @empty {
+        <option value="" disabled>{{ models.isLoading() ? 'Loading models…' : 'No models found in Ollama' }}</option>
+      }
+    </select>
+    @if (selectedModel(); as model) {
+      <ul class="capabilities" aria-label="Model capabilities">
+        @for (capability of model.capabilities; track capability) {
+          <li>{{ capability }}</li>
+        }
+      </ul>
+    }
+    <p class="hint">Install more models with <code>ollama pull &lt;name&gt;</code>, e.g. <code>qwen3:4b</code> (faster) or <code>qwen3:14b</code> (smarter). Only models that support tool calling can run the agent.</p>
+
+    <div class="presets" role="group" aria-label="Presets">
+      @for (preset of presets; track preset.name) {
+        <button type="button" class="chip" [title]="preset.hint" (click)="applyPreset(preset)">{{ preset.name }}</button>
+      }
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="generation-title">
+    <h2 id="generation-title">Generation</h2>
+    <div class="grid">
+      <label class="range">
+        <span>Temperature <output>{{ form.controls.temperature.value | number: '1.2-2' }}</output></span>
+        <input type="range" min="0" max="2" step="0.05" formControlName="temperature" />
+        <small>Lower is more focused and repeatable; helpdesk answers work best around 0.1–0.3.</small>
+      </label>
+      <label class="range">
+        <span>Top-p <output>{{ form.controls.topP.value | number: '1.2-2' }}</output></span>
+        <input type="range" min="0.05" max="1" step="0.05" formControlName="topP" />
+        <small>Samples only from the most likely tokens covering this probability.</small>
+      </label>
+      <label>
+        <span>Context window (tokens)</span>
+        <input type="number" min="1024" max="131072" step="1024" formControlName="contextWindow" />
+        <small>How much conversation and tool output the model sees. Larger uses more RAM and is slower.</small>
+      </label>
+      <label>
+        <span>Max output tokens</span>
+        <input type="number" min="64" max="32768" step="64" formControlName="maxOutputTokens" />
+        <small>Upper bound per model call.</small>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" formControlName="thinking" />
+        <span>
+          Thinking (reasoning) mode
+          @if (selectedModel() && !selectedModel()!.supportsThinking) {
+            <em class="warn">not supported by this model</em>
+          }
+        </span>
+        <small>Better on hard questions but about 15× slower on CPU.</small>
+      </label>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="agent-title">
+    <h2 id="agent-title">Agent &amp; retrieval</h2>
+    <div class="grid">
+      <label>
+        <span>Max steps per request</span>
+        <input type="number" min="1" max="20" formControlName="maxIterations" />
+        <small>Model calls allowed before the request is escalated to a human.</small>
+      </label>
+      <label>
+        <span>Articles per search (top-K)</span>
+        <input type="number" min="1" max="10" formControlName="ragTopK" />
+      </label>
+      <label class="range">
+        <span>Similarity threshold <output>{{ form.controls.ragSimilarityThreshold.value | number: '1.2-2' }}</output></span>
+        <input type="range" min="0" max="1" step="0.05" formControlName="ragSimilarityThreshold" />
+        <small>Articles below this score count as "not relevant", so the agent rephrases or admits it has no answer.</small>
+      </label>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="tools-title">
+    <h2 id="tools-title">Tools</h2>
+    <table formGroupName="tools">
+      <thead>
+        <tr>
+          <th scope="col">Tool</th>
+          <th scope="col">Enabled</th>
+          <th scope="col">Needs approval</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (tool of tools.value(); track tool.name) {
+          @if (form.controls.tools.contains(tool.name)) {
+            <tr [formGroup]="toolControls(tool.name)">
+              <th scope="row">
+                <code>{{ tool.name }}</code>
+                <small>{{ tool.description }}</small>
+              </th>
+              <td><input type="checkbox" formControlName="enabled" [attr.aria-label]="'Enable ' + tool.name" /></td>
+              <td>
+                <input type="checkbox" formControlName="approval" [attr.aria-label]="'Require approval for ' + tool.name" />
+                @if (tool.approvalByDefault && !toolControls(tool.name).controls.approval.value) {
+                  <em class="warn">runs without review</em>
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card" aria-labelledby="prompt-title">
+    <h2 id="prompt-title">System prompt</h2>
+    <label for="systemPrompt">Override (leave empty to use the built-in helpdesk prompt)</label>
+    <textarea id="systemPrompt" rows="8" formControlName="systemPrompt" placeholder="You are the IT Helpdesk Agent…"></textarea>
+    @if (form.controls.systemPrompt.hasError('maxlength')) {
+      <small class="warn">At most 8000 characters.</small>
+    }
+  </section>
+
+  <footer class="save-bar">
+    @if (form.dirty) {
+      <span class="muted">Unsaved changes</span>
+      <button type="button" class="button" (click)="discard()">Discard</button>
+    }
+    <button type="submit" class="button primary" [disabled]="form.invalid || !form.dirty || store.saving()">
+      {{ store.saving() ? 'Saving…' : 'Save settings' }}
+    </button>
+  </footer>
+</form>

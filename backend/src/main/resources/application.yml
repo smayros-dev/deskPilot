@@ -1,0 +1,75 @@
+spring:
+  application:
+    name: agent-ai
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  http:
+    clients:
+      # Local models on CPU are slow; a multi-tool answer can take minutes.
+      connect-timeout: 5s
+      read-timeout: 5m
+  # Datasource: provided by Docker Compose (compose.yaml) in development,
+  # by Testcontainers in tests, and by SPRING_DATASOURCE_* environment variables in production.
+  docker:
+    compose:
+      lifecycle-management: start-only
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema (db/migration); Hibernate only checks it matches the entities.
+      ddl-auto: validate
+  ai:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      init:
+        # Models are pulled manually (`ollama pull ...`); never download gigabytes at startup.
+        pull-model-strategy: never
+      chat:
+        model: ${AGENT_CHAT_MODEL:qwen3:8b}
+        temperature: 0.2
+        keep-alive: 30m
+        # Reasoning mode is ~15x slower on CPU (44s vs 3s for a one-word answer); enable only on a GPU.
+        think: ${AGENT_THINK:false}
+      embedding:
+        model: ${AGENT_EMBEDDING_MODEL:nomic-embed-text}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        # nomic-embed-text produces 768-dimensional vectors; change together with the embedding model.
+        dimensions: 768
+        distance-type: COSINE_DISTANCE
+        index-type: HNSW
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+agent:
+  max-iterations: 8
+  rag:
+    similarity-threshold: 0.55
+    top-k: 3
+    index-on-startup: true
+  guardrails:
+    max-input-chars: 4000
+    max-tool-output-chars: 6000
+    blocked-patterns:
+      - "ignore (all |any )?(the )?(previous|prior|above) (instructions|rules|prompts?)"
+      - "disregard (all |any )?(the )?(previous|prior|above|system) (instructions|rules|prompts?)"
+      - "(reveal|print|show|repeat) (me )?(your|the) (system prompt|instructions|hidden rules)"
+      - "you are no longer (an? )?(it )?(helpdesk|assistant)"
+      - "</?(system|assistant)>"

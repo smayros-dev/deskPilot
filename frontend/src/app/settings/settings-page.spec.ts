@@ -1,0 +1,114 @@
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+
+import { errorInterceptor } from '../core/interceptors';
+import { AgentSettings, ModelInfo, ToolInfo } from '../core/models';
+import { SettingsPage } from './settings-page';
+
+const SETTINGS: AgentSettings = {
+  chatModel: 'qwen3:8b',
+  temperature: 0.2,
+  topP: 0.9,
+  contextWindow: 8192,
+  maxOutputTokens: 2048,
+  thinking: false,
+  maxIterations: 8,
+  ragTopK: 3,
+  ragSimilarityThreshold: 0.55,
+  disabledTools: [],
+  approvalTools: ['create_ticket'],
+  systemPrompt: null,
+  updatedAt: '2026-10-19T10:00:00Z',
+};
+
+const MODELS: ModelInfo[] = [
+  { name: 'qwen3:8b', sizeBytes: 5.2e9, parameterSize: '8.2B', family: 'qwen3', capabilities: ['completion', 'tools', 'thinking'], supportsTools: true, supportsThinking: true, chatModel: true },
+  { name: 'qwen3:4b', sizeBytes: 2.5e9, parameterSize: '4B', family: 'qwen3', capabilities: ['completion', 'tools'], supportsTools: true, supportsThinking: false, chatModel: true },
+  { name: 'gemma:2b', sizeBytes: 1.7e9, parameterSize: '2B', family: 'gemma', capabilities: ['completion'], supportsTools: false, supportsThinking: false, chatModel: true },
+  { name: 'nomic-embed-text:latest', sizeBytes: 2.7e8, parameterSize: '137M', family: 'nomic-bert', capabilities: ['embedding'], supportsTools: false, supportsThinking: false, chatModel: false },
+];
+
+const TOOLS: ToolInfo[] = [
+  { name: 'search_knowledge_base', description: 'Search the KB', approvalByDefault: false },
+  { name: 'create_ticket', description: 'Create a ticket', approvalByDefault: true },
+];
+
+describe('SettingsPage', () => {
+  let http: HttpTestingController;
+
+  async function render() {
+    TestBed.configureTestingModule({
+      imports: [SettingsPage],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptors([errorInterceptor])), provideHttpClientTesting()],
+    });
+    http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(SettingsPage);
+    fixture.detectChanges();
+    http.expectOne('/api/settings').flush(SETTINGS);
+    http.expectOne('/api/models').flush(MODELS);
+    http.expectOne('/api/tools').flush(TOOLS);
+    await fixture.whenStable();
+    return { fixture, element: fixture.nativeElement as HTMLElement };
+  }
+
+  afterEach(() => http.verify());
+
+  it('lists chat models only and disables those without tool calling', async () => {
+    const { element } = await render();
+
+    const options = Array.from(element.querySelectorAll<HTMLOptionElement>('#chatModel option'));
+    expect(options.map((o) => o.value)).toEqual(['qwen3:8b', 'qwen3:4b', 'gemma:2b']);
+    expect(options.find((o) => o.value === 'gemma:2b')!.disabled).toBe(true);
+  });
+
+  it('fills the form from the saved settings and starts pristine', async () => {
+    const { fixture, element } = await render();
+
+    expect(element.querySelector<HTMLSelectElement>('#chatModel')!.value).toBe('qwen3:8b');
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
+    expect(element.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(true);
+  });
+
+  it('saves the edited values, turning tool checkboxes into enabled/approval lists', async () => {
+    const { fixture, element } = await render();
+    const select = element.querySelector<HTMLSelectElement>('#chatModel')!;
+    select.value = 'qwen3:4b';
+    select.dispatchEvent(new Event('change'));
+    const approval = element.querySelector<HTMLInputElement>('input[aria-label="Require approval for create_ticket"]')!;
+    approval.click();
+    const enabled = element.querySelector<HTMLInputElement>('input[aria-label="Enable search_knowledge_base"]')!;
+    enabled.click();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(true);
+
+    element.querySelector<HTMLButtonElement>('button[type=submit]')!.click();
+    const req = http.expectOne({ method: 'PUT', url: '/api/settings' });
+
+    expect(req.request.body).toEqual({
+      ...SETTINGS,
+      updatedAt: undefined,
+      chatModel: 'qwen3:4b',
+      disabledTools: ['search_knowledge_base'],
+      approvalTools: [],
+    });
+    req.flush({ ...req.request.body, updatedAt: '2026-10-19T11:00:00Z' });
+    await fixture.whenStable();
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
+  });
+
+  it('presets change several values at once and only enable thinking when the model supports it', async () => {
+    const { fixture, element } = await render();
+    const select = element.querySelector<HTMLSelectElement>('#chatModel')!;
+    select.value = 'qwen3:4b';
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    Array.from(element.querySelectorAll<HTMLButtonElement>('.presets button')).find((b) => b.textContent?.trim() === 'Thorough')!.click();
+    await fixture.whenStable();
+
+    expect(element.querySelector<HTMLInputElement>('input[formControlName=contextWindow]')!.value).toBe('16384');
+    expect(element.querySelector<HTMLInputElement>('input[formControlName=thinking]')!.checked).toBe(false);
+  });
+});

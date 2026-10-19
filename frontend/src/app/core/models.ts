@@ -1,0 +1,178 @@
+// Mirrors the backend DTOs (pl.piomin.services.agentai.dto).
+
+export type RunStatus = 'RUNNING' | 'AWAITING_APPROVAL' | 'COMPLETED' | 'ESCALATED' | 'FAILED';
+
+export type StepType =
+  | 'USER_INPUT'
+  | 'THOUGHT'
+  | 'TOOL_CALL'
+  | 'TOOL_RESULT'
+  | 'APPROVAL_REQUESTED'
+  | 'APPROVAL_DECISION'
+  | 'ANSWER'
+  | 'GUARDRAIL'
+  | 'ERROR';
+
+export interface Session {
+  id: string;
+  userId: string;
+  createdAt: string;
+}
+
+export interface RunStep {
+  id: number;
+  type: StepType;
+  name: string | null;
+  content: string | null;
+  error: boolean;
+  durationMillis: number;
+  createdAt: string;
+}
+
+export interface PendingApproval {
+  toolCallId: string;
+  toolName: string;
+  arguments: string;
+}
+
+export interface RunStats {
+  iterations: number;
+  toolCalls: number;
+  toolErrors: number;
+  promptTokens: number;
+  completionTokens: number;
+  activeMillis: number;
+}
+
+export interface Run {
+  id: string;
+  sessionId: string;
+  model: string | null;
+  status: RunStatus;
+  userInput: string;
+  answer: string | null;
+  steps: RunStep[];
+  pendingApprovals: PendingApproval[];
+  stats: RunStats;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface ApprovalDecision {
+  approved: boolean;
+  comment: string | null;
+}
+
+export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface Ticket {
+  id: number;
+  title: string;
+  description: string;
+  priority: TicketPriority;
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+  requestedBy: string;
+  createdAt: string;
+}
+
+export interface Memory {
+  id: number;
+  content: string;
+  createdAt: string;
+}
+
+export interface Article {
+  id: number;
+  title: string;
+  tags: string;
+  content: string;
+}
+
+export interface ToolStats {
+  tool: string;
+  calls: number;
+  errors: number;
+  accuracy: number;
+  avgMillis: number;
+}
+
+export interface ModelStats {
+  model: string;
+  runs: number;
+  successRate: number;
+  avgLatencyMillis: number;
+  avgIterations: number;
+  avgTokens: number;
+}
+
+export interface AgentMetrics {
+  totalRuns: number;
+  finishedRuns: number;
+  awaitingApproval: number;
+  completed: number;
+  escalated: number;
+  failed: number;
+  taskSuccessRate: number;
+  escalationRate: number;
+  avgLatencyMillis: number;
+  p95LatencyMillis: number;
+  avgIterations: number;
+  toolCalls: number;
+  toolErrorRate: number;
+  approvalsRequested: number;
+  approvalsRejected: number;
+  promptTokens: number;
+  completionTokens: number;
+  inputsBlockedSinceStart: number;
+  tools: ToolStats[];
+  models: ModelStats[];
+}
+
+/** Runtime agent configuration (GET/PUT /api/settings). */
+export interface AgentSettings {
+  chatModel: string;
+  temperature: number;
+  topP: number;
+  contextWindow: number;
+  maxOutputTokens: number;
+  thinking: boolean;
+  maxIterations: number;
+  ragTopK: number;
+  ragSimilarityThreshold: number;
+  disabledTools: string[];
+  approvalTools: string[];
+  systemPrompt: string | null;
+  updatedAt?: string;
+}
+
+/** A model installed in Ollama (GET /api/models). */
+export interface ModelInfo {
+  name: string;
+  sizeBytes: number;
+  parameterSize: string | null;
+  family: string | null;
+  capabilities: string[];
+  supportsTools: boolean;
+  supportsThinking: boolean;
+  chatModel: boolean;
+}
+
+export interface ToolInfo {
+  name: string;
+  description: string;
+  approvalByDefault: boolean;
+}
+
+export interface Health {
+  status: 'UP' | 'DOWN' | 'UNKNOWN' | 'OUT_OF_SERVICE';
+  components?: Record<string, { status: string; details?: Record<string, unknown> }>;
+}
+
+/** RFC 9457 Problem Details, as returned by the backend for every error. */
+export interface ProblemDetail {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  rule?: string;
+}

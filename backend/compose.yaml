@@ -1,0 +1,18 @@
+# Local dependencies, started automatically by Spring Boot (spring-boot-docker-compose) on `./mvnw spring-boot:run`.
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: agentai
+      POSTGRES_USER: agentai
+      POSTGRES_PASSWORD: agentai
+    ports:
+      # Random host port: avoids clashing with other local Postgres instances; Spring Boot discovers it.
+      - "5432"
+    volumes:
+      - agentai-pgdata:/var/lib/postgresql/data
+    labels:
+      org.springframework.boot.service-connection: postgres
+
+volumes:
+  agentai-pgdata:

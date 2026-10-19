@@ -1,0 +1,107 @@
+<div class="chat-layout">
+  <section class="chat card" aria-label="Conversation">
+    <header class="chat-header">
+      <h1>IT Helpdesk</h1>
+      <div class="chat-tools">
+        <app-model-switcher [disabled]="store.sending()" />
+        <app-user-field [userId]="store.userId()" (userIdChange)="switchUser($event)" />
+        <button type="button" class="button" [disabled]="store.sending()" (click)="newConversation()">New conversation</button>
+      </div>
+    </header>
+
+    <div class="messages" [appAutoScroll]="scrollTrigger()" aria-live="polite">
+      @for (run of store.runs(); track run.id) {
+        <div class="bubble user">{{ run.userInput }}</div>
+
+        @switch (run.status) {
+          @case ('AWAITING_APPROVAL') {
+            <app-approval-card
+              [approvals]="run.pendingApprovals"
+              [busy]="store.sending()"
+              (decide)="decide(run, $event)"
+            />
+          }
+          @default {
+            <div class="bubble agent" [class.failed]="run.status === 'FAILED'">
+              <p>{{ run.answer ?? 'The request failed before the agent could answer.' }}</p>
+              <div class="meta">
+                <app-status-badge [status]="run.status" />
+                <span>{{ run.stats.activeMillis | duration }}</span>
+                <button type="button" class="link-button" (click)="toggleTrace(run.id)" [attr.aria-expanded]="expanded().has(run.id)">
+                  {{ expanded().has(run.id) ? 'Hide' : 'Show' }} reasoning
+                </button>
+                <a [routerLink]="['/runs', run.id]">Details</a>
+              </div>
+            </div>
+          }
+        }
+
+        @if (expanded().has(run.id)) {
+          <!-- The trace component is lazy-loaded the first time a trace is opened. -->
+          @defer (on immediate) {
+            <div class="trace card-inset">
+              <app-run-trace [run]="run" />
+            </div>
+          } @loading (minimum 200ms) {
+            <p class="muted">Loading trace…</p>
+          }
+        }
+      } @empty {
+        @if (!store.sending()) {
+          <div class="welcome">
+            <p>Hi! I can answer questions from the IT knowledge base, open tickets (after a human approves them) and remember your setup.</p>
+            <p class="muted">Try one of these:</p>
+            <ul class="examples">
+              @for (example of examples; track example) {
+                <li>
+                  <button type="button" class="chip" [disabled]="!store.canSend()" (click)="send(example)">{{ example }}</button>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      }
+
+      @if (store.sending()) {
+        <div class="bubble agent typing" role="status">
+          <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          Agent is working… {{ elapsedSeconds() }} s
+          @if (elapsedSeconds() > 15) {
+            <span class="muted">(the local model runs on CPU, this can take a minute)</span>
+          }
+        </div>
+      }
+    </div>
+
+    <footer class="composer-area">
+      @if (store.awaitingApproval()) {
+        <p class="muted">Approve or reject the pending action to continue the conversation.</p>
+      }
+      <app-chat-input [disabled]="!store.canSend()" (send)="send($event)" />
+    </footer>
+  </section>
+
+  <aside class="side" aria-label="Last run">
+    @let last = store.lastRun();
+    @if (last) {
+      <section class="card">
+        <h2>Last run</h2>
+        @defer (on viewport) {
+          <app-run-trace [run]="last" />
+        } @placeholder {
+          <p class="muted">Trace</p>
+        }
+      </section>
+    } @else {
+      <section class="card">
+        <h2>How it works</h2>
+        <ol class="how">
+          <li><strong>Reason</strong>: the model decides what to do next.</li>
+          <li><strong>Act</strong>: it calls tools (knowledge-base search, tickets, memory).</li>
+          <li><strong>Observe</strong>: tool results go back to the model.</li>
+          <li><strong>Ask a human</strong> before risky actions like creating a ticket.</li>
+        </ol>
+      </section>
+    }
+  </aside>
+</div>

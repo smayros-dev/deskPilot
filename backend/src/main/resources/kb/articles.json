@@ -1,0 +1,42 @@
+[
+  {
+    "title": "Connecting to the corporate VPN",
+    "tags": "vpn,network,remote,globalprotect",
+    "content": "To work remotely, install GlobalProtect from the Company Portal. Portal address: vpn.example.com. Sign in with your corporate e-mail and approve the MFA prompt. If the connection drops every few minutes, switch the protocol to IPSec in Settings > Connection. Error 'Gateway not found' means your client is outdated: uninstall it and reinstall from the Company Portal. The VPN is required for internal sites (intranet, HR portal, Jira)."
+  },
+  {
+    "title": "Resetting a forgotten password",
+    "tags": "password,login,account,reset,locked",
+    "content": "Go to https://passwordreset.example.com, enter your corporate e-mail and complete the MFA challenge. New passwords need at least 14 characters and cannot reuse your last 5 passwords. After 5 failed sign-in attempts the account is locked for 30 minutes; it unlocks automatically. If you no longer have access to your MFA device, the helpdesk must verify your identity: create a ticket with priority HIGH."
+  },
+  {
+    "title": "Setting up multi-factor authentication (MFA)",
+    "tags": "mfa,authenticator,2fa,security,phone",
+    "content": "Install Microsoft Authenticator on your phone, then open https://aka.example.com/mfa-setup and scan the QR code. Keep at least two methods registered (app + SMS). When you change phones, add the new device before wiping the old one. Lost or stolen phone: report it immediately through a ticket with priority CRITICAL so the device can be revoked."
+  },
+  {
+    "title": "Adding a network printer",
+    "tags": "printer,print,printing,office",
+    "content": "On Windows open Settings > Bluetooth & devices > Printers & scanners > Add device. Office printers are named PRN-<floor>-<number>, for example PRN-3-02. If the printer is not listed, connect to \\\\print.example.com and double-click it. Jobs stuck in the queue: restart the Print Spooler service or remove and re-add the printer. Paper jams and toner are handled by Facilities, not IT."
+  },
+  {
+    "title": "Outlook is not syncing e-mail",
+    "tags": "email,outlook,mail,sync,mailbox",
+    "content": "First check https://status.example.com for an ongoing incident. Then restart Outlook, and if the issue persists start it in safe mode (outlook.exe /safe). A full mailbox (limit 50 GB) stops new mail: archive old items via File > Tools > Mailbox Cleanup. To rebuild the local cache, close Outlook, rename the .ost file under %LOCALAPPDATA%\\Microsoft\\Outlook and restart. Shared mailbox access is requested through a ticket."
+  },
+  {
+    "title": "Requesting a new laptop or hardware",
+    "tags": "laptop,hardware,equipment,replacement,monitor",
+    "content": "Standard laptops are replaced every 4 years. Hardware requests (laptop, monitor, docking station, headset) are made through a ticket that includes the business justification and the manager's name. Broken devices under warranty are swapped within 3 business days. Accessories under 100 EUR (mouse, keyboard) can be picked up at the IT desk on floor 2 without a ticket."
+  },
+  {
+    "title": "Installing software",
+    "tags": "software,install,application,license,admin",
+    "content": "Approved software is self-service in the Company Portal (Windows) or Self Service app (macOS). Employees do not have local admin rights. Software not in the portal needs a ticket with the product name, version and license information; the security team reviews requests within 5 business days. Browser extensions are managed by policy and cannot be installed manually."
+  },
+  {
+    "title": "Wi-Fi access in the office",
+    "tags": "wifi,wireless,network,guest,internet",
+    "content": "Employees connect to the CORP network with their corporate credentials; the device must be enrolled in device management. Visitors use CORP-GUEST: the receptionist issues a 24-hour voucher. If CORP keeps asking for the password, forget the network and reconnect after changing your password. Slow connections in meeting rooms are often caused by too many devices; use the wired dock when available."
+  }
+]

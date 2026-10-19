@@ -1,0 +1,3 @@
+agent:
+  rag:
+    index-on-startup: false

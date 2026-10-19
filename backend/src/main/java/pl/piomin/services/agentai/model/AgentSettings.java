@@ -1,0 +1,105 @@
+package pl.piomin.services.agentai.model;
+
+import java.time.Instant;
+import java.util.Set;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+
+/**
+ * Runtime configuration of the agent, edited from the UI. A single row ({@link #SINGLETON_ID});
+ * defaults come from application.yml the first time it is read.
+ */
+@Entity
+@Table(name = "agent_settings")
+public class AgentSettings {
+
+    public static final int SINGLETON_ID = 1;
+
+    @Id
+    private Integer id;
+
+    @Column(nullable = false, length = 100)
+    private String chatModel;
+
+    private double temperature;
+
+    // Explicit names: the naming strategy maps a trailing capital to "topp" / "rag_topk".
+    @Column(name = "top_p")
+    private double topP;
+
+    private int contextWindow;
+    private int maxOutputTokens;
+    private boolean thinking;
+    private int maxIterations;
+
+    @Column(name = "rag_top_k")
+    private int ragTopK;
+
+    private double ragSimilarityThreshold;
+
+    @Convert(converter = StringSetConverter.class)
+    @Column(nullable = false, length = 1000)
+    private Set<String> disabledTools;
+
+    @Convert(converter = StringSetConverter.class)
+    @Column(nullable = false, length = 1000)
+    private Set<String> approvalTools;
+
+    /** Replaces the built-in system prompt when set. */
+    @Column(columnDefinition = "text")
+    private String systemPrompt;
+
+    @Column(nullable = false)
+    private Instant updatedAt;
+
+    @Version
+    private long version;
+
+    protected AgentSettings() {
+    }
+
+    public AgentSettings(Values values) {
+        this.id = SINGLETON_ID;
+        apply(values);
+    }
+
+    /** All editable values at once, so the entity is never half-updated. */
+    public record Values(String chatModel, double temperature, double topP, int contextWindow, int maxOutputTokens,
+                         boolean thinking, int maxIterations, int ragTopK, double ragSimilarityThreshold,
+                         Set<String> disabledTools, Set<String> approvalTools, String systemPrompt) {
+    }
+
+    public void apply(Values values) {
+        this.chatModel = values.chatModel();
+        this.temperature = values.temperature();
+        this.topP = values.topP();
+        this.contextWindow = values.contextWindow();
+        this.maxOutputTokens = values.maxOutputTokens();
+        this.thinking = values.thinking();
+        this.maxIterations = values.maxIterations();
+        this.ragTopK = values.ragTopK();
+        this.ragSimilarityThreshold = values.ragSimilarityThreshold();
+        this.disabledTools = Set.copyOf(values.disabledTools());
+        this.approvalTools = Set.copyOf(values.approvalTools());
+        this.systemPrompt = values.systemPrompt() == null || values.systemPrompt().isBlank() ? null : values.systemPrompt();
+        this.updatedAt = Instant.now();
+    }
+
+    public Values values() {
+        return new Values(chatModel, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations,
+                ragTopK, ragSimilarityThreshold, disabledTools, approvalTools, systemPrompt);
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public long getVersion() {
+        return version;
+    }
+}
