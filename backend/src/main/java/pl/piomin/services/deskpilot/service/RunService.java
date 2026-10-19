@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import pl.piomin.services.deskpilot.exception.NotFoundException;
 import pl.piomin.services.deskpilot.model.AgentRun;
 import pl.piomin.services.deskpilot.model.AgentStep;
+import pl.piomin.services.deskpilot.model.RunSource;
 import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.model.StepType;
 import pl.piomin.services.deskpilot.repository.AgentRunRepository;
@@ -30,7 +31,12 @@ public class RunService {
 
     @Transactional
     public AgentRun start(String sessionId, String userId, String userInput, String model) {
-        AgentRun run = runRepository.save(new AgentRun(sessionId, userId, userInput, model));
+        return start(sessionId, userId, userInput, model, RunSource.CHAT);
+    }
+
+    @Transactional
+    public AgentRun start(String sessionId, String userId, String userInput, String model, RunSource source) {
+        AgentRun run = runRepository.save(new AgentRun(sessionId, userId, userInput, model, source));
         stepRepository.save(new AgentStep(run.getId(), StepType.USER_INPUT, null, userInput, false, 0));
         return run;
     }
@@ -85,7 +91,7 @@ public class RunService {
 
     /** The reviewers' queue, oldest first. */
     public List<AgentRun> findAwaitingApproval() {
-        return runRepository.findByStatusOrderByCreatedAtAsc(RunStatus.AWAITING_APPROVAL);
+        return runRepository.findByStatusAndSourceOrderByCreatedAtAsc(RunStatus.AWAITING_APPROVAL, RunSource.CHAT);
     }
 
     public List<AgentRun> findBySession(String sessionId) {

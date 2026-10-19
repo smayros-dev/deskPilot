@@ -5,7 +5,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -31,6 +34,7 @@ import pl.piomin.services.deskpilot.guardrail.GuardrailViolationException;
 import pl.piomin.services.deskpilot.model.AgentRun;
 import pl.piomin.services.deskpilot.model.AgentSession;
 import pl.piomin.services.deskpilot.model.AgentStep;
+import pl.piomin.services.deskpilot.model.RunSource;
 import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.model.StepType;
 import pl.piomin.services.deskpilot.service.RunService;
@@ -61,12 +65,14 @@ public class AgentOrchestrator {
     private final ChatOptionsFactory chatOptionsFactory;
     private final GuardrailService guardrails;
     private final AgentMetrics metrics;
+    private final ObservationRegistry observations;
     private final String systemPrompt;
 
     public AgentOrchestrator(ChatModel chatModel, ChatMemory chatMemory, ToolRegistry toolRegistry,
                              RunService runService, SessionService sessionService, TurnStore turnStore,
                              AgentSettingsService settingsService,
                              ChatOptionsFactory chatOptionsFactory, GuardrailService guardrails, AgentMetrics metrics,
+                             ObservationRegistry observations,
                              @Value("classpath:prompts/system-prompt.txt") Resource systemPrompt) throws IOException {
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
@@ -78,6 +84,7 @@ public class AgentOrchestrator {
         this.chatOptionsFactory = chatOptionsFactory;
         this.guardrails = guardrails;
         this.metrics = metrics;
+        this.observations = observations;
         this.systemPrompt = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
     }
 
@@ -96,6 +103,33 @@ public class AgentOrchestrator {
 
     /** Like {@link #chat(String, String)}, reporting progress to the listener as the agent works. */
     public AgentRun chat(String sessionId, String userMessage, RunListener listener) {
+        return observe("chat", () -> doChat(sessionId, userMessage, listener));
+    }
+
+    /**
+     * Runs one evaluation scenario: like {@link #chat}, but with the given settings (e.g. another model) instead of the
+     * live ones, and recorded as an evaluation run.
+     */
+    public AgentRun evaluate(String sessionId, String userMessage, AgentConfig config) {
+        return observe("evaluate", () -> doChat(sessionId, userMessage, RunListener.NONE, config, RunSource.EVALUATION));
+    }
+
+    /** Closes a run paused for approval without running its tool calls (used by the evaluation runner). */
+    public AgentRun abandon(String runId, String reason) {
+        AgentRun run = runService.get(runId);
+        return sessionService.exclusively(run.getSessionId(), () -> {
+            turnStore.delete(runId);
+            runService.addStep(runId, StepType.APPROVAL_DECISION, "ABANDONED", reason, false, 0);
+            return runService.finish(runId, RunStatus.ESCALATED, reason, 0);
+        });
+    }
+
+    private AgentRun doChat(String sessionId, String userMessage, RunListener listener) {
+        return doChat(sessionId, userMessage, listener, null, RunSource.CHAT);
+    }
+
+    private AgentRun doChat(String sessionId, String userMessage, RunListener listener, AgentConfig override,
+                            RunSource source) {
         AgentSession session = sessionService.get(sessionId);
         try {
             guardrails.checkUserInput(userMessage);
@@ -107,8 +141,9 @@ public class AgentOrchestrator {
             if (turnStore.isPaused(sessionId)) {
                 throw new ConflictException("A run in session " + sessionId + " is waiting for approval; approve or reject it first");
             }
-            AgentConfig config = settingsService.current();
-            AgentRun run = runService.start(sessionId, session.getUserId(), userMessage, config.chatModel());
+            AgentConfig config = override != null ? override : settingsService.current();
+            AgentRun run = runService.start(sessionId, session.getUserId(), userMessage, config.chatModel(), source);
+            tagCurrentObservation(run);
             ActiveTurn turn = new ActiveTurn(new RunContext(session.getUserId(), sessionId, run.getId(), config), userMessage);
             turn.listen(listener);
             listener.runStarted(run);
@@ -123,7 +158,12 @@ public class AgentOrchestrator {
 
     /** Like {@link #decide(String, ApprovalDecision)}, reporting progress to the listener as the run continues. */
     public AgentRun decide(String runId, ApprovalDecision decision, RunListener listener) {
+        return observe("decide", () -> doDecide(runId, decision, listener));
+    }
+
+    private AgentRun doDecide(String runId, ApprovalDecision decision, RunListener listener) {
         AgentRun run = runService.get(runId);
+        tagCurrentObservation(run);
         return sessionService.exclusively(run.getSessionId(), () -> {
             ActiveTurn turn = turnStore.find(runId)
                     .filter(ActiveTurn::isAwaitingApproval)
@@ -266,7 +306,11 @@ public class AgentOrchestrator {
             return new ToolOutcome("Rejected by the human reviewer (" + reason + "). Do not retry; tell the user.", true);
         }
         try {
-            return new ToolOutcome(guardrails.limitToolOutput(tool.get().call(call.arguments(), context.toToolContext())), false);
+            String output = Observation.createNotStarted("deskpilot.tool", observations)
+                    .contextualName("tool " + call.name())
+                    .lowCardinalityKeyValue("tool", call.name())
+                    .observe(() -> tool.get().call(call.arguments(), context.toToolContext()));
+            return new ToolOutcome(guardrails.limitToolOutput(output), false);
         } catch (RuntimeException e) {
             Throwable cause = NestedExceptionUtils.getMostSpecificCause(e);
             return new ToolOutcome(cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage(), true);
@@ -286,6 +330,26 @@ public class AgentOrchestrator {
         // Short-term memory keeps only the question and the answer; tool chatter stays in the run trace.
         chatMemory.add(turn.context().sessionId(), List.of(new UserMessage(turn.userInput()), new AssistantMessage(answer)));
         return run;
+    }
+
+    /**
+     * One trace span per request on a run (OpenTelemetry through Micrometer Observation); the model calls made by
+     * Spring AI and the tool calls appear as its children.
+     */
+    private AgentRun observe(String operation, Supplier<AgentRun> work) {
+        return Observation.createNotStarted("deskpilot.run", observations)
+                .contextualName("agent " + operation)
+                .lowCardinalityKeyValue("operation", operation)
+                .observe(work);
+    }
+
+    private void tagCurrentObservation(AgentRun run) {
+        Observation current = observations.getCurrentObservation();
+        if (current != null) {
+            current.highCardinalityKeyValue("run.id", run.getId());
+            current.highCardinalityKeyValue("session.id", run.getSessionId());
+            current.lowCardinalityKeyValue("model", run.getModel() == null ? "unknown" : run.getModel());
+        }
     }
 
     private static long tokens(Integer value) {

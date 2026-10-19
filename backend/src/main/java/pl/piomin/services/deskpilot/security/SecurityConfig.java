@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/runs").hasAnyRole(REVIEWER, ADMIN)
                         .requestMatchers(HttpMethod.PUT, "/api/settings").hasRole(ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/settings").hasRole(ADMIN)
+                        .requestMatchers("/api/evaluations", "/api/evaluations/**").hasRole(ADMIN)
                         .requestMatchers("/actuator/**").hasRole(ADMIN)
                         .requestMatchers("/api/**").hasRole(USER)
                         .anyRequest().denyAll())

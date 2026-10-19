@@ -31,6 +31,14 @@ spring:
           # Keycloak realm from compose.yaml; the browser and the backend must see the same URL.
           issuer-uri: ${DESKPILOT_ISSUER_URI:http://localhost:8180/realms/deskpilot}
   ai:
+    retry:
+      # Spring AI's default (10 attempts, backoff x5 with no maximum) can hang a request for an hour when Ollama
+      # is down. One retry after a short pause, then the user gets "Model unavailable" (502).
+      max-attempts: 2
+      backoff:
+        initial-interval: 1s
+        multiplier: 2
+        max-interval: 5s
     chat:
       memory:
         repository:
@@ -66,6 +74,27 @@ management:
     web:
       exposure:
         include: health,info,metrics
+  tracing:
+    sampling:
+      # Every request is traced: traffic is low and each agent run is worth inspecting.
+      probability: 1.0
+    export:
+      enabled: ${TRACING_EXPORT_ENABLED:true}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          # Jaeger from compose.yaml (UI on http://localhost:16686).
+          endpoint: ${OTEL_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+  otlp:
+    metrics:
+      export:
+        # Metrics stay on /actuator/metrics and /api/metrics; only traces are exported.
+        enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false
   endpoint:
     health:
       # Public: overall and per-component status (the UI shows whether the model is online). Details: admins only.

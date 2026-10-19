@@ -24,6 +24,12 @@ export const routes: Routes = [
     loadComponent: () => import('./approvals/approvals-page').then((m) => m.ApprovalsPage),
   },
   {
+    path: 'evaluation',
+    title: 'Evaluation',
+    canMatch: [hasRole('admin')],
+    loadComponent: () => import('./evaluation/evaluation-page').then((m) => m.EvaluationPage),
+  },
+  {
     path: 'dashboard',
     title: 'Dashboard',
     loadComponent: () => import('./dashboard/dashboard-page').then((m) => m.DashboardPage),

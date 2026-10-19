@@ -20,6 +20,12 @@ public record AgentConfig(
         Set<String> approvalTools,
         String systemPrompt) {
 
+    /** The same settings with another chat model, e.g. to evaluate a model without switching the live agent. */
+    public AgentConfig withChatModel(String model) {
+        return new AgentConfig(model, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations, ragTopK,
+                ragSimilarityThreshold, disabledTools, approvalTools, systemPrompt);
+    }
+
     public boolean isToolEnabled(String tool) {
         return !disabledTools.contains(tool);
     }

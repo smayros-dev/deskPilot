@@ -1,5 +1,7 @@
 package pl.piomin.services.deskpilot.agent;
 
+import java.time.Instant;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -9,6 +11,7 @@ import pl.piomin.services.deskpilot.model.AgentRun;
 import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.model.StepType;
 import pl.piomin.services.deskpilot.repository.AgentSessionRepository;
+import pl.piomin.services.deskpilot.repository.EvaluationRepository;
 import pl.piomin.services.deskpilot.repository.PendingTurnRepository;
 import pl.piomin.services.deskpilot.service.RunService;
 
@@ -27,17 +30,20 @@ class InterruptedRunRecovery implements ApplicationRunner {
     private final RunService runService;
     private final PendingTurnRepository pendingTurnRepository;
     private final AgentSessionRepository sessionRepository;
+    private final EvaluationRepository evaluationRepository;
 
     InterruptedRunRecovery(RunService runService, PendingTurnRepository pendingTurnRepository,
-                           AgentSessionRepository sessionRepository) {
+                           AgentSessionRepository sessionRepository, EvaluationRepository evaluationRepository) {
         this.runService = runService;
         this.pendingTurnRepository = pendingTurnRepository;
         this.sessionRepository = sessionRepository;
+        this.evaluationRepository = evaluationRepository;
     }
 
     @Override
     public void run(ApplicationArguments args) {
         sessionRepository.releaseAll();
+        evaluationRepository.failRunning(Instant.now(), "Interrupted by a backend restart");
         int failed = 0;
         for (AgentRun run : runService.findUnfinished()) {
             boolean resumable = run.getStatus() == RunStatus.AWAITING_APPROVAL && pendingTurnRepository.existsById(run.getId());

@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>pl.piomin.services</groupId>
 	<artifactId>deskpilot</artifactId>
-	<version>1.0.10</version>
+	<version>1.0.12</version>
 	<name>deskpilot</name>
 	<description>Agentic AI backend (Spring AI + Ollama + Spring Boot)</description>
 	<url/>
@@ -46,6 +46,10 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-opentelemetry</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

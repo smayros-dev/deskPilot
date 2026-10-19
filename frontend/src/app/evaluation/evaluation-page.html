@@ -1,0 +1,153 @@
+<header class="page-header">
+  <div>
+    <h1>Evaluation</h1>
+    <p class="muted">
+      Run {{ scenarios.value().length }} scripted helpdesk scenarios through the real agent and score the answers,
+      to compare models and settings on the same requests. Runs are kept out of the dashboard.
+    </p>
+  </div>
+</header>
+
+<section class="card start" aria-labelledby="start-title">
+  <h2 id="start-title">New evaluation</h2>
+  <div class="start-form">
+    <label>
+      <span>Model</span>
+      <select [value]="model()" (change)="model.set($any($event.target).value)" [disabled]="!!running()">
+        @for (option of toolModels(); track option.name) {
+          <option [value]="option.name">{{ option.name }} @if (option.parameterSize) { · {{ option.parameterSize }} }</option>
+        } @empty {
+          <option value="" disabled>{{ models.isLoading() ? 'Loading models…' : 'No tool-capable model installed' }}</option>
+        }
+      </select>
+    </label>
+    <div class="categories" role="group" aria-label="Scenario categories (none selected = all)">
+      @for (category of categories(); track category) {
+        <button type="button" class="chip" [class.selected]="selectedCategories().has(category)"
+                [attr.aria-pressed]="selectedCategories().has(category)" (click)="toggleCategory(category)">
+          {{ category }}
+        </button>
+      }
+    </div>
+    <button type="button" class="button primary" (click)="start()"
+            [disabled]="!model() || starting() || !!running() || scenarioCount() === 0">
+      Run {{ scenarioCount() }} scenarios
+    </button>
+  </div>
+  <p class="hint">
+    Uses the current settings with the chosen model. On a CPU a scenario takes 10–60 s, so a full run takes 10–25 minutes;
+    the agent stays usable but slower meanwhile. Ticket requests are checked at the approval step and never created.
+  </p>
+</section>
+
+@if (running(); as current) {
+  <section class="card progress-card" role="status" aria-live="polite">
+    <div class="progress-head">
+      <strong>{{ current.model }}</strong>
+      <span>{{ current.completed }} / {{ current.scenarioCount }} scenarios · {{ current.passed }} passed</span>
+      <button type="button" class="button danger" (click)="cancel(current)">Cancel</button>
+    </div>
+    <progress [value]="current.completed" [max]="current.scenarioCount"></progress>
+  </section>
+}
+
+<section class="card" aria-labelledby="compare-title">
+  <h2 id="compare-title">Results</h2>
+  @if (evaluations.value().length > 0) {
+    <div class="table-wrap">
+      <table class="compare">
+        <thead>
+          <tr>
+            <th scope="col">Started</th>
+            <th scope="col">Model</th>
+            <th scope="col">Status</th>
+            <th scope="col">Pass rate</th>
+            <th scope="col">Avg latency</th>
+            <th scope="col">p95</th>
+            @for (category of comparedCategories(); track category) {
+              <th scope="col">{{ category }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (evaluation of evaluations.value(); track evaluation.id) {
+            <tr [class.selected]="selectedId() === evaluation.id" (click)="selectedId.set(evaluation.id)">
+              <td>
+                <button type="button" class="link-button" (click)="selectedId.set(evaluation.id)">
+                  {{ evaluation.startedAt | date: 'short' }}
+                </button>
+              </td>
+              <td><code>{{ evaluation.model }}</code></td>
+              <td><span class="status" [attr.data-status]="evaluation.status">{{ evaluation.status.toLowerCase() }}</span></td>
+              <td>
+                <span class="rate">
+                  <span class="bar" [style.width.%]="evaluation.passRate * 100"></span>
+                  <span>{{ evaluation.passRate | percent: '1.0-0' }}</span>
+                </span>
+                <small class="muted">{{ evaluation.passed }}/{{ evaluation.completed }}</small>
+              </td>
+              <td>{{ evaluation.avgLatencyMillis | duration }}</td>
+              <td>{{ evaluation.p95LatencyMillis | duration }}</td>
+              @for (category of comparedCategories(); track category) {
+                <td>{{ categoryScore(evaluation, category) }}</td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else if (!evaluations.isLoading()) {
+    <p class="muted">No evaluation yet. Pick a model and run the scenarios.</p>
+  }
+</section>
+
+@if (detail.hasValue()) {
+  @let evaluation = detail.value();
+  <section class="card" aria-labelledby="detail-title">
+    <div class="detail-head">
+      <h2 id="detail-title">{{ evaluation.model }} · {{ evaluation.startedAt | date: 'medium' }}</h2>
+      <label class="toggle">
+        <input type="checkbox" [checked]="showOnlyFailures()" (change)="showOnlyFailures.set($any($event.target).checked)" />
+        Only failures
+      </label>
+    </div>
+    @if (evaluation.error) {
+      <p class="error-text">{{ evaluation.error }}</p>
+    }
+    <ol class="results">
+      @for (result of visibleResults(); track result.scenarioId) {
+        <li [class.failed]="!result.passed">
+          <div class="result-head">
+            <span class="mark" [attr.aria-label]="result.passed ? 'passed' : 'failed'">{{ result.passed ? '✓' : '✗' }}</span>
+            <strong>{{ result.scenarioId }}</strong>
+            <span class="chip small">{{ result.category }}</span>
+            <span class="muted">{{ result.outcome.toLowerCase() }}
+              @if (result.outcome !== result.expectedOutcome) { (expected {{ result.expectedOutcome.toLowerCase() }}) }
+            </span>
+            <span class="muted right">{{ result.latencyMillis | duration }} · {{ result.iterations }} calls · {{ result.tokens | number }} tokens</span>
+          </div>
+          <p class="question">{{ result.question }}</p>
+          @if (result.failures.length > 0) {
+            <ul class="failures">
+              @for (failure of result.failures; track $index) {
+                <li>{{ failure }}</li>
+              }
+            </ul>
+          }
+          <details>
+            <summary>
+              Answer
+              @if (result.tools.length > 0) { · tools: {{ result.tools.join(', ') }} }
+            </summary>
+            <p class="answer">{{ result.answer ?? '—' }}</p>
+            @if (result.runId) {
+              <a [routerLink]="['/runs', result.runId]">Full trace</a>
+            }
+          </details>
+        </li>
+      } @empty {
+        <li class="muted">{{ evaluation.status === 'RUNNING' ? 'The first scenario is running…' : 'Nothing to show.' }}</li>
+      }
+    </ol>
+  </section>
+}

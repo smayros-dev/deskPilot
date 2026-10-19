@@ -104,9 +104,10 @@ Guiding principle (from the brief): **one focused use case → a working agent �
 - **Result:** full flow through the dev proxy on the real model: ticket request → paused (87 s) → approved → ticket #1 created (22 s); printer question answered from the KB (56 s); injection attempt → 422. Dashboard, tickets, run trace and chat pages checked with headless-Chrome screenshots. Initial bundle 93 kB gzipped, each page a lazy chunk
 
 ## Step 10 — Evaluation (before the pilot)
-- [ ] 20–30 scripted helpdesk scenarios with expected outcomes (answer from KB, ticket created, escalated)
-- [ ] Runner that reports success rate and latency per scenario
-- [ ] Compare models (`qwen3:8b` vs `gemma4:26b`, or a paid model) on the same scenarios, so the choice rests on data
+- [x] 25 scripted helpdesk scenarios (`eval/scenarios.json`): knowledge-base answers, no-answer, tickets, escalation, memory, safety, French. Each states the expected outcome (answered / approval / escalated / blocked), tools that must and must not be called, facts the answer must mention (`"a|b"` alternatives), text it must not contain, and details of the action waiting for approval
+- [x] Runner (`EvaluationService`): runs the scenarios through the real agent with a chosen model and the current settings, one at a time in the background, each in its own session; actions waiting for approval are checked and then abandoned (no ticket is created); deterministic scoring with readable failure reasons (`ScenarioScorer`); evaluation runs are tagged `source = EVALUATION` and kept out of the dashboard and the reviewers' queue (Flyway V4)
+- [x] Admin page `/evaluation` + `GET/POST /api/evaluations`: start (model, categories), progress, cancel, comparison table (pass rate, avg / p95 latency, score per category) and per-scenario details with links to the traces
+- [ ] Baseline run of `qwen3:8b` recorded below; comparison with `gemma4:26b` (slow on CPU — run only on request)
 - **Done when:** baseline numbers are recorded in the README
 
 ## Step 11 — Production hardening (Pilot → Scale)
@@ -123,9 +124,43 @@ Done one sub-step at a time:
 - [x] **11c — Durable sessions ✅:** `agent_session` table (Flyway V3) replaces the in-memory store; one request per session through a database claim (`busy_since`, taken over after 30 min if a request crashed); chat memory in Spring AI's `JdbcChatMemoryRepository`; a run paused for approval is saved as JSON in `pending_turn` (messages, held-back tool calls, settings snapshot, escalation) and can be approved after a restart (verified live: paused, restarted, approved, ticket created); on startup, runs cut off mid-flight are marked FAILED. Assumes a single backend instance
 - [x] **11d — Security ✅:** Keycloak 26 in `compose.yaml` with an imported realm (roles user/reviewer/admin, public SPA client with PKCE, demo users); Spring Security OAuth2 resource server (JWT, `realm_access.roles` → `ROLE_*`, principal = `preferred_username`); the user id comes from the token; approvals need `reviewer`, settings changes and actuator details need `admin`; other users' sessions/runs/tickets answer 404; approval steps record the reviewer. Frontend: `angular-oauth2-oidc` code flow in an app initializer, functional token interceptor, `canMatch` role guard, Approvals queue page, role-aware chat/settings, polling of runs waiting for a reviewer. Tests use real signed JWTs (test RSA key); verified live with Keycloak tokens and the real model
 - [x] **11e — Streaming ✅:** `POST …/messages/stream` and `…/approval/stream` return Server-Sent Events (`run`, `thinking`, `step`, `done` / `error` with a Problem Detail) from a `RunListener` the orchestrator calls for every saved step; the run goes on if the browser disconnects. Frontend reads the stream with `HttpClient` (fetch backend, progress events with `partialText`), so the auth and loading interceptors still apply; the chat shows the user's message at once, then live steps and the current activity. Verified live through the dev proxy: events at +0 s, +12 s, +13 s, +44 s instead of one response at +44 s
-- [ ] **11f — Delivery:** Dockerfiles (backend + frontend/nginx), full-stack Compose (incl. Ollama), CI pipeline (build + tests), OpenTelemetry tracing
+- [x] **11f — Delivery ✅:** `backend/Dockerfile` (Maven build with a dependency cache, layered jar, JRE 21, non-root), `frontend/Dockerfile` + `nginx.conf` (static build, `/api` proxy with buffering off for SSE, SPA fallback); root `compose.yaml` with Postgres, Keycloak (`KC_HOSTNAME` so tokens keep the browser's issuer; the backend fetches keys from `keycloak:8080`), Jaeger, backend, frontend, and an optional `ollama` profile that pulls the models; GitHub Actions CI (backend verify with Testcontainers, frontend tests + build, Docker images); OpenTelemetry via `spring-boot-starter-opentelemetry`: a `deskpilot.run` span per request on a run (with run/session ids and model), Spring AI model-call spans and `deskpilot.tool` spans as children, trace context carried to the SSE worker thread; exported over OTLP to Jaeger. Verified: both images build, the whole stack runs in containers (Keycloak login with the browser issuer, nginx serving the app and streaming SSE, 401/200 on the API), and Jaeger shows one trace per request: `http post …/stream` → `agent chat` → `chat qwen3:8b` → HTTP calls to Ollama. Found and fixed: Spring AI's default retry (10 attempts, backoff ×5, no maximum) kept a request hanging for minutes when Ollama was unreachable; now 2 attempts, fails in ~4 s with "Model unavailable"
 
-## Step 12 — Extensions (only if measurements justify them)
-- [ ] MCP tools (e.g. a real ticketing system), A2A
-- [ ] Reflection/critic pass or a supervisor with specialist sub-agents
-- [ ] A larger or hosted model if the evaluation shows quality gaps
+## Step 12 — Advanced features
+Each sub-step is a self-contained release (own Flyway migration, tests, README and changelog entry), done in the
+order of the recommended path below. Value / effort are rough estimates for this codebase.
+
+### A. Better answers (knowledge & retrieval)
+- [ ] **12a — Answers with citations:** the knowledge-base tool returns article ids; the agent cites them as `[1]`, the chat renders Markdown safely and shows the cited articles as links/cards. *Value: high · Effort: S*
+- [ ] **12b — Document ingestion:** admins upload PDF / Markdown / HTML (Spring AI document readers + token-based chunking with overlap), re-index on change, delete; a Knowledge admin page with ingestion status. *Value: high · Effort: M*
+- [ ] **12c — Hybrid search + re-ranking:** Postgres full-text (BM25-like `ts_rank`) combined with pgvector by reciprocal rank fusion, optional re-ranking of the top hits by the model; measured against Step 10's scenarios. *Value: medium–high · Effort: M*
+- [ ] **12d — Knowledge-gap detection:** questions answered "not found" or escalated are clustered weekly; reviewers get suggested new articles drafted by the model. *Value: medium · Effort: M*
+
+### B. Smarter agent
+- [ ] **12e — Multimodal tickets:** the user attaches a screenshot of an error; a vision model (`gemma4:26b` is installed and supports images) reads it, and the text goes into the search and the ticket. *Value: high · Effort: M*
+- [ ] **12f — Supervisor + specialist agents:** a router sends each request to a specialist (network/VPN, accounts/MFA, hardware, software) with its own prompt, tools and examples; the trace shows the hand-off. *Value: medium · Effort: L*
+- [ ] **12g — Self-check before answering:** a reflection pass compares the draft answer with the retrieved articles and rewrites or escalates unsupported claims (configurable, off on CPU). *Value: medium · Effort: S*
+- [ ] **12h — Conversation summarization:** long sessions are summarized into memory instead of truncated, so the context window holds more history. *Value: medium · Effort: S*
+
+### C. Integrations
+- [ ] **12i — MCP:** expose DeskPilot's tools as an MCP server (Spring AI MCP server starter) and let the agent call external MCP servers (e.g. GitHub Issues or Jira as the real ticket system) behind the same approval gate. *Value: high · Effort: M*
+- [ ] **12j — Notifications:** e-mail (Mailpit in development) and/or Slack/Teams webhook when an approval is waiting or a ticket is created; approvals not decided within an SLA are escalated automatically. *Value: medium · Effort: S*
+- [ ] **12k — Real-time updates:** replace the 5-second polling of paused runs with a per-user SSE channel (approval decided, ticket updated, new item in the reviewers' queue with a counter in the nav). *Value: medium · Effort: S*
+
+### D. Quality, safety & operations
+- [ ] **12l — User feedback loop:** 👍/👎 and a comment on every answer, stored with the run; shown on the dashboard and turned into evaluation scenarios. *Value: high · Effort: S*
+- [ ] **12m — Prompt & model experiments:** versioned system prompts; A/B split of traffic between two prompt/model variants; dashboard compares success rate, latency and feedback per variant. *Value: medium · Effort: M*
+- [ ] **12n — Guardrails v2:** model-based moderation and PII detection on input and output, in addition to the regex rules; per-user rate limits and token budgets (Bucket4j); circuit breaker and retry around Ollama (Resilience4j). *Value: medium · Effort: M*
+- [ ] **12o — Audit & privacy:** audit log of approvals and settings changes with export; users can view and delete their memories and conversations (GDPR "right to erasure"); data retention job. *Value: medium · Effort: S*
+- [ ] **12p — Grafana dashboards:** metrics and traces in Grafana (OTLP collector + Prometheus/Tempo, or `grafana/otel-lgtm`), alerts on success rate and p95 latency. *Value: low–medium · Effort: S*
+
+### E. User experience
+- [ ] **12q — Multilingual:** Angular i18n (English / French / Arabic, including right-to-left layout); the agent answers in the user's language. *Value: medium · Effort: M*
+- [ ] **12r — Conversation history:** a list of past conversations per user, renamed by the model from the first question, searchable, reopenable. *Value: medium · Effort: S*
+
+### Recommended path
+1. **Step 10 first** (evaluation): every change below should move a measured number, not a feeling.
+2. Quick wins that users see at once: **12a** citations + Markdown, **12l** feedback, **12k** real-time updates.
+3. Better knowledge: **12b** ingestion, then **12c** hybrid search (measured with Step 10).
+4. Differentiators: **12e** screenshots, **12i** MCP / real ticket system.
+5. Then by need: 12j, 12r, 12n, 12o, 12m, 12f, 12g, 12h, 12d, 12q, 12p.

@@ -1,0 +1,89 @@
+# The whole DeskPilot stack in containers: `docker compose up --build`, then open http://localhost:4200.
+# Uses the Ollama already running on this machine (fastest, can use its GPU). To run Ollama in a container too:
+#   OLLAMA_BASE_URL=http://ollama:11434 docker compose --profile ollama up --build
+# Uses the same ports as the development setup (backend/compose.yaml + ./mvnw + ng serve); run one or the other.
+name: deskpilot-stack
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: deskpilot
+      POSTGRES_USER: deskpilot
+      POSTGRES_PASSWORD: deskpilot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U deskpilot -d deskpilot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Demo realm with users alice/alice (user), bob/bob (reviewer), admin/admin (admin).
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.3
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Tokens always carry the URL the browser uses, even when the backend reaches Keycloak as http://keycloak:8080.
+      KC_HOSTNAME: http://localhost:8180
+    ports:
+      - "8180:8080"
+    volumes:
+      - ./backend/keycloak/deskpilot-realm.json:/opt/keycloak/data/import/deskpilot-realm.json:ro
+
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0
+    ports:
+      - "16686:16686"
+
+  backend:
+    build: ./backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/deskpilot
+      SPRING_DATASOURCE_USERNAME: deskpilot
+      SPRING_DATASOURCE_PASSWORD: deskpilot
+      SPRING_DOCKER_COMPOSE_ENABLED: "false"
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      # Signing keys are fetched inside the network; the issuer claim is still checked against http://localhost:8180.
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/deskpilot/protocol/openid-connect/certs
+      OTEL_TRACES_ENDPOINT: http://jaeger:4318/v1/traces
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      jaeger:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+
+  # Optional: Ollama in a container (CPU only unless a GPU is passed through), with the models pulled on first start.
+  ollama:
+    image: ollama/ollama:0.40.6
+    profiles: [ollama]
+    volumes:
+      - ollama:/root/.ollama
+
+  ollama-models:
+    image: ollama/ollama:0.40.6
+    profiles: [ollama]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "ollama pull qwen3:8b && ollama pull nomic-embed-text"]
+    depends_on:
+      - ollama
+
+volumes:
+  pgdata:
+  ollama:

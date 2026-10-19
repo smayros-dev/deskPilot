@@ -43,6 +43,10 @@ public class AgentRun {
     @Column(columnDefinition = "text")
     private String finalAnswer;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RunSource source;
+
     private int iterations;
     private int toolCalls;
     private int toolErrors;
@@ -64,7 +68,12 @@ public class AgentRun {
     }
 
     public AgentRun(String sessionId, String userId, String userInput, String model) {
+        this(sessionId, userId, userInput, model, RunSource.CHAT);
+    }
+
+    public AgentRun(String sessionId, String userId, String userInput, String model, RunSource source) {
         this.id = UUID.randomUUID().toString();
+        this.source = source;
         this.sessionId = sessionId;
         this.userId = userId;
         this.userInput = userInput;
@@ -166,5 +175,9 @@ public class AgentRun {
 
     public Instant getCompletedAt() {
         return completedAt;
+    }
+
+    public RunSource getSource() {
+        return source;
     }
 }

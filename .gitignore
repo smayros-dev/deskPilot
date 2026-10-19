@@ -5,3 +5,6 @@ Thumbs.db
 
 # Generated diagrams
 .archify/
+
+# Git worktrees of parallel agents
+.claude/worktrees/

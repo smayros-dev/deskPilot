@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.function.Function;
 
+import io.micrometer.context.ContextSnapshotFactory;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pl.piomin.services.deskpilot.agent.RunListener;
@@ -37,7 +38,8 @@ final class RunStream implements RunListener {
     /** Runs the work on a virtual thread and returns the emitter immediately. */
     static SseEmitter start(RunResponseMapper mapper, GlobalExceptionHandler errors, Function<RunListener, AgentRun> work) {
         RunStream stream = new RunStream(mapper);
-        Thread.ofVirtual().name("run-stream").start(() -> {
+        // Carry the request's trace context to the worker thread, so the run's spans join the HTTP request's trace.
+        Thread.ofVirtual().name("run-stream").start(ContextSnapshotFactory.builder().build().captureAll().wrap(() -> {
             try {
                 AgentRun run = work.apply(stream);
                 stream.send("done", mapper.toResponse(run));
@@ -46,7 +48,7 @@ final class RunStream implements RunListener {
             } finally {
                 stream.complete();
             }
-        });
+        }));
         return stream.emitter;
     }
 

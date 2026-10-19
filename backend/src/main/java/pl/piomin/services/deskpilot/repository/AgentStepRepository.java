@@ -11,8 +11,11 @@ public interface AgentStepRepository extends JpaRepository<AgentStep, Long> {
 
     List<AgentStep> findByRunIdOrderByIdAsc(String runId);
 
+    // Dashboard figures count chat runs only, never evaluation runs.
+    @Query("select count(s) from AgentStep s where s.type = :type and s.runId in (select r.id from AgentRun r where r.source = pl.piomin.services.deskpilot.model.RunSource.CHAT)")
     long countByType(StepType type);
 
+    @Query("select count(s) from AgentStep s where s.type = :type and s.name = :name and s.runId in (select r.id from AgentRun r where r.source = pl.piomin.services.deskpilot.model.RunSource.CHAT)")
     long countByTypeAndName(StepType type, String name);
 
     interface ToolTotals {
@@ -30,6 +33,7 @@ public interface AgentStepRepository extends JpaRepository<AgentStep, Long> {
                    sum(case when s.error = true then 1 else 0 end) as errors,
                    avg(s.durationMillis) as avgMillis
             from AgentStep s where s.type = pl.piomin.services.deskpilot.model.StepType.TOOL_RESULT
+              and s.runId in (select r.id from AgentRun r where r.source = pl.piomin.services.deskpilot.model.RunSource.CHAT)
             group by s.name order by count(s) desc""")
     List<ToolTotals> toolTotals();
 }

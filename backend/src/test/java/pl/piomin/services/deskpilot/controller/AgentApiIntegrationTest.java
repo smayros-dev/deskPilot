@@ -284,6 +284,18 @@ class AgentApiIntegrationTest {
     }
 
     @Test
+    void evaluationsAreForAdminsOnly() {
+        alice.get().uri("/api/evaluations").exchange().expectStatus().isForbidden();
+        bob.post().uri("/api/evaluations").body(Map.of("model", "qwen3:8b")).exchange().expectStatus().isForbidden();
+        admin.get().uri("/api/evaluations/scenarios").exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$[?(@.id == 'vpn-drops')].category").isEqualTo(List.of("knowledge"));
+        when(modelCatalog.find("missing-model")).thenReturn(Optional.empty());
+        admin.post().uri("/api/evaluations").body(Map.of("model", "missing-model")).exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
     void toolsAreListedWithApprovalDefaults() {
         alice.get().uri("/api/tools").exchange()
                 .expectStatus().isOk()

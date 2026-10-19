@@ -28,5 +28,12 @@ services:
     volumes:
       - ./keycloak/deskpilot-realm.json:/opt/keycloak/data/import/deskpilot-realm.json:ro
 
+  # Trace viewer (OpenTelemetry/OTLP): one trace per agent run with its model and tool calls. UI: http://localhost:16686
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+
 volumes:
   deskpilot-pgdata:

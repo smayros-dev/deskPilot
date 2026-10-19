@@ -1,5 +1,7 @@
 # DeskPilot
 
+[![CI](https://github.com/smayros-dev/deskPilot/actions/workflows/ci.yml/badge.svg)](https://github.com/smayros-dev/deskPilot/actions/workflows/ci.yml)
+
 **An AI copilot for the IT helpdesk that runs fully on your machine.** DeskPilot answers questions from a knowledge base, opens tickets, and remembers each user's setup. A human approves every risky action before it runs.
 
 Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local model served by [Ollama](https://ollama.com)**. No paid API and no data leaves your machine.
@@ -18,6 +20,7 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Metrics dashboard**: success rate, average and p95 latency, tool accuracy, escalations and tokens, overall and per model.
 - **Durable conversations**: sessions, chat memory and runs waiting for approval are stored in PostgreSQL, so a backend restart loses nothing; a paused run can still be approved afterwards.
 - **Sign-in and roles**: OpenID Connect login through Keycloak (Authorization Code + PKCE). The user id comes from the token; only **reviewers** can approve actions (from their own Approvals queue) and only **admins** can change settings.
+- **Tracing**: one OpenTelemetry trace per agent run, with every model and tool call as a span, viewable in Jaeger.
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -52,7 +55,8 @@ backend/                       Spring Boot app (pl.piomin.services.deskpilot)
   security/                    JWT resource server, roles (user / reviewer / admin)
   controller/ service/ model/  REST API, services, JPA entities
   src/main/resources/          application.yml, Flyway migrations, system prompt, KB articles
-  compose.yaml                 Postgres + pgvector, Keycloak (started automatically)
+  compose.yaml                 development containers: Postgres + pgvector, Keycloak, Jaeger (started automatically)
+  Dockerfile                   layered Spring Boot image (JRE 21, non-root)
   keycloak/                    realm with roles, SPA client and demo users
 frontend/                      Angular app
   src/app/chat/                chat, approval cards, model switcher
@@ -61,6 +65,9 @@ frontend/                      Angular app
   src/app/dashboard/           success metrics
   src/app/helpdesk/            tickets, knowledge base, memories
   src/app/settings/            runtime agent settings
+  Dockerfile, nginx.conf       production build served by nginx, proxying the API
+compose.yaml                   the whole stack in containers
+.github/workflows/ci.yml       build, tests and Docker images on every push
 steps.md                       implementation plan and progress
 ```
 
@@ -96,7 +103,7 @@ The Keycloak realm (`backend/keycloak/deskpilot-realm.json`) is imported on firs
 | `bob` / `bob` | user, reviewer | Also approve or reject agent actions on the **Approvals** page, see all tickets |
 | `admin` / `admin` | user, reviewer, admin | Also change the agent settings and switch the model |
 
-Keycloak's own console is at http://localhost:8180 (admin / admin).
+Keycloak's own console is at http://localhost:8180 (admin / admin). Traces are in Jaeger at http://localhost:16686 (service `deskpilot`, one trace per agent run, with the model and tool calls as spans).
 
 > Spring Boot only runs `docker compose up` when none of the project's containers are running. If Postgres was
 > already up from an earlier version, start Keycloak once with `docker compose up -d` in `backend/`.
@@ -115,6 +122,8 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `AGENT_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model for RAG |
 | `AGENT_THINK` | `false` | qwen3 reasoning mode. About 15x slower on CPU; enable on a GPU |
 | `DESKPILOT_ISSUER_URI` | `http://localhost:8180/realms/deskpilot` | OIDC issuer whose tokens the API accepts |
+| `OTEL_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP endpoint for traces (Jaeger) |
+| `TRACING_EXPORT_ENABLED` | `true` | Set to `false` to stop exporting traces |
 
 ## Frontend pages
 
@@ -126,6 +135,41 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `/dashboard` | Success metrics: task success, latency (avg/p95), tool accuracy, escalations, approvals, tokens |
 | `/helpdesk/tickets` · `/knowledge` · `/memories` | Tickets (own, or all for reviewers), KB articles, long-term memories of the signed-in user |
 | `/settings` | Agent configuration (read-only unless admin): model, temperature, top-p, context window, max tokens, thinking, max steps, RAG, tools & approvals, system prompt |
+
+## Run everything in Docker
+
+The root `compose.yaml` builds and starts the whole stack: Postgres + pgvector, Keycloak, Jaeger, the backend and the
+frontend (nginx, which also proxies `/api` and streams Server-Sent Events).
+
+```bash
+docker compose up --build        # then open http://localhost:4200
+```
+
+By default the backend uses the Ollama already running on your machine (`host.docker.internal:11434`), which is the
+fastest option and can use your GPU. Ollama must then accept connections from containers: by default it listens on
+`127.0.0.1` only, which containers cannot reach (on Windows with Rancher Desktop or WSL, for example). Either start Ollama
+with `OLLAMA_HOST=0.0.0.0` (it is then reachable from your network too — keep the firewall on), or run Ollama in a
+container as well (pulls `qwen3:8b` and `nomic-embed-text` on first start, CPU only):
+
+```bash
+OLLAMA_BASE_URL=http://ollama:11434 docker compose --profile ollama up --build
+```
+
+The stack uses the same ports as the development setup (4200, 8080, 8180, 16686), so stop one before starting the other
+(`docker compose down` in `backend/` for the development containers).
+
+## Evaluation
+
+The **Evaluation** page (admins) runs 25 scripted helpdesk scenarios ([`eval/scenarios.json`](backend/src/main/resources/eval/scenarios.json))
+through the real agent with a chosen model and scores each answer: expected outcome (answered, approval requested,
+escalated, blocked), tools that must and must not be called, facts the answer must mention and text it must not contain.
+Use it to compare models, prompts and settings on the same requests before changing the live agent. Ticket requests are
+checked at the approval step and never created; evaluation runs do not count in the dashboard.
+
+## CI
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: backend build and tests
+(Testcontainers starts Postgres on the runner), frontend tests and production build, then builds both Docker images.
 
 ## Tests
 
@@ -158,6 +202,8 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.12** — Evaluation: 25 scenarios, background runner with deterministic scoring, admin Evaluation page comparing models; evaluation runs kept out of the live metrics; bounded Spring AI retry so an unreachable model fails in seconds.
+- **1.0.11** — Delivery: Dockerfiles (layered backend image, nginx frontend with SSE proxying), full-stack `compose.yaml` (optional Ollama container), GitHub Actions CI, OpenTelemetry tracing to Jaeger (one trace per run, model and tool spans).
 - **1.0.10** — Streaming: Server-Sent Events endpoints for chat and approvals; the chat shows live steps and what the agent is doing.
 - **1.0.9** — Security: Keycloak (OIDC, PKCE) in Docker Compose, Spring Security resource server, user id from the token, reviewer role for approvals (new Approvals page), admin role for settings, ownership checks on sessions/runs/tickets.
 - **1.0.8** — Durable sessions: sessions, chat memory (Spring AI JDBC repository) and runs paused for approval stored in PostgreSQL (Flyway V3); runs interrupted by a restart are marked failed on startup.
