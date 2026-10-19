@@ -29,6 +29,7 @@ import pl.piomin.services.deskpilot.exception.ConflictException;
 import pl.piomin.services.deskpilot.guardrail.GuardrailService;
 import pl.piomin.services.deskpilot.guardrail.GuardrailViolationException;
 import pl.piomin.services.deskpilot.model.AgentRun;
+import pl.piomin.services.deskpilot.model.AgentSession;
 import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.model.StepType;
 import pl.piomin.services.deskpilot.service.RunService;
@@ -37,7 +38,8 @@ import pl.piomin.services.deskpilot.service.RunService;
  * The ReAct loop: ask the model, run the tools it requests, feed the results back, repeat until it
  * answers. Tool calls marked {@code @RequiresApproval} pause the run until a human decides.
  * Spring AI 2.0's {@link ChatModel} never executes tools itself, so every call goes through
- * {@link #executeToolCalls}, which records it and enforces the approval decision.
+ * {@link #executeToolCalls}, which records it and enforces the approval decision. Sessions, chat memory and
+ * paused runs live in the database, so a run waiting for approval can be resumed after a restart.
  */
 @Service
 public class AgentOrchestrator {
@@ -52,7 +54,8 @@ public class AgentOrchestrator {
     private final ChatMemory chatMemory;
     private final ToolRegistry toolRegistry;
     private final RunService runService;
-    private final SessionStore sessionStore;
+    private final SessionService sessionService;
+    private final TurnStore turnStore;
     private final AgentSettingsService settingsService;
     private final ChatOptionsFactory chatOptionsFactory;
     private final GuardrailService guardrails;
@@ -60,14 +63,16 @@ public class AgentOrchestrator {
     private final String systemPrompt;
 
     public AgentOrchestrator(ChatModel chatModel, ChatMemory chatMemory, ToolRegistry toolRegistry,
-                             RunService runService, SessionStore sessionStore, AgentSettingsService settingsService,
+                             RunService runService, SessionService sessionService, TurnStore turnStore,
+                             AgentSettingsService settingsService,
                              ChatOptionsFactory chatOptionsFactory, GuardrailService guardrails, AgentMetrics metrics,
                              @Value("classpath:prompts/system-prompt.txt") Resource systemPrompt) throws IOException {
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
         this.toolRegistry = toolRegistry;
         this.runService = runService;
-        this.sessionStore = sessionStore;
+        this.sessionService = sessionService;
+        this.turnStore = turnStore;
         this.settingsService = settingsService;
         this.chatOptionsFactory = chatOptionsFactory;
         this.guardrails = guardrails;
@@ -80,75 +85,72 @@ public class AgentOrchestrator {
 
     /** Handles a new user message; returns the run, finished or paused for approval. */
     public AgentRun chat(String sessionId, String userMessage) {
-        AgentSession session = sessionStore.get(sessionId);
+        AgentSession session = sessionService.get(sessionId);
         try {
             guardrails.checkUserInput(userMessage);
         } catch (GuardrailViolationException e) {
             metrics.guardrailBlocked(e.getRule());
             throw e;
         }
-        return session.exclusively(() -> {
-            session.activeTurn().ifPresent(turn -> {
-                throw new ConflictException("Run " + turn.runId() + " is waiting for approval; approve or reject it first");
-            });
+        return sessionService.exclusively(sessionId, () -> {
+            if (turnStore.isPaused(sessionId)) {
+                throw new ConflictException("A run in session " + sessionId + " is waiting for approval; approve or reject it first");
+            }
             AgentConfig config = settingsService.current();
-            AgentRun run = runService.start(session.id(), session.userId(), userMessage, config.chatModel());
-            ActiveTurn turn = new ActiveTurn(new RunContext(session.userId(), session.id(), run.getId(), config), userMessage);
-            session.begin(turn);
-            return loop(session, turn);
+            AgentRun run = runService.start(sessionId, session.getUserId(), userMessage, config.chatModel());
+            ActiveTurn turn = new ActiveTurn(new RunContext(session.getUserId(), sessionId, run.getId(), config), userMessage);
+            return loop(turn);
         });
     }
 
     /** Applies a human decision to the tool calls a paused run is waiting on, then resumes the run. */
     public AgentRun decide(String runId, ApprovalDecision decision) {
         AgentRun run = runService.get(runId);
-        AgentSession session = sessionStore.get(run.getSessionId());
-        return session.exclusively(() -> {
-            ActiveTurn turn = session.activeTurn()
-                    .filter(t -> t.runId().equals(runId) && t.isAwaitingApproval())
+        return sessionService.exclusively(run.getSessionId(), () -> {
+            ActiveTurn turn = turnStore.find(runId)
+                    .filter(ActiveTurn::isAwaitingApproval)
                     .orElseThrow(() -> new ConflictException("Run " + runId + " is not waiting for approval"));
+            turnStore.delete(runId);
             runService.addStep(runId, StepType.APPROVAL_DECISION, decision.approved() ? "APPROVED" : "REJECTED",
                     decision.comment(), false, 0);
             metrics.approval(decision.approved() ? "approved" : "rejected");
             runService.resume(runId);
             long start = System.nanoTime();
             executeToolCalls(turn, turn.takePendingToolCalls(), decision);
-            return loop(session, turn, start);
+            return loop(turn, start);
         });
     }
 
     /** Tool calls the run is currently waiting on, empty if it is not paused. */
     public List<AssistantMessage.ToolCall> pendingApprovals(String runId) {
-        AgentRun run = runService.get(runId);
-        return sessionStore.get(run.getSessionId()).activeTurn()
-                .filter(turn -> turn.runId().equals(runId))
+        return turnStore.find(runId)
                 .map(ActiveTurn::pendingToolCalls)
                 .orElse(List.of());
     }
 
-    private AgentRun loop(AgentSession session, ActiveTurn turn) {
-        return loop(session, turn, System.nanoTime());
+    private AgentRun loop(ActiveTurn turn) {
+        return loop(turn, System.nanoTime());
     }
 
-    private AgentRun loop(AgentSession session, ActiveTurn turn, long startNanos) {
+    private AgentRun loop(ActiveTurn turn, long startNanos) {
         String runId = turn.runId();
         AgentConfig config = turn.context().config();
         try {
             while (true) {
                 if (runService.get(runId).getIterations() >= config.maxIterations()) {
                     LOG.warn("Run {} hit the iteration limit ({})", runId, config.maxIterations());
-                    return finish(session, turn, RunStatus.ESCALATED, MAX_ITERATIONS_ANSWER, startNanos);
+                    return finish(turn, RunStatus.ESCALATED, MAX_ITERATIONS_ANSWER, startNanos);
                 }
-                AssistantMessage reply = callModel(session, turn);
+                AssistantMessage reply = callModel(turn);
                 turn.add(reply);
 
                 if (!reply.hasToolCalls()) {
                     String answer = reply.getText() == null ? "" : reply.getText().strip();
                     if (answer.isEmpty()) {
-                        return finish(session, turn, RunStatus.FAILED, EMPTY_ANSWER, startNanos);
+                        return finish(turn, RunStatus.FAILED, EMPTY_ANSWER, startNanos);
                     }
                     RunStatus status = turn.context().escalationReason().isPresent() ? RunStatus.ESCALATED : RunStatus.COMPLETED;
-                    return finish(session, turn, status, answer, startNanos);
+                    return finish(turn, status, answer, startNanos);
                 }
 
                 recordToolCallSteps(runId, reply);
@@ -158,6 +160,7 @@ public class AgentOrchestrator {
                 if (!gated.isEmpty()) {
                     // Hold back every call of this message: their results must be returned together.
                     turn.awaitApproval(reply.getToolCalls());
+                    turnStore.save(turn);
                     gated.forEach(call -> runService.addStep(runId, StepType.APPROVAL_REQUESTED, call.name(),
                             call.arguments(), false, 0));
                     runService.pauseForApproval(runId, elapsedMillis(startNanos));
@@ -170,16 +173,15 @@ public class AgentOrchestrator {
             runService.addStep(runId, StepType.ERROR, e.getClass().getSimpleName(), e.getMessage(), true, 0);
             AgentRun failed = runService.finish(runId, RunStatus.FAILED, null, elapsedMillis(startNanos));
             metrics.runFinished(RunStatus.FAILED, failed.getActiveMillis());
-            session.end();
             throw e;
         }
     }
 
-    private AssistantMessage callModel(AgentSession session, ActiveTurn turn) {
+    private AssistantMessage callModel(ActiveTurn turn) {
         AgentConfig config = turn.context().config();
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(config.systemPrompt() != null ? config.systemPrompt() : systemPrompt));
-        messages.addAll(chatMemory.get(session.id()));
+        messages.addAll(chatMemory.get(turn.context().sessionId()));
         messages.addAll(turn.messages());
         List<ToolCallback> tools = toolRegistry.all().stream()
                 .filter(tool -> config.isToolEnabled(tool.getToolDefinition().name()))
@@ -246,7 +248,7 @@ public class AgentOrchestrator {
         }
     }
 
-    private AgentRun finish(AgentSession session, ActiveTurn turn, RunStatus status, String rawAnswer, long startNanos) {
+    private AgentRun finish(ActiveTurn turn, RunStatus status, String rawAnswer, long startNanos) {
         GuardrailService.Sanitized sanitized = guardrails.sanitizeOutput(rawAnswer);
         if (sanitized.redactions() > 0) {
             runService.addStep(turn.runId(), StepType.GUARDRAIL, "output_redaction",
@@ -257,8 +259,7 @@ public class AgentOrchestrator {
         AgentRun run = runService.finish(turn.runId(), status, answer, elapsedMillis(startNanos));
         metrics.runFinished(status, run.getActiveMillis());
         // Short-term memory keeps only the question and the answer; tool chatter stays in the run trace.
-        chatMemory.add(session.id(), List.of(new UserMessage(turn.userInput()), new AssistantMessage(answer)));
-        session.end();
+        chatMemory.add(turn.context().sessionId(), List.of(new UserMessage(turn.userInput()), new AssistantMessage(answer)));
         return run;
     }
 

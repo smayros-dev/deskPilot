@@ -7,7 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import pl.piomin.services.deskpilot.agent.AgentOrchestrator;
-import pl.piomin.services.deskpilot.agent.SessionStore;
+import pl.piomin.services.deskpilot.agent.SessionService;
 import pl.piomin.services.deskpilot.model.AgentRun;
 import pl.piomin.services.deskpilot.model.AgentStep;
 import pl.piomin.services.deskpilot.model.RunStatus;
@@ -30,14 +30,14 @@ class AgentSmokeTest {
     private AgentOrchestrator orchestrator;
 
     @Autowired
-    private SessionStore sessionStore;
+    private SessionService sessionService;
 
     @Autowired
     private RunService runService;
 
     @Test
     void answersFromKnowledgeBase() {
-        String sessionId = sessionStore.create("smoke-user").id();
+        String sessionId = sessionService.create("smoke-user").getId();
 
         AgentRun run = orchestrator.chat(sessionId, "My VPN connection drops every few minutes. What should I do?");
 
@@ -49,7 +49,7 @@ class AgentSmokeTest {
 
     @Test
     void ticketRequestPausesForApproval() {
-        String sessionId = sessionStore.create("smoke-user").id();
+        String sessionId = sessionService.create("smoke-user").getId();
 
         AgentRun run = orchestrator.chat(sessionId, "Please open a HIGH priority ticket: my laptop screen is cracked "
                 + "and I need a replacement. I already tried an external monitor, it works.");

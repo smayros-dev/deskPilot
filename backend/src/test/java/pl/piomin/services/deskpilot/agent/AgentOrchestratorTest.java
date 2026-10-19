@@ -1,5 +1,7 @@
 package pl.piomin.services.deskpilot.agent;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -10,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
@@ -21,9 +24,11 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import pl.piomin.services.deskpilot.TestcontainersConfiguration;
+import pl.piomin.services.deskpilot.agent.tool.RunContext;
 import pl.piomin.services.deskpilot.exception.ConflictException;
 import pl.piomin.services.deskpilot.guardrail.GuardrailViolationException;
 import pl.piomin.services.deskpilot.model.AgentRun;
@@ -31,6 +36,8 @@ import pl.piomin.services.deskpilot.model.AgentSettings;
 import pl.piomin.services.deskpilot.model.AgentStep;
 import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.model.StepType;
+import pl.piomin.services.deskpilot.repository.AgentSessionRepository;
+import pl.piomin.services.deskpilot.repository.PendingTurnRepository;
 import pl.piomin.services.deskpilot.repository.TicketRepository;
 import pl.piomin.services.deskpilot.service.KnowledgeBaseService;
 import pl.piomin.services.deskpilot.service.RunService;
@@ -70,7 +77,7 @@ class AgentOrchestratorTest {
     private AgentOrchestrator orchestrator;
 
     @Autowired
-    private SessionStore sessionStore;
+    private SessionService sessionService;
 
     @Autowired
     private RunService runService;
@@ -81,12 +88,27 @@ class AgentOrchestratorTest {
     @Autowired
     private TicketRepository ticketRepository;
 
+    @Autowired
+    private TurnStore turnStore;
+
+    @Autowired
+    private PendingTurnRepository pendingTurnRepository;
+
+    @Autowired
+    private AgentSessionRepository sessionRepository;
+
+    @Autowired
+    private InterruptedRunRecovery recovery;
+
+    @Autowired
+    private JdbcClient jdbcClient;
+
     private String sessionId;
 
     @BeforeEach
     void setUp() {
         settingsService.reset();
-        sessionId = sessionStore.create("alice").id();
+        sessionId = sessionService.create("alice").getId();
     }
 
     @Test
@@ -324,6 +346,98 @@ class AgentOrchestratorTest {
                 v.ragSimilarityThreshold(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not support tool calling");
+    }
+
+    @Test
+    void pausedRunIsKeptInTheDatabaseAndResumesWithItsFullHistory() {
+        givenModelReplies(
+                toolCall("I'll open a ticket.", "create_ticket", "{\"title\":\"Printer\",\"description\":\"Jammed\",\"priority\":\"LOW\"}"),
+                answer("Ticket created."));
+        AgentRun paused = orchestrator.chat(sessionId, "The printer is jammed, open a ticket");
+
+        assertThat(pendingTurnRepository.existsById(paused.getId())).isTrue();
+
+        orchestrator.decide(paused.getId(), new AgentOrchestrator.ApprovalDecision(true, null));
+
+        assertThat(pendingTurnRepository.existsById(paused.getId())).isFalse();
+        List<Message> resumed = lastPromptMessages();
+        assertThat(resumed.get(resumed.size() - 3)).isInstanceOf(UserMessage.class)
+                .extracting(Message::getText).isEqualTo("The printer is jammed, open a ticket");
+        assertThat(resumed.get(resumed.size() - 2)).isInstanceOfSatisfying(AssistantMessage.class, m -> {
+            assertThat(m.getText()).isEqualTo("I'll open a ticket.");
+            assertThat(m.getToolCalls()).singleElement().satisfies(call -> {
+                assertThat(call.id()).isEqualTo("call-1");
+                assertThat(call.name()).isEqualTo("create_ticket");
+            });
+        });
+        assertThat(resumed.getLast()).isInstanceOfSatisfying(ToolResponseMessage.class,
+                m -> assertThat(m.getResponses().getFirst().id()).isEqualTo("call-1"));
+    }
+
+    @Test
+    void savedTurnRoundTripsSettingsAndEscalation() {
+        RunContext context = new RunContext("alice", sessionId, "run-roundtrip", settingsService.current());
+        context.requestEscalation("needs hardware");
+        ActiveTurn turn = new ActiveTurn(context, "Help");
+        turn.add(AssistantMessage.builder().content("")
+                .toolCalls(List.of(new AssistantMessage.ToolCall("c1", "function", "create_ticket", "{}"))).build());
+        turn.awaitApproval(List.of(new AssistantMessage.ToolCall("c1", "function", "create_ticket", "{}")));
+
+        turnStore.save(turn);
+        ActiveTurn restored = turnStore.find("run-roundtrip").orElseThrow();
+        turnStore.delete("run-roundtrip");
+
+        assertThat(restored.context().config()).isEqualTo(context.config());
+        assertThat(restored.context().escalationReason()).contains("needs hardware");
+        assertThat(restored.userInput()).isEqualTo("Help");
+        assertThat(restored.messages()).hasSize(2);
+        assertThat(restored.pendingToolCalls()).extracting(AssistantMessage.ToolCall::name).containsExactly("create_ticket");
+    }
+
+    @Test
+    void chatMemoryIsStoredInTheDatabase() {
+        givenModelReplies(answer("Hello!"));
+
+        orchestrator.chat(sessionId, "Hi");
+
+        assertThat(jdbcClient.sql("select count(*) from spring_ai_chat_memory where conversation_id = ?")
+                .param(sessionId).query(Long.class).single()).isEqualTo(2);
+    }
+
+    @Test
+    void requestInBusySessionIsConflictUntilTheClaimIsStale() {
+        givenModelReplies(answer("Hi"));
+        Instant now = Instant.now();
+        sessionRepository.claim(sessionId, now, now.minusSeconds(1));
+
+        assertThatThrownBy(() -> orchestrator.chat(sessionId, "Hi"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("already running");
+
+        sessionRepository.release(sessionId);
+        Instant longAgo = now.minus(SessionService.STALE_CLAIM).minus(Duration.ofMinutes(1));
+        sessionRepository.claim(sessionId, longAgo, longAgo.minusSeconds(1));
+
+        assertThat(orchestrator.chat(sessionId, "Hi").getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(sessionRepository.findById(sessionId).orElseThrow().getBusySince()).isNull();
+    }
+
+    @Test
+    void startupRecoveryFailsInterruptedRunsButKeepsResumablePausedOnes() {
+        AgentRun interrupted = runService.start(sessionId, "alice", "lost in flight", "qwen3:8b");
+        String otherSession = sessionService.create("bob").getId();
+        AgentRun pausedWithoutTurn = runService.start(otherSession, "bob", "paused before 1.0.8", "qwen3:8b");
+        runService.pauseForApproval(pausedWithoutTurn.getId(), 0);
+        String thirdSession = sessionService.create("carol").getId();
+        givenModelReplies(toolCall("", "create_ticket", "{\"title\":\"t\",\"description\":\"d\",\"priority\":\"LOW\"}"));
+        AgentRun resumable = orchestrator.chat(thirdSession, "Open a ticket");
+
+        recovery.run(null);
+
+        assertThat(runService.get(interrupted.getId()).getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(runService.get(interrupted.getId()).getFinalAnswer()).isEqualTo(InterruptedRunRecovery.INTERRUPTED);
+        assertThat(runService.get(pausedWithoutTurn.getId()).getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(runService.get(resumable.getId()).getStatus()).isEqualTo(RunStatus.AWAITING_APPROVAL);
     }
 
     private static ModelCatalog.ModelInfo toolModel(String name) {

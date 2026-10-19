@@ -11,7 +11,8 @@ import pl.piomin.services.deskpilot.agent.tool.RunContext;
 /**
  * Working state of the run currently in progress for a session: the user message, the assistant/tool
  * messages exchanged so far, and the tool calls held back while waiting for a human decision.
- * Only the final question and answer are moved to chat memory when the turn ends.
+ * Only the final question and answer are moved to chat memory when the turn ends. While paused for approval
+ * the turn is saved by {@link TurnStore}.
  */
 final class ActiveTurn {
 
@@ -24,6 +25,14 @@ final class ActiveTurn {
         this.context = context;
         this.userInput = userInput;
         this.messages.add(new UserMessage(userInput));
+    }
+
+    /** Restores a turn saved while it was paused for approval. */
+    ActiveTurn(RunContext context, String userInput, List<Message> messages, List<AssistantMessage.ToolCall> pendingToolCalls) {
+        this.context = context;
+        this.userInput = userInput;
+        this.messages.addAll(messages);
+        this.pendingToolCalls = List.copyOf(pendingToolCalls);
     }
 
     void add(Message message) {

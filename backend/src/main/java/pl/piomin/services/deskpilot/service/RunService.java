@@ -78,6 +78,11 @@ public class RunService {
                 .orElseThrow(() -> new NotFoundException("Run " + runId + " not found"));
     }
 
+    /** Runs still in progress or paused, e.g. left behind when the application stopped. */
+    public List<AgentRun> findUnfinished() {
+        return runRepository.findByStatusIn(List.of(RunStatus.RUNNING, RunStatus.AWAITING_APPROVAL));
+    }
+
     public List<AgentRun> findBySession(String sessionId) {
         return runRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
     }

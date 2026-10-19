@@ -15,6 +15,7 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Guardrails**: a prompt-injection filter, redaction of passwords, API keys and card numbers, and tool-output limits.
 - **Full traceability**: every thought, tool call, result and approval is stored and shown as a reasoning trace.
 - **Metrics dashboard**: success rate, average and p95 latency, tool accuracy, escalations and tokens, overall and per model.
+- **Durable conversations**: sessions, chat memory and runs waiting for approval are stored in PostgreSQL, so a backend restart loses nothing; a paused run can still be approved afterwards.
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -130,6 +131,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.8** — Durable sessions: sessions, chat memory (Spring AI JDBC repository) and runs paused for approval stored in PostgreSQL (Flyway V3); runs interrupted by a restart are marked failed on startup.
 - **1.0.7** — Project renamed to DeskPilot: Maven artifact `deskpilot`, package `pl.piomin.services.deskpilot`, UI title, Compose database `deskpilot`.
 - **1.0.6** — Runtime agent settings and model switching from the UI (Settings page + chat switcher), per-model metrics.
 - **1.0.5** — PostgreSQL + pgvector (Docker Compose, Flyway, Testcontainers) replaces H2 and the in-memory vector store.

@@ -25,6 +25,12 @@ spring:
       # Flyway owns the schema (db/migration); Hibernate only checks it matches the entities.
       ddl-auto: validate
   ai:
+    chat:
+      memory:
+        repository:
+          jdbc:
+            # Table created by Flyway (V3), not by Spring AI.
+            initialize-schema: never
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       init:
