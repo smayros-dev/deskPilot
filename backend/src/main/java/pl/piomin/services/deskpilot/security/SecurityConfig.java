@@ -38,7 +38,7 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/runs/*/approval", "/api/runs/*/approval/stream").hasRole(REVIEWER)
-                        .requestMatchers(HttpMethod.GET, "/api/runs").hasAnyRole(REVIEWER, ADMIN)
+                        .requestMatchers(HttpMethod.GET, "/api/runs", "/api/feedback").hasAnyRole(REVIEWER, ADMIN)
                         .requestMatchers(HttpMethod.PUT, "/api/settings").hasRole(ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/settings").hasRole(ADMIN)
                         .requestMatchers("/actuator/**").hasRole(ADMIN)

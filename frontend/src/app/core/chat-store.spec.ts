@@ -176,4 +176,16 @@ describe('ChatStore', () => {
       vi.useRealTimers();
     }
   });
+
+  it('keeps the rating given under an answer', async () => {
+    const sending = store.send('Hi');
+    http.expectOne('/api/sessions/s1/messages/stream').flush(sse(['done', run({})]));
+    await sending;
+
+    store.setFeedback('run-1', { rating: 'DOWN', comment: 'Too vague', updatedAt: '2026-10-19T12:00:00Z' });
+    expect(store.lastRun()?.feedback?.comment).toBe('Too vague');
+
+    store.setFeedback('run-1', null);
+    expect(store.lastRun()?.feedback).toBeNull();
+  });
 });

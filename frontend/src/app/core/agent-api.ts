@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_CONFIG } from './api-config';
-import { AgentSettings, ApprovalDecision, Run, Session } from './models';
+import { AgentSettings, ApprovalDecision, FeedbackRating, Run, RunFeedback, Session } from './models';
 import { RunEvent, toRunEvents } from './run-stream';
 
 /** Commands and lookups against the agent REST API. Read-only lists are loaded with httpResource in the pages. */
@@ -46,6 +46,15 @@ export class AgentApi {
   /** Like {@link decide}, but emits the steps of the resumed run as they happen. */
   streamDecision(runId: string, decision: ApprovalDecision): Observable<RunEvent> {
     return this.stream(`${this.config.baseUrl}/runs/${runId}/approval/stream`, decision);
+  }
+
+  /** Rates the answer of one of the user's finished runs; rating again replaces the earlier rating. */
+  rateRun(runId: string, rating: FeedbackRating, comment: string | null): Observable<RunFeedback> {
+    return this.http.put<RunFeedback>(`${this.config.baseUrl}/runs/${runId}/feedback`, { rating, comment });
+  }
+
+  removeRating(runId: string): Observable<void> {
+    return this.http.delete<void>(`${this.config.baseUrl}/runs/${runId}/feedback`);
   }
 
   getSettings(): Observable<AgentSettings> {

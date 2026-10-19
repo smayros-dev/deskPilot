@@ -36,3 +36,9 @@ th, td { white-space: nowrap; text-align: left; padding: 0.45rem 0.5rem; border-
 thead th { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
 .bar { display: inline-block; height: 0.5rem; border-radius: 999px; background: var(--accent); margin-right: 0.4rem; vertical-align: middle; }
 td.warn { color: var(--warn); font-weight: 600; }
+
+.negative { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
+.negative li { display: grid; gap: 0.15rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
+.negative li:last-child { border-bottom: none; padding-bottom: 0; }
+.negative q { overflow-wrap: anywhere; }
+.negative .muted { font-size: 0.8rem; }

@@ -40,6 +40,8 @@
                 </button>
                 <a [routerLink]="['/runs', run.id]">Details</a>
               </div>
+              <app-feedback-buttons [runId]="run.id" [feedback]="run.feedback ?? null"
+                                    (feedbackChange)="store.setFeedback(run.id, $event)" />
             </div>
           }
         }

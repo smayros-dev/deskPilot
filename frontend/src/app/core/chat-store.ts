@@ -5,7 +5,7 @@ import { Observable, firstValueFrom, lastValueFrom, tap } from 'rxjs';
 import { AgentApi } from './agent-api';
 import { SILENT_ERRORS } from './api-config';
 import { AuthService } from './auth';
-import { ApprovalDecision, Run, RunStep, Session } from './models';
+import { ApprovalDecision, Run, RunFeedback, RunStep, Session } from './models';
 import { Notifications } from './notifications';
 import { RunEvent } from './run-stream';
 
@@ -153,6 +153,11 @@ export class ChatStore {
     } catch {
       // Try again on the next tick.
     }
+  }
+
+  /** Keeps the rating given under an answer, so it survives re-rendering the conversation. */
+  setFeedback(runId: string, feedback: RunFeedback | null): void {
+    this._runs.update((runs) => runs.map((run) => (run.id === runId ? { ...run, feedback } : run)));
   }
 
   private upsert(run: Run): void {
