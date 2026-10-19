@@ -431,7 +431,7 @@ class AgentApiIntegrationTest {
 
     private static AgentSettingsDto withModel(AgentSettingsDto s, String model, double temperature) {
         return new AgentSettingsDto(model, temperature, s.topP(), s.contextWindow(), s.maxOutputTokens(), s.thinking(),
-                s.maxIterations(), s.ragTopK(), s.ragSimilarityThreshold(), s.disabledTools(), s.approvalTools(),
+                s.maxIterations(), s.ragTopK(), s.ragSimilarityThreshold(), s.groundingCheck(), s.disabledTools(), s.approvalTools(),
                 s.systemPrompt(), null);
     }
 

@@ -54,6 +54,7 @@ export class SettingsPage {
     maxIterations: [8, [Validators.required, Validators.min(1), Validators.max(20)]],
     ragTopK: [3, [Validators.required, Validators.min(1), Validators.max(10)]],
     ragSimilarityThreshold: [0.55, [Validators.min(0), Validators.max(1)]],
+    groundingCheck: [true],
     systemPrompt: ['', Validators.maxLength(8000)],
     tools: new FormRecord<ToolControls>({}),
   });
@@ -118,6 +119,7 @@ export class SettingsPage {
       maxIterations: v.maxIterations,
       ragTopK: v.ragTopK,
       ragSimilarityThreshold: v.ragSimilarityThreshold,
+      groundingCheck: v.groundingCheck,
       disabledTools: tools.filter(([, t]) => !t.enabled).map(([name]) => name),
       approvalTools: tools.filter(([, t]) => t.approval).map(([name]) => name),
       systemPrompt: v.systemPrompt.trim() || null,

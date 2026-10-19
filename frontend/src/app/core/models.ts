@@ -171,6 +171,8 @@ export interface AgentSettings {
   maxIterations: number;
   ragTopK: number;
   ragSimilarityThreshold: number;
+  /** Remind the model to search the knowledge base when it answers without any tool. */
+  groundingCheck: boolean;
   disabledTools: string[];
   approvalTools: string[];
   systemPrompt: string | null;

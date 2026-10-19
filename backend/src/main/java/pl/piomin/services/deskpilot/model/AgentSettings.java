@@ -42,6 +42,9 @@ public class AgentSettings {
 
     private double ragSimilarityThreshold;
 
+    /** Remind the model to search when it answers without any tool call. */
+    private boolean groundingCheck;
+
     @Convert(converter = StringSetConverter.class)
     @Column(nullable = false, length = 1000)
     private Set<String> disabledTools;
@@ -71,7 +74,7 @@ public class AgentSettings {
     /** All editable values at once, so the entity is never half-updated. */
     public record Values(String chatModel, double temperature, double topP, int contextWindow, int maxOutputTokens,
                          boolean thinking, int maxIterations, int ragTopK, double ragSimilarityThreshold,
-                         Set<String> disabledTools, Set<String> approvalTools, String systemPrompt) {
+                         boolean groundingCheck, Set<String> disabledTools, Set<String> approvalTools, String systemPrompt) {
     }
 
     public void apply(Values values) {
@@ -84,6 +87,7 @@ public class AgentSettings {
         this.maxIterations = values.maxIterations();
         this.ragTopK = values.ragTopK();
         this.ragSimilarityThreshold = values.ragSimilarityThreshold();
+        this.groundingCheck = values.groundingCheck();
         this.disabledTools = Set.copyOf(values.disabledTools());
         this.approvalTools = Set.copyOf(values.approvalTools());
         this.systemPrompt = values.systemPrompt() == null || values.systemPrompt().isBlank() ? null : values.systemPrompt();
@@ -92,7 +96,7 @@ public class AgentSettings {
 
     public Values values() {
         return new Values(chatModel, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations,
-                ragTopK, ragSimilarityThreshold, disabledTools, approvalTools, systemPrompt);
+                ragTopK, ragSimilarityThreshold, groundingCheck, disabledTools, approvalTools, systemPrompt);
     }
 
     public Instant getUpdatedAt() {

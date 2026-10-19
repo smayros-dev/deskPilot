@@ -104,6 +104,8 @@ management:
 
 agent:
   max-iterations: 8
+  # Default of the Settings toggle: remind the model to search the knowledge base before answering or opening a ticket.
+  grounding-check: true
   rag:
     similarity-threshold: 0.55
     top-k: 3

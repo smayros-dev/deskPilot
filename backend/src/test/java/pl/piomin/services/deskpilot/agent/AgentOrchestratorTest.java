@@ -113,16 +113,82 @@ class AgentOrchestratorTest {
     }
 
     @Test
-    void answersDirectlyWithoutTools() {
+    void answerWithoutAnyToolGetsOneGroundingReminder() {
+        setGroundingCheck(true);
         givenModelReplies(answer("Hello! How can I help?"));
 
         AgentRun run = orchestrator.chat(sessionId, "Hi");
 
         assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
         assertThat(run.getFinalAnswer()).isEqualTo("Hello! How can I help?");
-        assertThat(run.getIterations()).isEqualTo(1);
-        assertThat(run.getPromptTokens()).isEqualTo(100);
+        assertThat(run.getIterations()).isEqualTo(2);
+        assertThat(run.getPromptTokens()).isEqualTo(200);
+        assertThat(stepTypes(run)).containsExactly(StepType.USER_INPUT, StepType.GUARDRAIL, StepType.ANSWER);
+        assertThat(lastPromptMessages()).last().isInstanceOf(UserMessage.class)
+                .extracting(Message::getText).isEqualTo(AgentOrchestrator.GROUNDING_REMINDER);
+        // Short-term memory keeps the user's question and the final answer only, not the reminder.
         assertThat(chatMemory.get(sessionId)).hasSize(2);
+    }
+
+    @Test
+    void groundingReminderLeadsTheModelToSearchBeforeAnswering() {
+        setGroundingCheck(true);
+        when(knowledgeBaseService.search(eq("password length"), anyInt(), anyDouble()))
+                .thenReturn(List.of(new KnowledgeBaseService.Hit(2, "Passwords", "At least 14 characters", 0.9)));
+        givenModelReplies(
+                answer("At least 12 characters."),
+                toolCall("", "search_knowledge_base", "{\"query\":\"password length\"}"),
+                answer("At least 14 characters [2]."));
+
+        AgentRun run = orchestrator.chat(sessionId, "How long must a password be?");
+
+        assertThat(run.getFinalAnswer()).isEqualTo("At least 14 characters [2].");
+        assertThat(stepTypes(run)).containsExactly(StepType.USER_INPUT, StepType.GUARDRAIL, StepType.TOOL_CALL,
+                StepType.TOOL_RESULT, StepType.ANSWER);
+    }
+
+    @Test
+    void ticketRequestedBeforeAnySearchIsSentBackOnce() {
+        setGroundingCheck(true);
+        long ticketsBefore = ticketRepository.count();
+        when(knowledgeBaseService.search(eq("mouse"), anyInt(), anyDouble()))
+                .thenReturn(List.of(new KnowledgeBaseService.Hit(6, "Hardware", "Mice are handed out at the IT desk", 0.8)));
+        givenModelReplies(
+                toolCall("", "create_ticket", "{\"title\":\"Mouse\",\"description\":\"Broken\",\"priority\":\"HIGH\"}"),
+                toolCall("", "search_knowledge_base", "{\"query\":\"mouse\"}"),
+                answer("Pick up a new mouse at the IT desk [6]."));
+
+        AgentRun run = orchestrator.chat(sessionId, "My mouse is broken");
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(ticketRepository.count()).isEqualTo(ticketsBefore);
+        assertThat(stepTypes(run)).containsExactly(StepType.USER_INPUT, StepType.GUARDRAIL, StepType.TOOL_CALL,
+                StepType.TOOL_RESULT, StepType.ANSWER);
+        assertThat(steps(run)).filteredOn(s -> s.getType() == StepType.TOOL_CALL)
+                .extracting(AgentStep::getName).containsExactly("search_knowledge_base");
+    }
+
+    @Test
+    void ticketIsAllowedOnceTheModelInsistsAfterTheReminder() {
+        setGroundingCheck(true);
+        givenModelReplies(
+                toolCall("", "create_ticket", "{\"title\":\"New monitor\",\"description\":\"x\",\"priority\":\"LOW\"}"),
+                toolCall("", "create_ticket", "{\"title\":\"New monitor\",\"description\":\"x\",\"priority\":\"LOW\"}"));
+
+        AgentRun run = orchestrator.chat(sessionId, "Open a ticket for a monitor");
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.AWAITING_APPROVAL);
+    }
+
+    @Test
+    void groundingCheckCanBeSwitchedOff() {
+        setGroundingCheck(false);
+        givenModelReplies(answer("Hello! How can I help?"));
+
+        AgentRun run = orchestrator.chat(sessionId, "Hi");
+
+        assertThat(run.getIterations()).isEqualTo(1);
+        assertThat(stepTypes(run)).containsExactly(StepType.USER_INPUT, StepType.ANSWER);
     }
 
     @Test
@@ -286,7 +352,7 @@ class AgentOrchestratorTest {
     void appliesSettingsToTheModelCallAndRecordsTheModel() {
         when(modelCatalog.find("llama3.2:3b")).thenReturn(Optional.of(toolModel("llama3.2:3b")));
         AgentSettings.Values values = settingsService.get().values();
-        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6,
+        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true,
                 Set.of("save_memory"), values.approvalTools(), "You are a terse helpdesk bot."));
         givenModelReplies(answer("Done."));
 
@@ -309,7 +375,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
                 v.disabledTools(), Set.of(), v.systemPrompt()));
         givenModelReplies(
                 toolCall("", "create_ticket", "{\"title\":\"Mouse\",\"description\":\"Broken\",\"priority\":\"LOW\"}"),
@@ -326,7 +392,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
                 Set.of("escalate_to_human"), v.approvalTools(), v.systemPrompt()));
         givenModelReplies(toolCall("", "escalate_to_human", "{\"reason\":\"x\"}"), answer("OK"));
 
@@ -344,7 +410,7 @@ class AgentOrchestratorTest {
 
         assertThatThrownBy(() -> settingsService.update(new AgentSettings.Values("gemma:2b", v.temperature(), v.topP(),
                 v.contextWindow(), v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(),
-                v.ragSimilarityThreshold(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
+                v.ragSimilarityThreshold(), v.groundingCheck(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not support tool calling");
     }
@@ -469,6 +535,14 @@ class AgentOrchestratorTest {
 
         assertThat(events).containsExactly("run:RUNNING", "thinking:1", "THOUGHT", "TOOL_CALL", "TOOL_RESULT",
                 "thinking:2", "ANSWER");
+    }
+
+    private void setGroundingCheck(boolean on) {
+        AgentSettings.Values v = settingsService.get().values();
+        when(modelCatalog.find(v.chatModel())).thenReturn(Optional.of(toolModel(v.chatModel())));
+        settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), on,
+                v.disabledTools(), v.approvalTools(), v.systemPrompt()));
     }
 
     private static ModelCatalog.ModelInfo toolModel(String name) {

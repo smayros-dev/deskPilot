@@ -31,13 +31,14 @@ public class AgentSettingsService {
                                 AgentProperties properties,
                                 @Value("${spring.ai.ollama.chat.model}") String chatModel,
                                 @Value("${spring.ai.ollama.chat.temperature:0.2}") double temperature,
-                                @Value("${spring.ai.ollama.chat.think:false}") String think) {
+                                @Value("${spring.ai.ollama.chat.think:false}") String think,
+                                @Value("${agent.grounding-check:true}") boolean groundingCheck) {
         this.repository = repository;
         this.modelCatalog = modelCatalog;
         this.toolRegistry = toolRegistry;
         this.defaults = new AgentSettings.Values(chatModel, temperature, 0.9, DEFAULT_CONTEXT_WINDOW,
                 DEFAULT_MAX_OUTPUT_TOKENS, Boolean.parseBoolean(think), properties.maxIterations(),
-                properties.rag().topK(), properties.rag().similarityThreshold(), Set.of(),
+                properties.rag().topK(), properties.rag().similarityThreshold(), groundingCheck, Set.of(),
                 toolRegistry.defaultApprovalTools(), null);
     }
 
@@ -88,7 +89,7 @@ public class AgentSettingsService {
 
     private static AgentConfig toConfig(AgentSettings.Values v) {
         return new AgentConfig(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(), v.maxOutputTokens(),
-                v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.disabledTools(),
-                v.approvalTools(), v.systemPrompt());
+                v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
+                v.disabledTools(), v.approvalTools(), v.systemPrompt());
     }
 }

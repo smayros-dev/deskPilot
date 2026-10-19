@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
@@ -54,6 +55,17 @@ public class AgentOrchestrator {
     static final String MAX_ITERATIONS_ANSWER =
             "I could not finish this request on my own, so I have handed it to a helpdesk engineer who will follow up.";
     static final String EMPTY_ANSWER = "Sorry, I could not produce an answer. Please rephrase your question.";
+    static final String GROUNDING_REMINDER = """
+            (Automatic check, not written by the user.) You answered without searching the knowledge base. \
+            Example Corp's procedures differ from general advice: if the question is about IT, call \
+            search_knowledge_base now and answer only from the articles it returns. If it is not about IT, \
+            say briefly that you can only help with IT topics.""";
+
+    static final String KNOWLEDGE_SEARCH_TOOL = "search_knowledge_base";
+    static final String TICKET_TOOL = "create_ticket";
+    static final String SEARCH_BEFORE_TICKET = "Not created yet: call search_knowledge_base first. The articles say "
+            + "whether this needs a ticket at all and which priority to use. If a ticket is still needed, call create_ticket "
+            + "again right after the search, with the same details and the priority from the article; do not ask the user again.";
 
     private final ChatModel chatModel;
     private final ChatMemory chatMemory;
@@ -205,6 +217,12 @@ public class AgentOrchestrator {
                 AssistantMessage reply = callModel(turn);
                 turn.add(reply);
 
+                if (!reply.hasToolCalls() && needsGrounding(turn, config)) {
+                    record(turn, StepType.GUARDRAIL, "grounding_check",
+                            "Answered without using any tool; asked the model to search the knowledge base first", false, 0);
+                    turn.add(new UserMessage(GROUNDING_REMINDER));
+                    continue;
+                }
                 if (!reply.hasToolCalls()) {
                     String answer = reply.getText() == null ? "" : reply.getText().strip();
                     if (answer.isEmpty()) {
@@ -214,6 +232,15 @@ public class AgentOrchestrator {
                     return finish(turn, status, answer, startNanos);
                 }
 
+                if (ticketBeforeSearch(turn, config, reply)) {
+                    // Not executed and not sent for approval: the model must look up the procedure first.
+                    record(turn, StepType.GUARDRAIL, "grounding_check", "create_ticket requested before searching the "
+                            + "knowledge base; asked the model to search first: " + describe(reply.getToolCalls()), false, 0);
+                    turn.add(ToolResponseMessage.builder().responses(reply.getToolCalls().stream()
+                            .map(call -> new ToolResponseMessage.ToolResponse(call.id(), call.name(), "ERROR: " + SEARCH_BEFORE_TICKET))
+                            .toList()).build());
+                    continue;
+                }
                 recordToolCallSteps(turn, reply);
                 List<AssistantMessage.ToolCall> gated = reply.getToolCalls().stream()
                         .filter(call -> config.requiresApproval(call.name()))
@@ -262,6 +289,45 @@ public class AgentOrchestrator {
             record(turn, StepType.THOUGHT, null, reply.getText().strip(), false, durationMillis);
         }
         return reply;
+    }
+
+    /**
+     * Small local models often answer IT questions from general knowledge instead of searching (measured by the
+     * evaluation: 7 of 13 knowledge scenarios on qwen3:8b). When a turn reaches a final answer without any tool call,
+     * the model is reminded once to search; answers after a search, a ticket, a memory or an escalation pass as they are.
+     */
+    private boolean needsGrounding(ActiveTurn turn, AgentConfig config) {
+        if (!config.groundingCheck() || !config.isToolEnabled(KNOWLEDGE_SEARCH_TOOL)) {
+            return false;
+        }
+        List<Message> messages = turn.messages();
+        boolean usedTool = messages.stream().anyMatch(m -> m instanceof AssistantMessage a && a.hasToolCalls());
+        boolean reminded = messages.stream().anyMatch(m -> m instanceof UserMessage u && GROUNDING_REMINDER.equals(u.getText()));
+        return !usedTool && !reminded;
+    }
+
+    /**
+     * Same idea for tickets: a ticket requested before any knowledge-base search often has the wrong priority or is not
+     * needed at all (e.g. accessories handed out at the IT desk). Blocked once per turn, so the model cannot loop.
+     */
+    private boolean ticketBeforeSearch(ActiveTurn turn, AgentConfig config, AssistantMessage reply) {
+        if (!config.groundingCheck() || !config.isToolEnabled(KNOWLEDGE_SEARCH_TOOL)) {
+            return false;
+        }
+        List<String> requested = reply.getToolCalls().stream().map(AssistantMessage.ToolCall::name).toList();
+        if (!requested.contains(TICKET_TOOL) || requested.contains(KNOWLEDGE_SEARCH_TOOL)) {
+            return false;
+        }
+        List<Message> messages = turn.messages();
+        boolean searched = messages.stream().anyMatch(m -> m instanceof AssistantMessage a
+                && a.getToolCalls().stream().anyMatch(call -> KNOWLEDGE_SEARCH_TOOL.equals(call.name())));
+        boolean blockedBefore = messages.stream().anyMatch(m -> m instanceof ToolResponseMessage r
+                && r.getResponses().stream().anyMatch(response -> response.responseData().endsWith(SEARCH_BEFORE_TICKET)));
+        return !searched && !blockedBefore;
+    }
+
+    private static String describe(List<AssistantMessage.ToolCall> calls) {
+        return calls.stream().map(call -> call.name() + " " + call.arguments()).collect(Collectors.joining("; "));
     }
 
     private void recordToolCallSteps(ActiveTurn turn, AssistantMessage reply) {

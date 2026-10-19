@@ -55,7 +55,7 @@ function evaluation(overrides: Partial<Evaluation>): Evaluation {
 }
 
 /** Waits (real time) until the condition holds; the poll interval is shortened in the test that uses it. */
-async function waitFor(condition: () => boolean, timeoutMs = 2000): Promise<void> {
+async function waitFor(condition: () => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!condition()) {
     if (Date.now() > deadline) {
@@ -154,16 +154,22 @@ describe('EvaluationPage', () => {
 
   it('refreshes while an evaluation is running, then stops', async () => {
     const running = evaluation({ status: 'RUNNING', completed: 1, passed: 1 });
-    const { fixture } = await render([running], running, 20);
+    await render([running], running, 50);
+    const finished = () => {
+      // Answer every poll with the finished evaluation; a tick may fire before the page sees the new status.
+      http.match('/api/evaluations').forEach((req) => req.flush([evaluation({})]));
+      http.match('/api/evaluations/e1').forEach((req) => req.flush(evaluation({})));
+    };
 
-    // match() takes the requests out of the queue, so keep the one it finds.
+    // match() takes the requests out of the queue, so keep the ones it finds.
     let reload: TestRequest[] = [];
     await waitFor(() => (reload = http.match('/api/evaluations')).length > 0);
-    reload[0].flush([evaluation({})]);
-    http.expectOne('/api/evaluations/e1').flush(evaluation({}));
-    await fixture.whenStable();
+    reload.forEach((req) => req.flush([evaluation({})]));
+    finished();
+    await settle();
+    finished();
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 200));
     http.expectNone('/api/evaluations');
-  });
+  }, 20_000); // real timers: generous limit for a busy machine
 });

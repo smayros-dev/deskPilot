@@ -23,6 +23,7 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Durable conversations**: sessions, chat memory and runs waiting for approval are stored in PostgreSQL, so a backend restart loses nothing; a paused run can still be approved afterwards.
 - **Sign-in and roles**: OpenID Connect login through Keycloak (Authorization Code + PKCE). The user id comes from the token; only **reviewers** can approve actions (from their own Approvals queue) and only **admins** can change settings.
 - **Tracing**: one OpenTelemetry trace per agent run, with every model and tool call as a span, viewable in Jaeger.
+- **Grounding check**: when the model answers or opens a ticket without searching the knowledge base, it is sent back once to search first (measured: 64% → 84% of the evaluation scenarios).
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -168,6 +169,30 @@ escalated, blocked), tools that must and must not be called, facts the answer mu
 Use it to compare models, prompts and settings on the same requests before changing the live agent. Ticket requests are
 checked at the approval step and never created; evaluation runs do not count in the dashboard.
 
+### Results (qwen3:8b on CPU, 2026-10-20)
+
+| Version | Score | Knowledge | Tickets | Escalation | Avg / p95 latency |
+|---|---|---|---|---|---|
+| Baseline (prompt v1) | 16/25 (64%) | 6/13 | 3/4 | 1/2 | 25 s / 52 s |
+| Prompt v2 (19 scenarios) | 13/19 (baseline: 10/19) | 8/13 | 3/4 | 2/2 | — |
+| + grounding check for answers (19 scenarios) | 16/19 | 11/13 | 3/4 | 2/2 | — |
+| + grounding check for tickets | **21/25 (84%)** | 10/13 | 3/4 | 2/2 | 44 s / 71 s |
+| + refined ticket reminder (ticket scenarios) | — | — | **4/4** | — | — |
+
+What the evaluation found and what fixed it:
+- **The model answered from general knowledge** in 7 of 13 knowledge questions: no search, invented procedures
+  ("12 characters" instead of 14, a guest Wi-Fi without password) and copied the prompt's example citation `[4]`.
+  Prompt v2 (no literal example, "search even if you think you know") helped a little; the **grounding check** — when a
+  turn ends without any tool call, the model is reminded once to search — fixed most of it.
+- **Tickets were opened without looking up the procedure**: wrong priority for a lost phone (HIGH instead of CRITICAL),
+  a ticket for a mouse that the IT desk hands out. The grounding check also sends back a `create_ticket` requested
+  before any search, once per turn.
+- **Cost**: one extra model call when a check fires, so the average latency rose from 25 s to 44 s on CPU. The check
+  can be switched off on the Settings page.
+- **Left**: two retrieval gaps (the search for "install visual studio code" and "broken mouse" returns no article
+  above the similarity threshold), which is what hybrid search (Step 12c) addresses, and one incomplete answer.
+  `gemma4:26b` was not compared: far too slow on this CPU.
+
 ## CI
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: backend build and tests
@@ -207,6 +232,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.14** — Step 10 results: prompt v2 and the grounding check (answers and tickets, Settings toggle, Flyway V6); qwen3:8b from 64% to 84% of the scenarios.
 - **1.0.13** — Cited answers with safe Markdown rendering (12a); 👍/👎 feedback on answers with satisfaction metrics (12l).
 - **1.0.12** — Evaluation: 25 scenarios, background runner with deterministic scoring, admin Evaluation page comparing models; evaluation runs kept out of the live metrics; bounded Spring AI retry so an unreachable model fails in seconds.
 - **1.0.11** — Delivery: Dockerfiles (layered backend image, nginx frontend with SSE proxying), full-stack `compose.yaml` (optional Ollama container), GitHub Actions CI, OpenTelemetry tracing to Jaeger (one trace per run, model and tool spans).

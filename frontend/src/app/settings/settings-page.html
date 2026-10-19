@@ -104,6 +104,11 @@
         <input type="range" min="0" max="1" step="0.05" formControlName="ragSimilarityThreshold" />
         <small>Articles below this score count as "not relevant", so the agent rephrases or admits it has no answer.</small>
       </label>
+      <label class="toggle">
+        <input type="checkbox" formControlName="groundingCheck" />
+        <span>Grounding check</span>
+        <small>If the model answers without using any tool, remind it once to search the knowledge base first. Small local models often answer from general knowledge; costs one extra model call in those cases.</small>
+      </label>
     </div>
   </section>
 
