@@ -296,6 +296,54 @@ class AgentApiIntegrationTest {
     }
 
     @Test
+    void ownerRatesAnAnswerAndReviewersSeeTheNegativeOnes() {
+        givenModelReplies(answer("Restart the router."));
+        RunResponse run = chat("Wi-Fi is slow").expectBody(RunResponse.class).returnResult().getResponseBody();
+        assertThat(run).isNotNull();
+        assertThat(run.feedback()).isNull();
+
+        alice.put().uri("/api/runs/{id}/feedback", run.id())
+                .body(Map.of("rating", "DOWN", "comment", "The router is not mine to restart"))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.rating").isEqualTo("DOWN");
+        carol.put().uri("/api/runs/{id}/feedback", run.id()).body(Map.of("rating", "UP"))
+                .exchange().expectStatus().isNotFound();
+        alice.put().uri("/api/runs/{id}/feedback", run.id()).body(Map.of("comment", "no rating"))
+                .exchange().expectStatus().isBadRequest();
+
+        alice.get().uri("/api/runs/{id}", run.id()).exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.feedback.rating").isEqualTo("DOWN")
+                .jsonPath("$.feedback.comment").isEqualTo("The router is not mine to restart");
+
+        alice.get().uri("/api/feedback").exchange().expectStatus().isForbidden();
+        bob.get().uri("/api/feedback?rating=DOWN").exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$[?(@.runId == '" + run.id() + "')].comment")
+                .isEqualTo(List.of("The router is not mine to restart"));
+        alice.get().uri("/api/metrics").exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.feedback.down").value(down -> assertThat((Integer) down).isPositive());
+
+        alice.delete().uri("/api/runs/{id}/feedback", run.id()).exchange().expectStatus().isNoContent();
+        alice.get().uri("/api/runs/{id}", run.id()).exchange()
+                .expectBody().jsonPath("$.feedback").doesNotExist();
+    }
+
+    @Test
+    void runsWaitingForApprovalCannotBeRated() {
+        givenModelReplies(toolCall("create_ticket", "{\"title\":\"Desk\",\"description\":\"Broken\",\"priority\":\"LOW\"}"));
+        RunResponse paused = chat("Open a ticket for my desk").expectBody(RunResponse.class).returnResult().getResponseBody();
+        assertThat(paused).isNotNull();
+
+        alice.put().uri("/api/runs/{id}/feedback", paused.id()).body(Map.of("rating", "UP"))
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
     void toolsAreListedWithApprovalDefaults() {
         alice.get().uri("/api/tools").exchange()
                 .expectStatus().isOk()

@@ -26,7 +26,19 @@ public record AgentMetricsResponse(
         long completionTokens,
         long inputsBlockedSinceStart,
         List<ToolStats> tools,
-        List<ModelStats> models) {
+        List<ModelStats> models,
+        FeedbackStats feedback) {
+
+    /**
+     * Users' ratings of answers.
+     *
+     * @param satisfactionRate share of 👍 among all ratings (0..1), 0 when there is none
+     */
+    public record FeedbackStats(long up, long down, double satisfactionRate, List<ModelFeedback> models) {
+    }
+
+    public record ModelFeedback(String model, long up, long down, double satisfactionRate) {
+    }
 
     /** Per-model comparison over finished runs: the data to choose a model on. */
     public record ModelStats(String model, long runs, double successRate, double avgLatencyMillis,

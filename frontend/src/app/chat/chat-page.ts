@@ -5,8 +5,10 @@ import { AuthService } from '../core/auth';
 import { ChatStore } from '../core/chat-store';
 import { ApprovalDecision, Run } from '../core/models';
 import { RunTrace } from '../runs/run-trace';
+import { Answer } from '../shared/answer';
 import { AutoScroll } from '../shared/auto-scroll';
 import { DurationPipe } from '../shared/duration-pipe';
+import { FeedbackButtons } from '../shared/feedback-buttons';
 import { StatusBadge } from '../shared/status-badge';
 import { ApprovalCard } from './approval-card';
 import { ChatInput } from './chat-input';
@@ -22,7 +24,7 @@ const EXAMPLES = [
 
 @Component({
   selector: 'app-chat-page',
-  imports: [RouterLink, ChatInput, ApprovalCard, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe],
+  imports: [FeedbackButtons, RouterLink, ChatInput, ApprovalCard, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe, Answer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.css',

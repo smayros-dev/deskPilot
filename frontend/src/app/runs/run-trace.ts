@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
 import { Run, RunStep, StepType } from '../core/models';
+import { Answer } from '../shared/answer';
 import { DurationPipe } from '../shared/duration-pipe';
 
 interface StepView extends RunStep {
@@ -25,7 +26,7 @@ const STEP_LABELS: Record<StepType, string> = {
 /** The ReAct trace of one run: thoughts, tool calls and results, approvals and the answer. */
 @Component({
   selector: 'app-run-trace',
-  imports: [DecimalPipe, DurationPipe],
+  imports: [DecimalPipe, DurationPipe, Answer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="stats" role="list" aria-label="Run statistics">
@@ -67,7 +68,9 @@ const STEP_LABELS: Record<StepType, string> = {
             }
           </div>
           @if (step.body) {
-            @if (step.isJson) {
+            @if (step.type === 'ANSWER') {
+              <app-answer class="answer" [text]="step.body" [run]="run()" />
+            } @else if (step.isJson) {
               <pre>{{ step.body }}</pre>
             } @else {
               <p>{{ step.body }}</p>
@@ -93,6 +96,7 @@ const STEP_LABELS: Record<StepType, string> = {
     .label { font-weight: 600; }
     .muted { color: var(--text-muted); font-size: 0.8rem; }
     p { margin: 0.25rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .answer { margin-top: 0.25rem; }
     pre { margin: 0.25rem 0 0; max-height: 16rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.78rem; background: var(--surface-muted); padding: 0.5rem; border-radius: var(--radius); }
   `,
 })

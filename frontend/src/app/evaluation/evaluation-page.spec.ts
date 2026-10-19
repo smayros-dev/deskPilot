@@ -1,5 +1,5 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -54,6 +54,17 @@ function evaluation(overrides: Partial<Evaluation>): Evaluation {
   };
 }
 
+/** Waits (real time) until the condition holds; the poll interval is shortened in the test that uses it. */
+async function waitFor(condition: () => boolean, timeoutMs = 2000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) {
+      throw new Error('condition not met in time');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 /** Lets resources pick up responses and issue the requests that depend on them, without waiting for stability. */
 async function settle(): Promise<void> {
   for (let i = 0; i < 3; i++) {
@@ -65,7 +76,7 @@ async function settle(): Promise<void> {
 describe('EvaluationPage', () => {
   let http: HttpTestingController;
 
-  async function render(evaluations: Evaluation[], detail: Evaluation) {
+  async function render(evaluations: Evaluation[], detail: Evaluation, pollMs = 60_000) {
     TestBed.configureTestingModule({
       imports: [EvaluationPage],
       providers: [
@@ -74,6 +85,7 @@ describe('EvaluationPage', () => {
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
         provideFakeAuth('admin', ['user', 'admin']),
+        { provide: EVALUATION_POLL_MS, useValue: pollMs },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -140,24 +152,18 @@ describe('EvaluationPage', () => {
     expect(start.disabled).toBe(true);
   });
 
-  it('refreshes while an evaluation is running', async () => {
-    // Only the polling interval is faked; zoneless change detection still needs the real setTimeout.
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    try {
-      const running = evaluation({ status: 'RUNNING', completed: 1, passed: 1 });
-      const { fixture } = await render([running], running);
-      TestBed.tick();
+  it('refreshes while an evaluation is running, then stops', async () => {
+    const running = evaluation({ status: 'RUNNING', completed: 1, passed: 1 });
+    const { fixture } = await render([running], running, 20);
 
-      await vi.advanceTimersByTimeAsync(EVALUATION_POLL_MS);
-      http.expectOne('/api/evaluations').flush([evaluation({})]);
-      http.expectOne('/api/evaluations/e1').flush(evaluation({}));
-      TestBed.tick();
-      await fixture.whenStable();
+    // match() takes the requests out of the queue, so keep the one it finds.
+    let reload: TestRequest[] = [];
+    await waitFor(() => (reload = http.match('/api/evaluations')).length > 0);
+    reload[0].flush([evaluation({})]);
+    http.expectOne('/api/evaluations/e1').flush(evaluation({}));
+    await fixture.whenStable();
 
-      await vi.advanceTimersByTimeAsync(EVALUATION_POLL_MS * 2);
-      http.expectNone('/api/evaluations');
-    } finally {
-      vi.useRealTimers();
-    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    http.expectNone('/api/evaluations');
   });
 });

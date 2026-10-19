@@ -16,6 +16,8 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Memory**: short-term conversation memory and long-term per-user facts (which refuse secrets).
 - **Guardrails**: a prompt-injection filter, redaction of passwords, API keys and card numbers, and tool-output limits.
 - **Full traceability**: every thought, tool call, result and approval is stored and shown as a reasoning trace.
+- **Cited answers**: answers are rendered as Markdown (safely, without raw HTML) and cite the knowledge-base articles they use as `[n]` chips, with a Sources list linking to each article.
+- **User feedback**: 👍/👎 and a comment on every answer; the dashboard shows the satisfaction rate (overall and per model) and the latest negative feedback for reviewers.
 - **Live progress**: answers are streamed as Server-Sent Events, so the chat shows each step (model thinking, tool calls, results) while the agent works instead of a silent wait of a minute or more.
 - **Metrics dashboard**: success rate, average and p95 latency, tool accuracy, escalations and tokens, overall and per model.
 - **Durable conversations**: sessions, chat memory and runs waiting for approval are stored in PostgreSQL, so a backend restart loses nothing; a paused run can still be approved afterwards.
@@ -189,6 +191,9 @@ OLLAMA_IT=true ./mvnw test -Dtest="*SmokeTest"   # real local model: chat, RAG, 
 | `GET` | `/api/sessions/{id}/runs` | Conversation history |
 | `GET` | `/api/runs/{id}` | One run with its steps |
 | `GET` | `/api/runs` | Reviewers: runs waiting for approval, oldest first |
+| `PUT` `DELETE` | `/api/runs/{id}/feedback` | Owner: rate a finished answer (`{"rating": "UP"|"DOWN", "comment": "..."}`) or remove the rating |
+| `GET` | `/api/feedback?rating=DOWN` | Reviewers: latest negative feedback |
+| `GET` `POST` | `/api/evaluations`, `/api/evaluations/{id}`, `/api/evaluations/scenarios`, `POST /api/evaluations/{id}/cancel` | Admins: run and compare evaluations |
 | `POST` | `/api/runs/{id}/approval` | Reviewers: approve/reject a paused tool call (`{"approved": true, "comment": "..."}`) |
 | `POST` | `/api/runs/{id}/approval/stream` | Same, streaming the resumed run as Server-Sent Events |
 | `GET` | `/api/tickets`, `/api/me/memories`, `/api/knowledge-base/articles` | Agent data (tickets: own, or all for reviewers) |
@@ -202,6 +207,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.13** — Cited answers with safe Markdown rendering (12a); 👍/👎 feedback on answers with satisfaction metrics (12l).
 - **1.0.12** — Evaluation: 25 scenarios, background runner with deterministic scoring, admin Evaluation page comparing models; evaluation runs kept out of the live metrics; bounded Spring AI retry so an unreachable model fails in seconds.
 - **1.0.11** — Delivery: Dockerfiles (layered backend image, nginx frontend with SSE proxying), full-stack `compose.yaml` (optional Ollama container), GitHub Actions CI, OpenTelemetry tracing to Jaeger (one trace per run, model and tool spans).
 - **1.0.10** — Streaming: Server-Sent Events endpoints for chat and approvals; the chat shows live steps and what the agent is doing.

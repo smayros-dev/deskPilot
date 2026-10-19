@@ -81,6 +81,17 @@ class ToolRegistryTest {
     }
 
     @Test
+    void searchHitsCarryACiteMarkerBuiltFromTheArticleId() {
+        when(knowledgeBaseService.search("printer", 3, 0.55)).thenReturn(List.of(
+                new KnowledgeBaseService.Hit(4, "Printers", "Add PRN-3-02", 0.7),
+                new KnowledgeBaseService.Hit(2, "Passwords", "Reset", 0.6)));
+
+        String result = call("search_knowledge_base", "{\"query\":\"printer\"}");
+
+        assertThat(result).contains("\"id\":4,\"cite\":\"[4]\"", "\"id\":2,\"cite\":\"[2]\"");
+    }
+
+    @Test
     void searchWithoutHitsTellsTheAgentToReformulate() {
         when(knowledgeBaseService.search("cake recipe", 3, 0.55)).thenReturn(List.of());
 

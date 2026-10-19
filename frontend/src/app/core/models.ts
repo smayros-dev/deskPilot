@@ -44,6 +44,34 @@ export interface RunStats {
   activeMillis: number;
 }
 
+export type FeedbackRating = 'UP' | 'DOWN';
+
+/** The user's rating of an answer (PUT /api/runs/{id}/feedback). */
+export interface RunFeedback {
+  rating: FeedbackRating;
+  comment: string | null;
+  updatedAt: string;
+}
+
+/** A rated answer as listed for reviewers (GET /api/feedback). */
+export interface RatedAnswer {
+  runId: string;
+  userId: string;
+  model: string | null;
+  question: string;
+  answer: string | null;
+  rating: FeedbackRating;
+  comment: string | null;
+  updatedAt: string;
+}
+
+export interface FeedbackStats {
+  up: number;
+  down: number;
+  satisfactionRate: number;
+  models: { model: string; up: number; down: number; satisfactionRate: number }[];
+}
+
 export interface Run {
   id: string;
   sessionId: string;
@@ -57,6 +85,8 @@ export interface Run {
   stats: RunStats;
   createdAt: string;
   completedAt: string | null;
+  /** Null until the user rates the answer. */
+  feedback?: RunFeedback | null;
 }
 
 export interface ApprovalDecision {
@@ -127,6 +157,7 @@ export interface AgentMetrics {
   inputsBlockedSinceStart: number;
   tools: ToolStats[];
   models: ModelStats[];
+  feedback: FeedbackStats;
 }
 
 /** Runtime agent configuration (GET/PUT /api/settings). */

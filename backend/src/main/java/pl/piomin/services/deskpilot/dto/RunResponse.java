@@ -3,6 +3,7 @@ package pl.piomin.services.deskpilot.dto;
 import java.time.Instant;
 import java.util.List;
 
+import pl.piomin.services.deskpilot.model.FeedbackRating;
 import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.model.StepType;
 
@@ -18,7 +19,12 @@ public record RunResponse(
         List<PendingApproval> pendingApprovals,
         Stats stats,
         Instant createdAt,
-        Instant completedAt) {
+        Instant completedAt,
+        Feedback feedback) {
+
+    /** The user's rating of the answer; null until they give one. */
+    public record Feedback(FeedbackRating rating, String comment, Instant updatedAt) {
+    }
 
     public record Step(long id, StepType type, String name, String content, boolean error, long durationMillis,
                        Instant createdAt) {

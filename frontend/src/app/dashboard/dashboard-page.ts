@@ -1,9 +1,12 @@
-import { DecimalPipe, PercentPipe } from '@angular/common';
+import { DatePipe, DecimalPipe, PercentPipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
+import { RouterLink } from '@angular/router';
+
 import { AgentApi } from '../core/agent-api';
-import { AgentMetrics } from '../core/models';
+import { AuthService } from '../core/auth';
+import { AgentMetrics, RatedAnswer } from '../core/models';
 import { DurationPipe } from '../shared/duration-pipe';
 
 interface StatusSlice {
@@ -16,7 +19,7 @@ interface StatusSlice {
 /** Success metrics from step 10 of the brief: task success, latency, tool accuracy, escalations. */
 @Component({
   selector: 'app-dashboard-page',
-  imports: [DecimalPipe, PercentPipe, DurationPipe],
+  imports: [DatePipe, DecimalPipe, PercentPipe, DurationPipe, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard-page.html',
   styleUrl: './dashboard-page.css',
@@ -24,7 +27,15 @@ interface StatusSlice {
 export class DashboardPage {
   private readonly api = inject(AgentApi);
 
+  private readonly auth = inject(AuthService);
+
   protected readonly metrics = httpResource<AgentMetrics>(() => this.api.url('/metrics'));
+  /** Latest 👎 with their comments; reviewers and admins only (the request is not even made for others). */
+  protected readonly canReadFeedback = computed(() => this.auth.isReviewer() || this.auth.isAdmin());
+  protected readonly negativeFeedback = httpResource<RatedAnswer[]>(
+    () => (this.canReadFeedback() ? this.api.url('/feedback?rating=DOWN') : undefined),
+    { defaultValue: [] },
+  );
 
   protected readonly statusSlices = computed<StatusSlice[]>(() => {
     if (!this.metrics.hasValue()) {
@@ -46,5 +57,6 @@ export class DashboardPage {
 
   protected refresh(): void {
     this.metrics.reload();
+    this.negativeFeedback.reload();
   }
 }

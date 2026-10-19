@@ -51,6 +51,13 @@
       <span class="tile-sub">{{ m.completionTokens | number }} generated</span>
     </article>
     <article class="tile">
+      <span class="tile-label">User satisfaction</span>
+      <span class="tile-value">
+        @if (m.feedback.up + m.feedback.down > 0) { {{ m.feedback.satisfactionRate | percent: '1.0-0' }} } @else { – }
+      </span>
+      <span class="tile-sub">👍 {{ m.feedback.up }} · 👎 {{ m.feedback.down }}</span>
+    </article>
+    <article class="tile">
       <span class="tile-label">Blocked inputs</span>
       <span class="tile-value">{{ m.inputsBlockedSinceStart }}</span>
       <span class="tile-sub">guardrail, since start</span>
@@ -80,6 +87,23 @@
         </ul>
       }
     </section>
+
+    @if (canReadFeedback()) {
+      <section class="card" aria-labelledby="negative-title">
+        <h2 id="negative-title">Latest negative feedback</h2>
+        <ul class="negative">
+          @for (item of negativeFeedback.value(); track item.runId) {
+            <li>
+              <a [routerLink]="['/runs', item.runId]">{{ item.question }}</a>
+              @if (item.comment) { <q>{{ item.comment }}</q> }
+              <span class="muted">{{ item.userId }} · {{ item.model ?? 'unknown model' }} · {{ item.updatedAt | date: 'short' }}</span>
+            </li>
+          } @empty {
+            <li class="muted">No 👎 yet.</li>
+          }
+        </ul>
+      </section>
+    }
 
     <section class="card" aria-labelledby="models-title">
       <h2 id="models-title">Models</h2>

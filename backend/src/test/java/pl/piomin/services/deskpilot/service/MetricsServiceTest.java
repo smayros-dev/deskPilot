@@ -15,6 +15,7 @@ import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.model.StepType;
 import pl.piomin.services.deskpilot.repository.AgentRunRepository;
 import pl.piomin.services.deskpilot.repository.AgentStepRepository;
+import pl.piomin.services.deskpilot.repository.RunFeedbackRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,11 +32,15 @@ class MetricsServiceTest {
     @Autowired
     private AgentStepRepository stepRepository;
 
+    @Autowired
+    private RunFeedbackRepository feedbackRepository;
+
     private MetricsService metricsService;
 
     @BeforeEach
     void setUp() {
-        metricsService = new MetricsService(runRepository, stepRepository, new AgentMetrics(new SimpleMeterRegistry()));
+        metricsService = new MetricsService(runRepository, stepRepository, new AgentMetrics(new SimpleMeterRegistry()),
+                feedbackRepository);
     }
 
     @Test

@@ -1,6 +1,6 @@
 import { DatePipe, DecimalPipe, PercentPipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, linkedSignal, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, InjectionToken, computed, effect, inject, linkedSignal, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
@@ -10,8 +10,11 @@ import { Notifications } from '../core/notifications';
 import { DurationPipe } from '../shared/duration-pipe';
 import { Evaluation, EvaluationApi, Scenario } from './evaluation-api';
 
-/** How often a running evaluation is refreshed. */
-export const EVALUATION_POLL_MS = 3000;
+/** How often a running evaluation is refreshed, in milliseconds. */
+export const EVALUATION_POLL_MS = new InjectionToken<number>('EVALUATION_POLL_MS', {
+  providedIn: 'root',
+  factory: () => 3000,
+});
 
 /**
  * Admins run the scenario catalogue against an installed model and compare the scores of past evaluations
@@ -28,6 +31,7 @@ export class EvaluationPage {
   private readonly api = inject(EvaluationApi);
   private readonly agentApi = inject(AgentApi);
   private readonly notifications = inject(Notifications);
+  private readonly pollMs = inject(EVALUATION_POLL_MS);
 
   protected readonly scenarios = httpResource<Scenario[]>(() => this.api.scenariosUrl, { defaultValue: [] });
   protected readonly models = httpResource<ModelInfo[]>(() => this.agentApi.url('/models'), { defaultValue: [] });
@@ -74,7 +78,7 @@ export class EvaluationPage {
       const timer = setInterval(() => {
         this.evaluations.reload();
         this.detail.reload();
-      }, EVALUATION_POLL_MS);
+      }, this.pollMs);
       onCleanup(() => clearInterval(timer));
     });
   }

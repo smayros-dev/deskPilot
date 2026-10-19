@@ -131,7 +131,7 @@ Each sub-step is a self-contained release (own Flyway migration, tests, README a
 order of the recommended path below. Value / effort are rough estimates for this codebase.
 
 ### A. Better answers (knowledge & retrieval)
-- [ ] **12a — Answers with citations:** the knowledge-base tool returns article ids; the agent cites them as `[1]`, the chat renders Markdown safely and shows the cited articles as links/cards. *Value: high · Effort: S*
+- [x] **12a — Answers with citations ✅:** the knowledge-base tool returns article ids; the agent cites them as `[1]`, the chat renders Markdown safely and shows the cited articles as links/cards. *Value: high · Effort: S*
 - [ ] **12b — Document ingestion:** admins upload PDF / Markdown / HTML (Spring AI document readers + token-based chunking with overlap), re-index on change, delete; a Knowledge admin page with ingestion status. *Value: high · Effort: M*
 - [ ] **12c — Hybrid search + re-ranking:** Postgres full-text (BM25-like `ts_rank`) combined with pgvector by reciprocal rank fusion, optional re-ranking of the top hits by the model; measured against Step 10's scenarios. *Value: medium–high · Effort: M*
 - [ ] **12d — Knowledge-gap detection:** questions answered "not found" or escalated are clustered weekly; reviewers get suggested new articles drafted by the model. *Value: medium · Effort: M*
@@ -148,7 +148,7 @@ order of the recommended path below. Value / effort are rough estimates for this
 - [ ] **12k — Real-time updates:** replace the 5-second polling of paused runs with a per-user SSE channel (approval decided, ticket updated, new item in the reviewers' queue with a counter in the nav). *Value: medium · Effort: S*
 
 ### D. Quality, safety & operations
-- [ ] **12l — User feedback loop:** 👍/👎 and a comment on every answer, stored with the run; shown on the dashboard and turned into evaluation scenarios. *Value: high · Effort: S*
+- [x] **12l — User feedback loop ✅:** 👍/👎 and a comment on every answer, stored with the run; shown on the dashboard and turned into evaluation scenarios. *Value: high · Effort: S*
 - [ ] **12m — Prompt & model experiments:** versioned system prompts; A/B split of traffic between two prompt/model variants; dashboard compares success rate, latency and feedback per variant. *Value: medium · Effort: M*
 - [ ] **12n — Guardrails v2:** model-based moderation and PII detection on input and output, in addition to the regex rules; per-user rate limits and token budgets (Bucket4j); circuit breaker and retry around Ollama (Resilience4j). *Value: medium · Effort: M*
 - [ ] **12o — Audit & privacy:** audit log of approvals and settings changes with export; users can view and delete their memories and conversations (GDPR "right to erasure"); data retention job. *Value: medium · Effort: S*

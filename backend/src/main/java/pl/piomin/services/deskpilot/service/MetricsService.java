@@ -16,6 +16,7 @@ import pl.piomin.services.deskpilot.model.StepType;
 import pl.piomin.services.deskpilot.repository.AgentRunRepository;
 import pl.piomin.services.deskpilot.repository.AgentRunRepository.StatusTotals;
 import pl.piomin.services.deskpilot.repository.AgentStepRepository;
+import pl.piomin.services.deskpilot.repository.RunFeedbackRepository;
 
 /** Computes success metrics from the persisted runs, so they survive restarts (unlike in-memory meters). */
 @Service
@@ -25,12 +26,14 @@ public class MetricsService {
     private final AgentRunRepository runRepository;
     private final AgentStepRepository stepRepository;
     private final AgentMetrics agentMetrics;
+    private final RunFeedbackRepository feedbackRepository;
 
     public MetricsService(AgentRunRepository runRepository, AgentStepRepository stepRepository,
-                          AgentMetrics agentMetrics) {
+                          AgentMetrics agentMetrics, RunFeedbackRepository feedbackRepository) {
         this.runRepository = runRepository;
         this.stepRepository = stepRepository;
         this.agentMetrics = agentMetrics;
+        this.feedbackRepository = feedbackRepository;
     }
 
     public AgentMetricsResponse metrics() {
@@ -77,7 +80,18 @@ public class MetricsService {
                 sum(byStatus.values(), StatusTotals::getCompletionTokens),
                 (long) agentMetrics.guardrailBlockedTotal(),
                 tools,
-                models);
+                models,
+                feedback());
+    }
+
+    private AgentMetricsResponse.FeedbackStats feedback() {
+        List<AgentMetricsResponse.ModelFeedback> byModel = feedbackRepository.totalsByModel().stream()
+                .map(m -> new AgentMetricsResponse.ModelFeedback(m.getModel(), m.getUp(), m.getDown(),
+                        ratio(m.getUp(), m.getUp() + m.getDown())))
+                .toList();
+        long up = byModel.stream().mapToLong(AgentMetricsResponse.ModelFeedback::up).sum();
+        long down = byModel.stream().mapToLong(AgentMetricsResponse.ModelFeedback::down).sum();
+        return new AgentMetricsResponse.FeedbackStats(up, down, ratio(up, up + down), byModel);
     }
 
     private static long runs(Map<RunStatus, StatusTotals> byStatus, RunStatus status) {
