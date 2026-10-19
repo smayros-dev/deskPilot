@@ -1,4 +1,4 @@
-# Agent AI — Implementation Steps
+# DeskPilot — Implementation Steps
 
 Stack: **Angular 22** (frontend) + **Spring Boot 4.1 / Java 21** (backend) + **Spring AI 2.0** + **Ollama** (free, local LLM).
 

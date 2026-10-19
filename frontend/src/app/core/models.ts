@@ -1,4 +1,4 @@
-// Mirrors the backend DTOs (pl.piomin.services.agentai.dto).
+// Mirrors the backend DTOs (pl.piomin.services.deskpilot.dto).
 
 export type RunStatus = 'RUNNING' | 'AWAITING_APPROVAL' | 'COMPLETED' | 'ESCALATED' | 'FAILED';
 

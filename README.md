@@ -42,7 +42,7 @@ flowchart LR
 ## Project layout
 
 ```
-backend/                       Spring Boot app (pl.piomin.services.agentai)
+backend/                       Spring Boot app (pl.piomin.services.deskpilot)
   agent/                       orchestrator, settings, model catalog, chat options
   agent/tool/                  @Tool classes: knowledge base, tickets, memory, escalation
   guardrail/                   input filter and output redaction
@@ -130,6 +130,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.7** — Project renamed to DeskPilot: Maven artifact `deskpilot`, package `pl.piomin.services.deskpilot`, UI title, Compose database `deskpilot`.
 - **1.0.6** — Runtime agent settings and model switching from the UI (Settings page + chat switcher), per-model metrics.
 - **1.0.5** — PostgreSQL + pgvector (Docker Compose, Flyway, Testcontainers) replaces H2 and the in-memory vector store.
 - **1.0.4** — Angular frontend: chat with approvals and reasoning traces, run details, metrics dashboard, tickets/knowledge/memories pages.

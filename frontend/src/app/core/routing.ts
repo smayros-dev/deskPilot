@@ -43,6 +43,6 @@ export class AppTitleStrategy extends TitleStrategy {
 
   override updateTitle(snapshot: RouterStateSnapshot): void {
     const pageTitle = this.buildTitle(snapshot);
-    this.title.setTitle(pageTitle ? `${pageTitle} · Helpdesk Agent` : 'Helpdesk Agent');
+    this.title.setTitle(pageTitle ? `${pageTitle} · DeskPilot` : 'DeskPilot');
   }
 }

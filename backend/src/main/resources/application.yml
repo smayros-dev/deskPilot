@@ -1,6 +1,6 @@
 spring:
   application:
-    name: agent-ai
+    name: deskpilot
   threads:
     virtual:
       enabled: true

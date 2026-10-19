@@ -136,7 +136,7 @@
   <section class="card" aria-labelledby="prompt-title">
     <h2 id="prompt-title">System prompt</h2>
     <label for="systemPrompt">Override (leave empty to use the built-in helpdesk prompt)</label>
-    <textarea id="systemPrompt" rows="8" formControlName="systemPrompt" placeholder="You are the IT Helpdesk Agent…"></textarea>
+    <textarea id="systemPrompt" rows="8" formControlName="systemPrompt" placeholder="You are DeskPilot, the IT helpdesk agent…"></textarea>
     @if (form.controls.systemPrompt.hasError('maxlength')) {
       <small class="warn">At most 8000 characters.</small>
     }

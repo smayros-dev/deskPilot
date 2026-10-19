@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>pl.piomin.services</groupId>
-	<artifactId>agent-ai</artifactId>
-	<version>1.0.6</version>
-	<name>agent-ai</name>
+	<artifactId>deskpilot</artifactId>
+	<version>1.0.7</version>
+	<name>deskpilot</name>
 	<description>Agentic AI backend (Spring AI + Ollama + Spring Boot)</description>
 	<url/>
 	<licenses>
