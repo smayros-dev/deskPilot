@@ -3,13 +3,14 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Run } from '../core/models';
+import { Answer } from '../shared/answer';
 import { StatusBadge } from '../shared/status-badge';
 import { RunTrace } from './run-trace';
 
 /** Full trace of one run. `run` comes from the route resolver via component input binding. */
 @Component({
   selector: 'app-run-page',
-  imports: [RouterLink, DatePipe, JsonPipe, RunTrace, StatusBadge],
+  imports: [RouterLink, DatePipe, JsonPipe, RunTrace, StatusBadge, Answer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let r = run();
@@ -29,7 +30,7 @@ import { RunTrace } from './run-trace';
       </header>
 
       @if (r.answer) {
-        <blockquote>{{ r.answer }}</blockquote>
+        <blockquote><app-answer [text]="r.answer" [run]="r" /></blockquote>
       }
 
       <h2>Reasoning trace</h2>

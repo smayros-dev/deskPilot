@@ -22,7 +22,15 @@ public class KnowledgeBaseTools implements AgentTools {
         this.knowledgeBaseService = knowledgeBaseService;
     }
 
-    public record Article(long id, String title, String content, double relevance) {
+    /**
+     * @param cite marker the agent puts after the sentences based on this article, e.g. {@code [4]}. It is built from
+     *             the article id, so it stays the same across several searches in one run and the UI can resolve it.
+     */
+    public record Article(long id, String cite, String title, String content, double relevance) {
+
+        static String citeOf(long articleId) {
+            return "[" + articleId + "]";
+        }
     }
 
     public record SearchResult(List<Article> articles, String guidance) {
@@ -30,7 +38,8 @@ public class KnowledgeBaseTools implements AgentTools {
 
     @Tool(name = "search_knowledge_base", description = """
             Search the IT helpdesk knowledge base (VPN, passwords, MFA, printers, e-mail, hardware, software, Wi-Fi). \
-            Always search before answering a technical question, and base the answer only on the returned articles.""")
+            Always search before answering a technical question, and base the answer only on the returned articles. \
+            Cite the articles you used by putting their "cite" marker, e.g. [4], after the sentences they support.""")
     public SearchResult searchKnowledgeBase(
             @ToolParam(description = "Search query describing the problem, e.g. 'outlook not receiving email'") String query,
             ToolContext toolContext) {
@@ -39,7 +48,8 @@ public class KnowledgeBaseTools implements AgentTools {
         }
         AgentConfig config = RunContext.from(toolContext).config();
         List<Article> articles = knowledgeBaseService.search(query, config.ragTopK(), config.ragSimilarityThreshold()).stream()
-                .map(hit -> new Article(hit.articleId(), hit.title(), hit.content(), Math.round(hit.score() * 100) / 100.0))
+                .map(hit -> new Article(hit.articleId(), Article.citeOf(hit.articleId()), hit.title(), hit.content(),
+                        Math.round(hit.score() * 100) / 100.0))
                 .toList();
         return new SearchResult(articles, articles.isEmpty() ? NO_RESULTS_GUIDANCE : null);
     }

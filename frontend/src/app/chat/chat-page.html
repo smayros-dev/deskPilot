@@ -31,7 +31,7 @@
           }
           @default {
             <div class="bubble agent" [class.failed]="run.status === 'FAILED'">
-              <p>{{ run.answer ?? 'The request failed before the agent could answer.' }}</p>
+              <app-answer [text]="run.answer ?? 'The request failed before the agent could answer.'" [run]="run" />
               <div class="meta">
                 <app-status-badge [status]="run.status" />
                 <span>{{ run.stats.activeMillis | duration }}</span>
