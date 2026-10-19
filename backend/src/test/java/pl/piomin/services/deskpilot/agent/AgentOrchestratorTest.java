@@ -2,6 +2,7 @@ package pl.piomin.services.deskpilot.agent;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -438,6 +439,36 @@ class AgentOrchestratorTest {
         assertThat(runService.get(interrupted.getId()).getFinalAnswer()).isEqualTo(InterruptedRunRecovery.INTERRUPTED);
         assertThat(runService.get(pausedWithoutTurn.getId()).getStatus()).isEqualTo(RunStatus.FAILED);
         assertThat(runService.get(resumable.getId()).getStatus()).isEqualTo(RunStatus.AWAITING_APPROVAL);
+    }
+
+    @Test
+    void listenerFollowsTheRunStepByStep() {
+        when(knowledgeBaseService.search(eq("printer"), anyInt(), anyDouble()))
+                .thenReturn(List.of(new KnowledgeBaseService.Hit(2, "Printers", "Add PRN-3-02 from Settings", 0.8)));
+        givenModelReplies(
+                toolCall("Searching.", "search_knowledge_base", "{\"query\":\"printer\"}"),
+                answer("Add it from Settings."));
+        List<String> events = new ArrayList<>();
+
+        orchestrator.chat(sessionId, "How do I add the printer?", new RunListener() {
+            @Override
+            public void runStarted(AgentRun run) {
+                events.add("run:" + run.getStatus());
+            }
+
+            @Override
+            public void thinking(int iteration) {
+                events.add("thinking:" + iteration);
+            }
+
+            @Override
+            public void step(AgentStep step) {
+                events.add(step.getType().name());
+            }
+        });
+
+        assertThat(events).containsExactly("run:RUNNING", "thinking:1", "THOUGHT", "TOOL_CALL", "TOOL_RESULT",
+                "thinking:2", "ANSWER");
     }
 
     private static ModelCatalog.ModelInfo toolModel(String name) {

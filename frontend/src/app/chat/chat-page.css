@@ -69,7 +69,26 @@ app-approval-card { align-self: stretch; max-width: 36rem; }
 
 .trace { align-self: stretch; }
 
-.typing { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.typing { display: grid; gap: 0.5rem; }
+.activity { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.live-steps { list-style: none; margin: 0; padding: 0 0 0 0.25rem; display: grid; gap: 0.3rem; font-size: 0.85rem; }
+.live-steps li {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  min-width: 0;
+  animation: step-in 0.25s ease-out;
+}
+.live-steps li code { flex: none; }
+.live-steps li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.live-steps li.error { color: var(--danger); }
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-steps li { animation: none; }
+}
 .dots { display: inline-flex; gap: 0.2rem; }
 .dots span {
   width: 0.4rem;
@@ -97,7 +116,7 @@ app-approval-card { align-self: stretch; max-width: 36rem; }
 }
 .composer-area p { margin: 0; }
 
-.side { position: sticky; top: 5rem; display: grid; gap: 1rem; max-height: calc(100dvh - 8rem); overflow-y: auto; }
+.side { position: sticky; top: 5rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; max-height: calc(100dvh - 8rem); overflow-y: auto; overflow-x: hidden; }
 .side h2 { font-size: 1rem; margin: 0 0 0.75rem; }
 .how { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.4rem; }
 

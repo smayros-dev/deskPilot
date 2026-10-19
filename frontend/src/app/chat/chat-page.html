@@ -15,6 +15,9 @@
         <div class="bubble user">{{ run.userInput }}</div>
 
         @switch (run.status) {
+          @case ('RUNNING') {
+            <!-- In progress: the live steps are shown in the "working" bubble below. -->
+          }
           @case ('AWAITING_APPROVAL') {
             @if (auth.isReviewer()) {
               <app-approval-card
@@ -69,10 +72,28 @@
 
       @if (store.sending()) {
         <div class="bubble agent typing" role="status">
-          <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
-          Agent is working… {{ elapsedSeconds() }} s
-          @if (elapsedSeconds() > 15) {
-            <span class="muted">(the local model runs on CPU, this can take a minute)</span>
+          <div class="activity">
+            <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+            {{ store.activity() || 'Agent is working' }}… {{ elapsedSeconds() }} s
+            @if (elapsedSeconds() > 15) {
+              <span class="muted">(the local model runs on CPU, this can take a minute)</span>
+            }
+          </div>
+          @if (store.liveSteps().length > 0) {
+            <ol class="live-steps" aria-label="Steps so far">
+              @for (step of store.liveSteps(); track step.id) {
+                <li [class.error]="step.error">
+                  @switch (step.type) {
+                    @case ('THOUGHT') { 💭 <span>{{ step.content }}</span> }
+                    @case ('TOOL_CALL') { 🔧 <code>{{ step.name }}</code> <span class="muted">{{ step.content }}</span> }
+                    @case ('TOOL_RESULT') { {{ step.error ? '⚠️' : '📄' }} <code>{{ step.name }}</code> <span class="muted">{{ step.content }}</span> }
+                    @case ('APPROVAL_DECISION') { {{ step.name === 'APPROVED' ? '✅' : '⛔' }} <span>{{ step.name?.toLowerCase() }} {{ step.content }}</span> }
+                    @case ('ANSWER') { 💬 <span>Answer ready</span> }
+                    @default { • <span>{{ step.type.toLowerCase().replace('_', ' ') }}</span> }
+                  }
+                </li>
+              }
+            </ol>
           }
         </div>
       }
@@ -93,7 +114,7 @@
   </section>
 
   <aside class="side" aria-label="Last run">
-    @let last = store.lastRun();
+    @let last = store.lastSettledRun();
     @if (last) {
       <section class="card">
         <h2>Last run</h2>

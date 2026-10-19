@@ -30,6 +30,7 @@ import pl.piomin.services.deskpilot.guardrail.GuardrailService;
 import pl.piomin.services.deskpilot.guardrail.GuardrailViolationException;
 import pl.piomin.services.deskpilot.model.AgentRun;
 import pl.piomin.services.deskpilot.model.AgentSession;
+import pl.piomin.services.deskpilot.model.AgentStep;
 import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.model.StepType;
 import pl.piomin.services.deskpilot.service.RunService;
@@ -90,6 +91,11 @@ public class AgentOrchestrator {
 
     /** Handles a new user message; returns the run, finished or paused for approval. */
     public AgentRun chat(String sessionId, String userMessage) {
+        return chat(sessionId, userMessage, RunListener.NONE);
+    }
+
+    /** Like {@link #chat(String, String)}, reporting progress to the listener as the agent works. */
+    public AgentRun chat(String sessionId, String userMessage, RunListener listener) {
         AgentSession session = sessionService.get(sessionId);
         try {
             guardrails.checkUserInput(userMessage);
@@ -104,22 +110,30 @@ public class AgentOrchestrator {
             AgentConfig config = settingsService.current();
             AgentRun run = runService.start(sessionId, session.getUserId(), userMessage, config.chatModel());
             ActiveTurn turn = new ActiveTurn(new RunContext(session.getUserId(), sessionId, run.getId(), config), userMessage);
+            turn.listen(listener);
+            listener.runStarted(run);
             return loop(turn);
         });
     }
 
     /** Applies a human decision to the tool calls a paused run is waiting on, then resumes the run. */
     public AgentRun decide(String runId, ApprovalDecision decision) {
+        return decide(runId, decision, RunListener.NONE);
+    }
+
+    /** Like {@link #decide(String, ApprovalDecision)}, reporting progress to the listener as the run continues. */
+    public AgentRun decide(String runId, ApprovalDecision decision, RunListener listener) {
         AgentRun run = runService.get(runId);
         return sessionService.exclusively(run.getSessionId(), () -> {
             ActiveTurn turn = turnStore.find(runId)
                     .filter(ActiveTurn::isAwaitingApproval)
                     .orElseThrow(() -> new ConflictException("Run " + runId + " is not waiting for approval"));
             turnStore.delete(runId);
-            runService.addStep(runId, StepType.APPROVAL_DECISION, decision.approved() ? "APPROVED" : "REJECTED",
-                    decision.summary(), false, 0);
-            metrics.approval(decision.approved() ? "approved" : "rejected");
+            turn.listen(listener);
             runService.resume(runId);
+            listener.runStarted(runService.get(runId));
+            record(turn, StepType.APPROVAL_DECISION, decision.approved() ? "APPROVED" : "REJECTED", decision.summary(), false, 0);
+            metrics.approval(decision.approved() ? "approved" : "rejected");
             long start = System.nanoTime();
             executeToolCalls(turn, turn.takePendingToolCalls(), decision);
             return loop(turn, start);
@@ -142,10 +156,12 @@ public class AgentOrchestrator {
         AgentConfig config = turn.context().config();
         try {
             while (true) {
-                if (runService.get(runId).getIterations() >= config.maxIterations()) {
+                int iterations = runService.get(runId).getIterations();
+                if (iterations >= config.maxIterations()) {
                     LOG.warn("Run {} hit the iteration limit ({})", runId, config.maxIterations());
                     return finish(turn, RunStatus.ESCALATED, MAX_ITERATIONS_ANSWER, startNanos);
                 }
+                turn.listener().thinking(iterations + 1);
                 AssistantMessage reply = callModel(turn);
                 turn.add(reply);
 
@@ -158,7 +174,7 @@ public class AgentOrchestrator {
                     return finish(turn, status, answer, startNanos);
                 }
 
-                recordToolCallSteps(runId, reply);
+                recordToolCallSteps(turn, reply);
                 List<AssistantMessage.ToolCall> gated = reply.getToolCalls().stream()
                         .filter(call -> config.requiresApproval(call.name()))
                         .toList();
@@ -166,8 +182,7 @@ public class AgentOrchestrator {
                     // Hold back every call of this message: their results must be returned together.
                     turn.awaitApproval(reply.getToolCalls());
                     turnStore.save(turn);
-                    gated.forEach(call -> runService.addStep(runId, StepType.APPROVAL_REQUESTED, call.name(),
-                            call.arguments(), false, 0));
+                    gated.forEach(call -> record(turn, StepType.APPROVAL_REQUESTED, call.name(), call.arguments(), false, 0));
                     runService.pauseForApproval(runId, elapsedMillis(startNanos));
                     return runService.get(runId);
                 }
@@ -175,7 +190,7 @@ public class AgentOrchestrator {
             }
         } catch (RuntimeException e) {
             LOG.error("Run {} failed", runId, e);
-            runService.addStep(runId, StepType.ERROR, e.getClass().getSimpleName(), e.getMessage(), true, 0);
+            record(turn, StepType.ERROR, e.getClass().getSimpleName(), e.getMessage(), true, 0);
             AgentRun failed = runService.finish(runId, RunStatus.FAILED, null, elapsedMillis(startNanos));
             metrics.runFinished(RunStatus.FAILED, failed.getActiveMillis());
             throw e;
@@ -204,14 +219,19 @@ public class AgentOrchestrator {
         AssistantMessage reply = response.getResult().getOutput();
         // Text that accompanies tool calls is the model's reasoning step (the "thought" in ReAct).
         if (reply.hasToolCalls() && reply.getText() != null && !reply.getText().isBlank()) {
-            runService.addStep(turn.runId(), StepType.THOUGHT, null, reply.getText().strip(), false, durationMillis);
+            record(turn, StepType.THOUGHT, null, reply.getText().strip(), false, durationMillis);
         }
         return reply;
     }
 
-    private void recordToolCallSteps(String runId, AssistantMessage reply) {
-        reply.getToolCalls().forEach(call ->
-                runService.addStep(runId, StepType.TOOL_CALL, call.name(), call.arguments(), false, 0));
+    private void recordToolCallSteps(ActiveTurn turn, AssistantMessage reply) {
+        reply.getToolCalls().forEach(call -> record(turn, StepType.TOOL_CALL, call.name(), call.arguments(), false, 0));
+    }
+
+    /** Saves a step of the trace and reports it to whoever follows the run. */
+    private void record(ActiveTurn turn, StepType type, String name, String content, boolean error, long durationMillis) {
+        AgentStep step = runService.addStep(turn.runId(), type, name, content, error, durationMillis);
+        turn.listener().step(step);
     }
 
     /**
@@ -225,7 +245,7 @@ public class AgentOrchestrator {
             ToolOutcome outcome = executeToolCall(turn.context(), call, decision);
             runService.recordToolCall(turn.runId(), outcome.error());
             metrics.toolCall(call.name(), outcome.error());
-            runService.addStep(turn.runId(), StepType.TOOL_RESULT, call.name(), outcome.output(), outcome.error(),
+            record(turn, StepType.TOOL_RESULT, call.name(), outcome.output(), outcome.error(),
                     elapsedMillis(start));
             responses.add(new ToolResponseMessage.ToolResponse(call.id(), call.name(),
                     outcome.error() ? "ERROR: " + outcome.output() : outcome.output()));
@@ -256,11 +276,11 @@ public class AgentOrchestrator {
     private AgentRun finish(ActiveTurn turn, RunStatus status, String rawAnswer, long startNanos) {
         GuardrailService.Sanitized sanitized = guardrails.sanitizeOutput(rawAnswer);
         if (sanitized.redactions() > 0) {
-            runService.addStep(turn.runId(), StepType.GUARDRAIL, "output_redaction",
+            record(turn, StepType.GUARDRAIL, "output_redaction",
                     sanitized.redactions() + " sensitive value(s) redacted from the answer", false, 0);
         }
         String answer = sanitized.text();
-        runService.addStep(turn.runId(), StepType.ANSWER, status.name(), answer, status == RunStatus.FAILED, 0);
+        record(turn, StepType.ANSWER, status.name(), answer, status == RunStatus.FAILED, 0);
         AgentRun run = runService.finish(turn.runId(), status, answer, elapsedMillis(startNanos));
         metrics.runFinished(status, run.getActiveMillis());
         // Short-term memory keeps only the question and the answer; tool chatter stays in the run trace.

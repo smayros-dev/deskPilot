@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import pl.piomin.services.deskpilot.agent.AgentOrchestrator;
 import pl.piomin.services.deskpilot.dto.RunResponse;
 import pl.piomin.services.deskpilot.model.AgentRun;
+import pl.piomin.services.deskpilot.model.AgentStep;
 import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.service.RunService;
 
@@ -21,10 +22,7 @@ class RunResponseMapper {
     }
 
     RunResponse toResponse(AgentRun run) {
-        List<RunResponse.Step> steps = runService.steps(run.getId()).stream()
-                .map(s -> new RunResponse.Step(s.getId(), s.getType(), s.getName(), s.getContent(), s.isError(),
-                        s.getDurationMillis(), s.getCreatedAt()))
-                .toList();
+        List<RunResponse.Step> steps = runService.steps(run.getId()).stream().map(RunResponseMapper::toStep).toList();
         List<RunResponse.PendingApproval> pending = run.getStatus() == RunStatus.AWAITING_APPROVAL
                 ? orchestrator.pendingApprovals(run.getId()).stream()
                         .map(call -> new RunResponse.PendingApproval(call.id(), call.name(), call.arguments()))
@@ -34,5 +32,10 @@ class RunResponseMapper {
                 run.getPromptTokens(), run.getCompletionTokens(), run.getActiveMillis());
         return new RunResponse(run.getId(), run.getSessionId(), run.getUserId(), run.getModel(), run.getStatus(), run.getUserInput(),
                 run.getFinalAnswer(), steps, pending, stats, run.getCreatedAt(), run.getCompletedAt());
+    }
+
+    static RunResponse.Step toStep(AgentStep step) {
+        return new RunResponse.Step(step.getId(), step.getType(), step.getName(), step.getContent(), step.isError(),
+                step.getDurationMillis(), step.getCreatedAt());
     }
 }

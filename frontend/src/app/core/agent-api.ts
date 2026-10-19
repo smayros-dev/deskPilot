@@ -1,9 +1,10 @@
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_CONFIG } from './api-config';
 import { AgentSettings, ApprovalDecision, Run, Session } from './models';
+import { RunEvent, toRunEvents } from './run-stream';
 
 /** Commands and lookups against the agent REST API. Read-only lists are loaded with httpResource in the pages. */
 @Injectable({ providedIn: 'root' })
@@ -25,6 +26,11 @@ export class AgentApi {
     return this.http.post<Run>(`${this.config.baseUrl}/sessions/${sessionId}/messages`, { message });
   }
 
+  /** Like {@link sendMessage}, but emits the run's steps as the agent works (Server-Sent Events). */
+  streamMessage(sessionId: string, message: string): Observable<RunEvent> {
+    return this.stream(`${this.config.baseUrl}/sessions/${sessionId}/messages/stream`, { message });
+  }
+
   listRuns(sessionId: string): Observable<Run[]> {
     return this.http.get<Run[]>(`${this.config.baseUrl}/sessions/${sessionId}/runs`);
   }
@@ -37,6 +43,11 @@ export class AgentApi {
     return this.http.post<Run>(`${this.config.baseUrl}/runs/${runId}/approval`, decision);
   }
 
+  /** Like {@link decide}, but emits the steps of the resumed run as they happen. */
+  streamDecision(runId: string, decision: ApprovalDecision): Observable<RunEvent> {
+    return this.stream(`${this.config.baseUrl}/runs/${runId}/approval/stream`, decision);
+  }
+
   getSettings(): Observable<AgentSettings> {
     return this.http.get<AgentSettings>(`${this.config.baseUrl}/settings`);
   }
@@ -47,6 +58,18 @@ export class AgentApi {
 
   resetSettings(): Observable<AgentSettings> {
     return this.http.delete<AgentSettings>(`${this.config.baseUrl}/settings`);
+  }
+
+  // POST with a body and a bearer token, which EventSource cannot do; HttpClient's fetch backend streams the text.
+  private stream(url: string, body: unknown): Observable<RunEvent> {
+    return this.http
+      .post(url, body, {
+        headers: new HttpHeaders({ Accept: 'text/event-stream' }),
+        observe: 'events',
+        reportProgress: true,
+        responseType: 'text',
+      })
+      .pipe(toRunEvents());
   }
 
   url(path: string): string {

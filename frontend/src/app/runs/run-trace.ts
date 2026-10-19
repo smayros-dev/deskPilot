@@ -93,7 +93,7 @@ const STEP_LABELS: Record<StepType, string> = {
     .label { font-weight: 600; }
     .muted { color: var(--text-muted); font-size: 0.8rem; }
     p { margin: 0.25rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-    pre { margin: 0.25rem 0 0; max-height: 16rem; overflow: auto; font-size: 0.78rem; background: var(--surface-muted); padding: 0.5rem; border-radius: var(--radius); }
+    pre { margin: 0.25rem 0 0; max-height: 16rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.78rem; background: var(--surface-muted); padding: 0.5rem; border-radius: var(--radius); }
   `,
 })
 export class RunTrace {

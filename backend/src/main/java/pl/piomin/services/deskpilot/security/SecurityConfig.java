@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -33,8 +34,10 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth
+                        // Streamed responses (SSE) finish in an async dispatch of a request already authorized.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/runs/*/approval").hasRole(REVIEWER)
+                        .requestMatchers(HttpMethod.POST, "/api/runs/*/approval", "/api/runs/*/approval/stream").hasRole(REVIEWER)
                         .requestMatchers(HttpMethod.GET, "/api/runs").hasAnyRole(REVIEWER, ADMIN)
                         .requestMatchers(HttpMethod.PUT, "/api/settings").hasRole(ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/settings").hasRole(ADMIN)

@@ -48,6 +48,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "The language model server is not reachable. Check that Ollama is running.");
     }
 
+    /** The same mapping for failures that happen after a response was started, e.g. in a Server-Sent Events stream. */
+    public ProblemDetail toProblem(RuntimeException e) {
+        return switch (e) {
+            case NotFoundException n -> handleNotFound(n);
+            case ConflictException c -> handleConflict(c);
+            case GuardrailViolationException g -> handleGuardrail(g);
+            case IllegalArgumentException i -> handleIllegalArgument(i);
+            case ResourceAccessException r -> handleModelUnavailable(r);
+            default -> {
+                LOG.error("Request failed", e);
+                yield problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", "The request failed unexpectedly.");
+            }
+        };
+    }
+
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setTitle(title);

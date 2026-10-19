@@ -20,6 +20,8 @@ final class ActiveTurn {
     private final String userInput;
     private final List<Message> messages = new ArrayList<>();
     private List<AssistantMessage.ToolCall> pendingToolCalls = List.of();
+    /** Not saved with the turn: it belongs to the HTTP request currently driving the run. */
+    private RunListener listener = RunListener.NONE;
 
     ActiveTurn(RunContext context, String userInput) {
         this.context = context;
@@ -59,6 +61,14 @@ final class ActiveTurn {
 
     List<Message> messages() {
         return List.copyOf(messages);
+    }
+
+    void listen(RunListener listener) {
+        this.listener = listener;
+    }
+
+    RunListener listener() {
+        return listener;
     }
 
     RunContext context() {
