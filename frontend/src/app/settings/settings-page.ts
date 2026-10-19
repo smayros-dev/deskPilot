@@ -5,6 +5,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, FormRecord, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AgentApi } from '../core/agent-api';
+import { AuthService } from '../core/auth';
 import { AgentSettings, ModelInfo, ToolInfo } from '../core/models';
 import { SettingsStore } from '../core/settings-store';
 
@@ -36,6 +37,7 @@ export class SettingsPage {
   private readonly api = inject(AgentApi);
   private readonly fb = inject(NonNullableFormBuilder);
   protected readonly store = inject(SettingsStore);
+  protected readonly auth = inject(AuthService);
 
   protected readonly presets = PRESETS;
   protected readonly gib = GIB;
@@ -72,6 +74,14 @@ export class SettingsPage {
       if (settings && tools.length > 0 && !this.loaded()) {
         this.patch(settings, tools);
         this.loaded.set(true);
+      }
+    });
+    // Everyone can read the settings; only admins can change them (the backend enforces it too).
+    effect(() => {
+      if (this.auth.isAdmin()) {
+        this.form.enable({ emitEvent: false });
+      } else {
+        this.form.disable({ emitEvent: false });
       }
     });
   }

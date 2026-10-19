@@ -15,5 +15,18 @@ services:
     labels:
       org.springframework.boot.service-connection: postgres
 
+  # Identity provider (OIDC). Demo realm with users alice/alice (user), bob/bob (reviewer), admin/admin (admin).
+  # Fixed port: the issuer URL must be the same for the browser and the backend.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.3
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8180:8080"
+    volumes:
+      - ./keycloak/deskpilot-realm.json:/opt/keycloak/data/import/deskpilot-realm.json:ro
+
 volumes:
   deskpilot-pgdata:

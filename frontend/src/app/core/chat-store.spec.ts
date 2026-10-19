@@ -3,15 +3,17 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { ChatStore } from './chat-store';
+import { APPROVAL_POLL_MS, ChatStore } from './chat-store';
 import { errorInterceptor } from './interceptors';
 import { Run } from './models';
 import { Notifications } from './notifications';
+import { provideFakeAuth } from './testing';
 
 function run(overrides: Partial<Run>): Run {
   return {
     id: 'run-1',
     sessionId: 's1',
+    userId: 'alice',
     model: 'qwen3:8b',
     status: 'COMPLETED',
     userInput: 'Hi',
@@ -36,19 +38,20 @@ describe('ChatStore', () => {
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
+        provideFakeAuth('alice'),
       ],
     });
     store = TestBed.inject(ChatStore);
     http = TestBed.inject(HttpTestingController);
 
     const init = store.init();
-    http.expectOne({ method: 'POST', url: '/api/sessions' }).flush({ id: 's1', userId: 'demo-user', createdAt: '' });
+    http.expectOne({ method: 'POST', url: '/api/sessions' }).flush({ id: 's1', userId: 'alice', createdAt: '' });
     await init;
   });
 
   afterEach(() => http.verify());
 
-  it('creates a session for the default user', () => {
+  it('creates a session for the signed-in user', () => {
     expect(store.session()?.id).toBe('s1');
     expect(store.canSend()).toBe(true);
   });
@@ -97,14 +100,46 @@ describe('ChatStore', () => {
     expect(TestBed.inject(Notifications).toasts()[0].message).toBe('Message was blocked by the safety filter.');
   });
 
-  it('starts a new conversation when switching user', async () => {
-    const switching = store.switchUser('alice');
-    http.expectOne({ method: 'POST', url: '/api/sessions' }).flush({ id: 's2', userId: 'alice', createdAt: '' });
-    await switching;
-    TestBed.tick(); // flush effects (persistence to localStorage)
+  it('restores the stored session of the same user', async () => {
+    TestBed.resetTestingModule();
+    localStorage.setItem('agent.sessionId', 's1');
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideFakeAuth('alice')],
+    });
+    const restored = TestBed.inject(ChatStore);
+    const httpCtl = TestBed.inject(HttpTestingController);
 
-    expect(store.userId()).toBe('alice');
-    expect(store.session()?.id).toBe('s2');
-    expect(localStorage.getItem('agent.userId')).toBe('alice');
+    const init = restored.init();
+    httpCtl.expectOne('/api/sessions/s1').flush({ id: 's1', userId: 'alice', createdAt: '' });
+    await Promise.resolve();
+    httpCtl.expectOne('/api/sessions/s1/runs').flush([run({})]);
+    await init;
+
+    expect(restored.session()?.id).toBe('s1');
+    expect(restored.runs()).toHaveLength(1);
+    httpCtl.verify();
+  });
+
+  it('polls a run waiting for a reviewer until it is decided', async () => {
+    vi.useFakeTimers();
+    try {
+      const sending = store.send('Open a ticket');
+      http.expectOne('/api/sessions/s1/messages').flush(run({ status: 'AWAITING_APPROVAL', answer: null }));
+      await sending;
+      TestBed.tick();
+
+      await vi.advanceTimersByTimeAsync(APPROVAL_POLL_MS);
+      http.expectOne('/api/runs/run-1').flush(run({ status: 'AWAITING_APPROVAL', answer: null }));
+      await vi.advanceTimersByTimeAsync(APPROVAL_POLL_MS);
+      http.expectOne('/api/runs/run-1').flush(run({ answer: 'Ticket #7 created' }));
+      await vi.advanceTimersByTimeAsync(0);
+      TestBed.tick();
+
+      expect(store.lastRun()?.answer).toBe('Ticket #7 created');
+      await vi.advanceTimersByTimeAsync(APPROVAL_POLL_MS * 2);
+      http.expectNone('/api/runs/run-1');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

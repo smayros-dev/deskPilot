@@ -3,6 +3,7 @@ import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 
 import { AgentApi } from '../core/agent-api';
+import { AuthService } from '../core/auth';
 import { Ticket, TicketPriority } from '../core/models';
 
 type PriorityFilter = TicketPriority | 'ALL';
@@ -14,8 +15,8 @@ type PriorityFilter = TicketPriority | 'ALL';
   template: `
     <header class="page-header">
       <div>
-        <h1>Tickets</h1>
-        <p class="muted">Created by the agent after a human approved them.</p>
+        <h1>{{ auth.isReviewer() || auth.isAdmin() ? 'All tickets' : 'Your tickets' }}</h1>
+        <p class="muted">Created by the agent after a reviewer approved them.</p>
       </div>
       <button type="button" class="button" (click)="tickets.reload()" [disabled]="tickets.isLoading()">Refresh</button>
     </header>
@@ -84,6 +85,7 @@ type PriorityFilter = TicketPriority | 'ALL';
 })
 export class TicketsPage {
   private readonly api = inject(AgentApi);
+  protected readonly auth = inject(AuthService);
 
   protected readonly priorities: PriorityFilter[] = ['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
   protected readonly tickets = httpResource<Ticket[]>(() => this.api.url('/tickets'), { defaultValue: [] });

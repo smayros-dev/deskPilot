@@ -4,6 +4,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { errorInterceptor } from '../core/interceptors';
+import { Role } from '../core/auth';
+import { provideFakeAuth } from '../core/testing';
 import { AgentSettings, ModelInfo, ToolInfo } from '../core/models';
 import { SettingsPage } from './settings-page';
 
@@ -38,10 +40,15 @@ const TOOLS: ToolInfo[] = [
 describe('SettingsPage', () => {
   let http: HttpTestingController;
 
-  async function render() {
+  async function render(roles: Role[] = ['user', 'admin']) {
     TestBed.configureTestingModule({
       imports: [SettingsPage],
-      providers: [provideZonelessChangeDetection(), provideHttpClient(withInterceptors([errorInterceptor])), provideHttpClientTesting()],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideHttpClient(withInterceptors([errorInterceptor])),
+        provideHttpClientTesting(),
+        provideFakeAuth('admin', roles),
+      ],
     });
     http = TestBed.inject(HttpTestingController);
     const fixture = TestBed.createComponent(SettingsPage);
@@ -110,5 +117,13 @@ describe('SettingsPage', () => {
 
     expect(element.querySelector<HTMLInputElement>('input[formControlName=contextWindow]')!.value).toBe('16384');
     expect(element.querySelector<HTMLInputElement>('input[formControlName=thinking]')!.checked).toBe(false);
+  });
+
+  it('is read-only for users who are not admins', async () => {
+    const { element } = await render(['user']);
+
+    expect(element.querySelector<HTMLSelectElement>('#chatModel')!.disabled).toBe(true);
+    expect(element.querySelector('button[type=submit]')).toBeNull();
+    expect(element.querySelector('.notice')?.textContent).toContain('admin');
   });
 });

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { AuthService } from '../core/auth';
 import { ChatStore } from '../core/chat-store';
 import { ApprovalDecision, Run } from '../core/models';
 import { RunTrace } from '../runs/run-trace';
@@ -10,7 +11,6 @@ import { StatusBadge } from '../shared/status-badge';
 import { ApprovalCard } from './approval-card';
 import { ChatInput } from './chat-input';
 import { ModelSwitcher } from './model-switcher';
-import { UserField } from './user-field';
 
 const EXAMPLES = [
   'My VPN disconnects every few minutes, what should I do?',
@@ -22,13 +22,14 @@ const EXAMPLES = [
 
 @Component({
   selector: 'app-chat-page',
-  imports: [RouterLink, ChatInput, ApprovalCard, UserField, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe],
+  imports: [RouterLink, ChatInput, ApprovalCard, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.css',
 })
 export class ChatPage implements OnInit {
   protected readonly store = inject(ChatStore);
+  protected readonly auth = inject(AuthService);
   protected readonly examples = EXAMPLES;
 
   private readonly chatInput = viewChild.required(ChatInput);
@@ -75,10 +76,6 @@ export class ChatPage implements OnInit {
       }
       return next;
     });
-  }
-
-  protected switchUser(userId: string): void {
-    void this.store.switchUser(userId);
   }
 
   protected newConversation(): void {

@@ -47,6 +47,7 @@ export interface RunStats {
 export interface Run {
   id: string;
   sessionId: string;
+  userId: string;
   model: string | null;
   status: RunStatus;
   userInput: string;

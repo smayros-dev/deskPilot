@@ -4,10 +4,9 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { AgentApi } from '../core/agent-api';
-import { ChatStore } from '../core/chat-store';
 import { Memory } from '../core/models';
 
-/** Long-term memory of the current user; reloads automatically when the user changes. */
+/** Long-term memory of the signed-in user. */
 @Component({
   selector: 'app-memories-page',
   imports: [DatePipe, RouterLink],
@@ -15,7 +14,7 @@ import { Memory } from '../core/models';
   template: `
     <header class="page-header">
       <div>
-        <h1>Memories of {{ store.userId() }}</h1>
+        <h1>Your memories</h1>
         <p class="muted">Facts the agent saved with <code>save_memory</code> and recalls in later conversations.</p>
       </div>
     </header>
@@ -47,10 +46,5 @@ import { Memory } from '../core/models';
 })
 export class MemoriesPage {
   private readonly api = inject(AgentApi);
-  protected readonly store = inject(ChatStore);
-
-  // The URL is reactive: changing the user in the chat re-fetches this list.
-  protected readonly memories = httpResource<Memory[]>(() =>
-    this.api.url(`/users/${encodeURIComponent(this.store.userId())}/memories`),
-  );
+  protected readonly memories = httpResource<Memory[]>(() => this.api.url('/me/memories'));
 }

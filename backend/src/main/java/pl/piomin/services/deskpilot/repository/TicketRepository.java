@@ -8,4 +8,6 @@ import pl.piomin.services.deskpilot.model.Ticket;
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     List<Ticket> findAllByOrderByCreatedAtDesc();
+
+    List<Ticket> findByRequestedByOrderByCreatedAtDesc(String requestedBy);
 }

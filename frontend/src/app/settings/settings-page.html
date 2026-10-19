@@ -8,10 +8,16 @@
       }
     </p>
   </div>
-  <div class="actions">
-    <button type="button" class="button" (click)="reset()" [disabled]="store.saving()">Reset to defaults</button>
-  </div>
+  @if (auth.isAdmin()) {
+    <div class="actions">
+      <button type="button" class="button" (click)="reset()" [disabled]="store.saving()">Reset to defaults</button>
+    </div>
+  }
 </header>
+
+@if (!auth.isAdmin()) {
+  <p class="notice" role="note">Read-only: only users with the <strong>admin</strong> role can change the agent settings.</p>
+}
 
 <form [formGroup]="form" (ngSubmit)="save()" class="settings">
   <section class="card" aria-labelledby="model-title">
@@ -40,7 +46,7 @@
 
     <div class="presets" role="group" aria-label="Presets">
       @for (preset of presets; track preset.name) {
-        <button type="button" class="chip" [title]="preset.hint" (click)="applyPreset(preset)">{{ preset.name }}</button>
+        <button type="button" class="chip" [title]="preset.hint" [disabled]="!auth.isAdmin()" (click)="applyPreset(preset)">{{ preset.name }}</button>
       }
     </div>
   </section>
@@ -142,6 +148,7 @@
     }
   </section>
 
+  @if (auth.isAdmin()) {
   <footer class="save-bar">
     @if (form.dirty) {
       <span class="muted">Unsaved changes</span>
@@ -151,4 +158,5 @@
       {{ store.saving() ? 'Saving…' : 'Save settings' }}
     </button>
   </footer>
+  }
 </form>

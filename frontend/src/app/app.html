@@ -11,7 +11,7 @@
   </a>
   <nav aria-label="Main">
     <ul>
-      @for (link of links; track link.path) {
+      @for (link of visibleLinks(); track link.path) {
         <li>
           <a [routerLink]="link.path" routerLinkActive="active" ariaCurrentWhenActive="page">{{ link.label }}</a>
         </li>
@@ -19,10 +19,29 @@
     </ul>
   </nav>
   <app-health-pill />
+  @if (auth.isAuthenticated()) {
+    <div class="user-menu">
+      <span class="user" [title]="auth.username()">{{ auth.displayName() }}</span>
+      @for (role of auth.roles(); track role) {
+        @if (role === 'reviewer' || role === 'admin') {
+          <span class="role">{{ role }}</span>
+        }
+      }
+      <button type="button" class="link-button" (click)="auth.logout()">Sign out</button>
+    </div>
+  }
 </header>
 
 <main id="main" tabindex="-1">
-  <router-outlet />
+  @if (auth.error(); as error) {
+    <section class="card auth-error" role="alert">
+      <h1>Sign-in unavailable</h1>
+      <p>{{ error }}</p>
+      <p class="muted">Start the backend (it starts Keycloak through Docker Compose), then reload this page.</p>
+    </section>
+  } @else if (auth.isAuthenticated()) {
+    <router-outlet />
+  }
 </main>
 
 <app-toast-container />

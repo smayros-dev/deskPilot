@@ -16,6 +16,7 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Full traceability**: every thought, tool call, result and approval is stored and shown as a reasoning trace.
 - **Metrics dashboard**: success rate, average and p95 latency, tool accuracy, escalations and tokens, overall and per model.
 - **Durable conversations**: sessions, chat memory and runs waiting for approval are stored in PostgreSQL, so a backend restart loses nothing; a paused run can still be approved afterwards.
+- **Sign-in and roles**: OpenID Connect login through Keycloak (Authorization Code + PKCE). The user id comes from the token; only **reviewers** can approve actions (from their own Approvals queue) and only **admins** can change settings.
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -47,11 +48,14 @@ backend/                       Spring Boot app (pl.piomin.services.deskpilot)
   agent/                       orchestrator, settings, model catalog, chat options
   agent/tool/                  @Tool classes: knowledge base, tickets, memory, escalation
   guardrail/                   input filter and output redaction
+  security/                    JWT resource server, roles (user / reviewer / admin)
   controller/ service/ model/  REST API, services, JPA entities
   src/main/resources/          application.yml, Flyway migrations, system prompt, KB articles
-  compose.yaml                 Postgres + pgvector (started automatically)
+  compose.yaml                 Postgres + pgvector, Keycloak (started automatically)
+  keycloak/                    realm with roles, SPA client and demo users
 frontend/                      Angular app
   src/app/chat/                chat, approval cards, model switcher
+  src/app/approvals/           reviewers' approval queue
   src/app/runs/                run trace and details
   src/app/dashboard/           success metrics
   src/app/helpdesk/            tickets, knowledge base, memories
@@ -62,7 +66,7 @@ steps.md                       implementation plan and progress
 ## Prerequisites
 
 - Java 21+, Node 22+
-- Docker (Docker Desktop / Rancher Desktop): Postgres + pgvector runs from `backend/compose.yaml`, started automatically by Spring Boot
+- Docker (Docker Desktop / Rancher Desktop): Postgres + pgvector and Keycloak run from `backend/compose.yaml`, started automatically by Spring Boot
 - [Ollama](https://ollama.com) running locally, with the models pulled:
   ```bash
   ollama pull qwen3:8b
@@ -79,7 +83,22 @@ cd backend && ./mvnw spring-boot:run
 cd frontend && npm start
 ```
 
-Open **http://localhost:4200**. The dev server proxies `/api` and `/actuator` to the backend.
+Open **http://localhost:4200** and sign in. The dev server proxies `/api` and `/actuator` to the backend.
+
+### Demo users
+
+The Keycloak realm (`backend/keycloak/deskpilot-realm.json`) is imported on first start, with these users (local demo only):
+
+| User / password | Roles | Can |
+|---|---|---|
+| `alice` / `alice` | user | Chat, see own tickets and memories, read settings |
+| `bob` / `bob` | user, reviewer | Also approve or reject agent actions on the **Approvals** page, see all tickets |
+| `admin` / `admin` | user, reviewer, admin | Also change the agent settings and switch the model |
+
+Keycloak's own console is at http://localhost:8180 (admin / admin).
+
+> Spring Boot only runs `docker compose up` when none of the project's containers are running. If Postgres was
+> already up from an earlier version, start Keycloak once with `docker compose up -d` in `backend/`.
 Check `http://localhost:8080/actuator/health`. The `ollama` component reports DOWN if Ollama isn't running or a model is missing.
 
 ## Configuration
@@ -94,16 +113,18 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `AGENT_CHAT_MODEL` | `qwen3:8b` | Chat/tool-calling model |
 | `AGENT_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model for RAG |
 | `AGENT_THINK` | `false` | qwen3 reasoning mode. About 15x slower on CPU; enable on a GPU |
+| `DESKPILOT_ISSUER_URI` | `http://localhost:8180/realms/deskpilot` | OIDC issuer whose tokens the API accepts |
 
 ## Frontend pages
 
 | Route | What it shows |
 |---|---|
-| `/chat` | Conversation with the agent, approval cards for gated actions, per-answer reasoning trace |
+| `/chat` | Conversation with the agent, pending actions (decided here by reviewers, otherwise shown until a reviewer decides), per-answer reasoning trace |
+| `/approvals` | Reviewers only: every run waiting for a decision, from all users |
 | `/runs/:id` | Full trace of one run (thoughts, tool calls, results, approvals, tokens, timing) |
 | `/dashboard` | Success metrics: task success, latency (avg/p95), tool accuracy, escalations, approvals, tokens |
-| `/helpdesk/tickets` · `/knowledge` · `/memories` | Tickets created, KB articles, long-term memories of the current user |
-| `/settings` | Agent configuration: model, temperature, top-p, context window, max tokens, thinking, max steps, RAG, tools & approvals, system prompt |
+| `/helpdesk/tickets` · `/knowledge` · `/memories` | Tickets (own, or all for reviewers), KB articles, long-term memories of the signed-in user |
+| `/settings` | Agent configuration (read-only unless admin): model, temperature, top-p, context window, max tokens, thinking, max steps, RAG, tools & approvals, system prompt |
 
 ## Tests
 
@@ -117,20 +138,24 @@ OLLAMA_IT=true ./mvnw test -Dtest="*SmokeTest"   # real local model: chat, RAG, 
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/sessions` | Start a conversation (`{"userId": "alice"}`, optional) |
+| `POST` | `/api/sessions` | Start a conversation for the signed-in user |
 | `POST` | `/api/sessions/{id}/messages` | Ask the agent (`{"message": "..."}`) → run with trace |
 | `GET` | `/api/sessions/{id}/runs` | Conversation history |
 | `GET` | `/api/runs/{id}` | One run with its steps |
-| `POST` | `/api/runs/{id}/approval` | Approve/reject a paused tool call (`{"approved": true, "comment": "..."}`) |
-| `GET` | `/api/tickets`, `/api/users/{id}/memories`, `/api/knowledge-base/articles` | Agent data |
+| `GET` | `/api/runs` | Reviewers: runs waiting for approval, oldest first |
+| `POST` | `/api/runs/{id}/approval` | Reviewers: approve/reject a paused tool call (`{"approved": true, "comment": "..."}`) |
+| `GET` | `/api/tickets`, `/api/me/memories`, `/api/knowledge-base/articles` | Agent data (tickets: own, or all for reviewers) |
 | `GET` | `/api/metrics` | Success metrics (success rate, latency, tool accuracy, escalations…), also per model |
 | `GET` `PUT` `DELETE` | `/api/settings` | Read / change / reset the runtime agent settings (applied from the next request) |
 | `GET` | `/api/models`, `/api/tools` | Installed Ollama models with capabilities; available tools |
+
+Every `/api` call needs `Authorization: Bearer <access token>` from Keycloak (401 without, 403 without the role). Other users' sessions, runs and tickets answer 404. `PUT`/`DELETE /api/settings` need the admin role.
 
 Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state, 422 guardrail, 502 model down).
 
 ## Changelog
 
+- **1.0.9** — Security: Keycloak (OIDC, PKCE) in Docker Compose, Spring Security resource server, user id from the token, reviewer role for approvals (new Approvals page), admin role for settings, ownership checks on sessions/runs/tickets.
 - **1.0.8** — Durable sessions: sessions, chat memory (Spring AI JDBC repository) and runs paused for approval stored in PostgreSQL (Flyway V3); runs interrupted by a restart are marked failed on startup.
 - **1.0.7** — Project renamed to DeskPilot: Maven artifact `deskpilot`, package `pl.piomin.services.deskpilot`, UI title, Compose database `deskpilot`.
 - **1.0.6** — Runtime agent settings and model switching from the UI (Settings page + chat switcher), per-model metrics.

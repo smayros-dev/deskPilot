@@ -18,28 +18,33 @@ import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureRestTe
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.client.RestTestClient;
+import pl.piomin.services.deskpilot.TestSecurityConfiguration;
 import pl.piomin.services.deskpilot.TestcontainersConfiguration;
 import pl.piomin.services.deskpilot.agent.ModelCatalog;
 import pl.piomin.services.deskpilot.dto.AgentSettingsDto;
 import pl.piomin.services.deskpilot.dto.ApprovalRequest;
 import pl.piomin.services.deskpilot.dto.ChatRequest;
-import pl.piomin.services.deskpilot.dto.CreateSessionRequest;
 import pl.piomin.services.deskpilot.dto.RunResponse;
 import pl.piomin.services.deskpilot.dto.SessionResponse;
 import pl.piomin.services.deskpilot.dto.TicketResponse;
 import pl.piomin.services.deskpilot.model.RunStatus;
+import pl.piomin.services.deskpilot.model.StepType;
 import pl.piomin.services.deskpilot.service.KnowledgeBaseService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+/**
+ * The REST API over HTTP with signed JWTs: alice is a plain user, carol another user, bob a reviewer, admin an admin.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, TestSecurityConfiguration.class})
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 class AgentApiIntegrationTest {
@@ -56,12 +61,24 @@ class AgentApiIntegrationTest {
     @Autowired
     private RestTestClient client;
 
+    @Autowired
+    private TestSecurityConfiguration.TestTokens tokens;
+
+    private RestTestClient alice;
+    private RestTestClient carol;
+    private RestTestClient bob;
+    private RestTestClient admin;
+
     private String sessionId;
 
     @BeforeEach
     void createSession() {
-        SessionResponse session = client.post().uri("/api/sessions")
-                .body(new CreateSessionRequest("alice"))
+        alice = as("alice", "user");
+        carol = as("carol", "user");
+        bob = as("bob", "user", "reviewer");
+        admin = as("admin", "user", "reviewer", "admin");
+
+        SessionResponse session = alice.post().uri("/api/sessions")
                 .exchange()
                 .expectStatus().isCreated()
                 .expectHeader().exists("Location")
@@ -73,17 +90,15 @@ class AgentApiIntegrationTest {
     }
 
     @Test
-    void sessionWithoutBodyUsesDemoUser() {
-        client.post().uri("/api/sessions").exchange()
-                .expectStatus().isCreated()
-                .expectBody().jsonPath("$.userId").isEqualTo(SessionController.DEFAULT_USER);
+    void requestsWithoutTokenAreUnauthorized() {
+        client.post().uri("/api/sessions").exchange().expectStatus().isUnauthorized();
+        client.get().uri("/api/tickets").exchange().expectStatus().isUnauthorized();
+        client.get().uri("/actuator/info").exchange().expectStatus().isOk();
     }
 
     @Test
-    void invalidUserIdIsBadRequest() {
-        client.post().uri("/api/sessions").body(new CreateSessionRequest("alice; drop table"))
-                .exchange()
-                .expectStatus().isBadRequest();
+    void tokenWithoutUserRoleIsForbidden() {
+        as("mallory").get().uri("/api/tickets").exchange().expectStatus().isForbidden();
     }
 
     @Test
@@ -99,16 +114,30 @@ class AgentApiIntegrationTest {
         assertThat(run.steps()).isNotEmpty();
         assertThat(run.stats().iterations()).isEqualTo(1);
 
-        client.get().uri("/api/sessions/{id}/runs", sessionId).exchange()
+        alice.get().uri("/api/sessions/{id}/runs", sessionId).exchange()
                 .expectStatus().isOk()
                 .expectBody().jsonPath("$.length()").isEqualTo(1);
-        client.get().uri("/api/runs/{id}", run.id()).exchange()
+        alice.get().uri("/api/runs/{id}", run.id()).exchange()
                 .expectStatus().isOk()
                 .expectBody().jsonPath("$.answer").isEqualTo("Restart Outlook in safe mode.");
     }
 
     @Test
-    void approvalFlowCreatesTicket() {
+    void otherUsersCannotSeeTheSessionOrItsRunsButReviewersCanOpenTheRun() {
+        givenModelReplies(answer("Hi alice"));
+        RunResponse run = chat("Hi").expectBody(RunResponse.class).returnResult().getResponseBody();
+        assertThat(run).isNotNull();
+
+        carol.get().uri("/api/sessions/{id}", sessionId).exchange().expectStatus().isNotFound();
+        carol.get().uri("/api/sessions/{id}/runs", sessionId).exchange().expectStatus().isNotFound();
+        carol.post().uri("/api/sessions/{id}/messages", sessionId).body(new ChatRequest("Hi"))
+                .exchange().expectStatus().isNotFound();
+        carol.get().uri("/api/runs/{id}", run.id()).exchange().expectStatus().isNotFound();
+        bob.get().uri("/api/runs/{id}", run.id()).exchange().expectStatus().isOk();
+    }
+
+    @Test
+    void reviewerApprovesFromTheQueueAndTicketBelongsToTheRequester() {
         givenModelReplies(
                 toolCall("create_ticket", "{\"title\":\"Monitor request\",\"description\":\"Need a 2nd screen\",\"priority\":\"LOW\"}"),
                 answer("Ticket created."));
@@ -120,20 +149,37 @@ class AgentApiIntegrationTest {
         assertThat(paused.pendingApprovals()).singleElement()
                 .satisfies(p -> assertThat(p.toolName()).isEqualTo("create_ticket"));
 
-        client.post().uri("/api/runs/{id}/approval", paused.id())
+        List<RunResponse> queue = bob.get().uri("/api/runs").exchange()
+                .expectStatus().isOk()
+                .expectBody(new ParameterizedTypeReference<List<RunResponse>>() { })
+                .returnResult().getResponseBody();
+        assertThat(queue).extracting(RunResponse::id).contains(paused.id());
+
+        alice.post().uri("/api/runs/{id}/approval", paused.id()).body(new ApprovalRequest(true, "self-approve"))
+                .exchange()
+                .expectStatus().isForbidden();
+
+        RunResponse done = bob.post().uri("/api/runs/{id}/approval", paused.id())
                 .body(new ApprovalRequest(true, "Approved by IT lead"))
                 .exchange()
                 .expectStatus().isOk()
-                .expectBody().jsonPath("$.status").isEqualTo("COMPLETED");
+                .expectBody(RunResponse.class).returnResult().getResponseBody();
+        assertThat(done).isNotNull();
+        assertThat(done.status()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(done.steps()).filteredOn(s -> s.type() == StepType.APPROVAL_DECISION).singleElement()
+                .satisfies(s -> assertThat(s.content()).isEqualTo("by bob: Approved by IT lead"));
 
-        List<TicketResponse> tickets = client.get().uri("/api/tickets").exchange()
-                .expectStatus().isOk()
-                .expectBody(new ParameterizedTypeReference<List<TicketResponse>>() { })
-                .returnResult().getResponseBody();
-        assertThat(tickets).anySatisfy(t -> {
+        assertThat(tickets(alice)).anySatisfy(t -> {
             assertThat(t.title()).isEqualTo("Monitor request");
             assertThat(t.requestedBy()).isEqualTo("alice");
         });
+        assertThat(tickets(bob)).extracting(TicketResponse::title).contains("Monitor request");
+        assertThat(tickets(carol)).extracting(TicketResponse::title).doesNotContain("Monitor request");
+    }
+
+    @Test
+    void reviewerQueueIsForbiddenForUsers() {
+        alice.get().uri("/api/runs").exchange().expectStatus().isForbidden();
     }
 
     @Test
@@ -142,7 +188,7 @@ class AgentApiIntegrationTest {
         RunResponse run = chat("Hi").expectBody(RunResponse.class).returnResult().getResponseBody();
         assertThat(run).isNotNull();
 
-        client.post().uri("/api/runs/{id}/approval", run.id())
+        bob.post().uri("/api/runs/{id}/approval", run.id())
                 .body(new ApprovalRequest(true, null))
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.CONFLICT)
@@ -151,7 +197,7 @@ class AgentApiIntegrationTest {
 
     @Test
     void approvalWithoutDecisionIsBadRequest() {
-        client.post().uri("/api/runs/{id}/approval", "any")
+        bob.post().uri("/api/runs/{id}/approval", "any")
                 .body(Map.of("comment", "missing approved flag"))
                 .exchange()
                 .expectStatus().isBadRequest();
@@ -173,35 +219,37 @@ class AgentApiIntegrationTest {
 
     @Test
     void unknownSessionAndRunAreNotFound() {
-        client.post().uri("/api/sessions/{id}/messages", "missing").body(new ChatRequest("Hi"))
+        alice.post().uri("/api/sessions/{id}/messages", "missing").body(new ChatRequest("Hi"))
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectBody().jsonPath("$.detail").isEqualTo("Session missing not found");
-        client.get().uri("/api/runs/{id}", "missing").exchange().expectStatus().isNotFound();
-        client.get().uri("/api/tickets/{id}", 999_999).exchange().expectStatus().isNotFound();
+        alice.get().uri("/api/runs/{id}", "missing").exchange().expectStatus().isNotFound();
+        alice.get().uri("/api/tickets/{id}", 999_999).exchange().expectStatus().isNotFound();
     }
 
     @Test
     void readOnlyEndpointsRespond() {
         when(knowledgeBaseService.findAll()).thenReturn(List.of());
 
-        client.get().uri("/api/knowledge-base/articles").exchange().expectStatus().isOk();
-        client.get().uri("/api/users/{id}/memories", "alice").exchange().expectStatus().isOk();
-        client.get().uri("/api/metrics").exchange()
+        alice.get().uri("/api/knowledge-base/articles").exchange().expectStatus().isOk();
+        alice.get().uri("/api/me/memories").exchange().expectStatus().isOk();
+        alice.get().uri("/api/metrics").exchange()
                 .expectStatus().isOk()
                 .expectBody().jsonPath("$.taskSuccessRate").exists();
     }
 
     @Test
-    void settingsCanBeReadUpdatedAndReset() {
+    void settingsCanBeReadByUsersButChangedOnlyByAdmins() {
         when(modelCatalog.find("llama3.2:3b")).thenReturn(Optional.of(new ModelCatalog.ModelInfo("llama3.2:3b", 1, "3B",
                 "llama", List.of("completion", "tools"), true, false, true)));
-        AgentSettingsDto current = client.get().uri("/api/settings").exchange()
-                .expectStatus().isOk()
-                .expectBody(AgentSettingsDto.class).returnResult().getResponseBody();
-        assertThat(current).isNotNull();
+        AgentSettingsDto current = currentSettings();
 
-        client.put().uri("/api/settings")
+        alice.put().uri("/api/settings").body(withModel(current, "llama3.2:3b", 0.9))
+                .exchange()
+                .expectStatus().isForbidden();
+        alice.delete().uri("/api/settings").exchange().expectStatus().isForbidden();
+
+        admin.put().uri("/api/settings")
                 .body(withModel(current, "llama3.2:3b", 0.9))
                 .exchange()
                 .expectStatus().isOk()
@@ -209,18 +257,16 @@ class AgentApiIntegrationTest {
                 .jsonPath("$.chatModel").isEqualTo("llama3.2:3b")
                 .jsonPath("$.temperature").isEqualTo(0.9);
 
-        client.delete().uri("/api/settings").exchange()
+        admin.delete().uri("/api/settings").exchange()
                 .expectStatus().isOk()
                 .expectBody().jsonPath("$.chatModel").isEqualTo(current.chatModel());
     }
 
     @Test
     void settingsWithOutOfRangeValuesAreBadRequest() {
-        AgentSettingsDto current = client.get().uri("/api/settings").exchange()
-                .expectBody(AgentSettingsDto.class).returnResult().getResponseBody();
-        assertThat(current).isNotNull();
+        AgentSettingsDto current = currentSettings();
 
-        client.put().uri("/api/settings").body(withModel(current, current.chatModel(), 5.0))
+        admin.put().uri("/api/settings").body(withModel(current, current.chatModel(), 5.0))
                 .exchange()
                 .expectStatus().isBadRequest();
     }
@@ -228,11 +274,9 @@ class AgentApiIntegrationTest {
     @Test
     void settingsWithModelThatIsNotInstalledAreBadRequest() {
         when(modelCatalog.find("missing-model")).thenReturn(Optional.empty());
-        AgentSettingsDto current = client.get().uri("/api/settings").exchange()
-                .expectBody(AgentSettingsDto.class).returnResult().getResponseBody();
-        assertThat(current).isNotNull();
+        AgentSettingsDto current = currentSettings();
 
-        client.put().uri("/api/settings").body(withModel(current, "missing-model", 0.2))
+        admin.put().uri("/api/settings").body(withModel(current, "missing-model", 0.2))
                 .exchange()
                 .expectStatus().isBadRequest()
                 .expectBody().jsonPath("$.detail").value(detail -> assertThat((String) detail).contains("not installed"));
@@ -240,11 +284,32 @@ class AgentApiIntegrationTest {
 
     @Test
     void toolsAreListedWithApprovalDefaults() {
-        client.get().uri("/api/tools").exchange()
+        alice.get().uri("/api/tools").exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.length()").isEqualTo(6)
                 .jsonPath("$[?(@.name == 'create_ticket')].approvalByDefault").isEqualTo(List.of(true));
+    }
+
+    private RestTestClient as(String username, String... roles) {
+        return client.mutate()
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.token(username, roles))
+                .build();
+    }
+
+    private AgentSettingsDto currentSettings() {
+        AgentSettingsDto current = alice.get().uri("/api/settings").exchange()
+                .expectStatus().isOk()
+                .expectBody(AgentSettingsDto.class).returnResult().getResponseBody();
+        assertThat(current).isNotNull();
+        return current;
+    }
+
+    private static List<TicketResponse> tickets(RestTestClient user) {
+        return user.get().uri("/api/tickets").exchange()
+                .expectStatus().isOk()
+                .expectBody(new ParameterizedTypeReference<List<TicketResponse>>() { })
+                .returnResult().getResponseBody();
     }
 
     private static AgentSettingsDto withModel(AgentSettingsDto s, String model, double temperature) {
@@ -254,7 +319,7 @@ class AgentApiIntegrationTest {
     }
 
     private RestTestClient.ResponseSpec chat(String message) {
-        return client.post().uri("/api/sessions/{id}/messages", sessionId)
+        return alice.post().uri("/api/sessions/{id}/messages", sessionId)
                 .body(new ChatRequest(message))
                 .exchange();
     }

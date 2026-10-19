@@ -14,7 +14,7 @@ interface ApprovalView extends PendingApproval {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="approval" aria-labelledby="approval-title">
-      <h3 id="approval-title">Approval needed</h3>
+      <h3 id="approval-title">{{ readOnly() ? 'Waiting for a reviewer' : 'Approval needed' }}</h3>
       <p>The agent wants to perform an action that needs a human decision:</p>
       @for (call of calls(); track call.toolCallId) {
         <div class="call">
@@ -27,6 +27,7 @@ interface ApprovalView extends PendingApproval {
           </dl>
         </div>
       }
+      @if (!readOnly()) {
       <form [formGroup]="form" (ngSubmit)="approve()">
         <label for="comment">Comment for the agent (optional)</label>
         <input id="comment" formControlName="comment" maxlength="1000" placeholder="e.g. Use priority MEDIUM next time" />
@@ -35,6 +36,7 @@ interface ApprovalView extends PendingApproval {
           <button type="submit" class="button primary" [disabled]="busy() || form.invalid">Approve</button>
         </div>
       </form>
+      }
     </section>
   `,
   styles: `
@@ -60,6 +62,8 @@ interface ApprovalView extends PendingApproval {
 export class ApprovalCard {
   readonly approvals = input.required<PendingApproval[]>();
   readonly busy = input(false);
+  /** Shows the pending calls without the decision form (users who are not reviewers). */
+  readonly readOnly = input(false);
   readonly decide = output<ApprovalDecision>();
 
   protected readonly form = inject(NonNullableFormBuilder).group({

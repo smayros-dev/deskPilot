@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
@@ -11,12 +11,13 @@ export class AgentApi {
   private readonly http = inject(HttpClient);
   private readonly config = inject(API_CONFIG);
 
-  createSession(userId: string): Observable<Session> {
-    return this.http.post<Session>(`${this.config.baseUrl}/sessions`, { userId });
+  /** Starts a conversation for the signed-in user (the backend takes the user from the token). */
+  createSession(): Observable<Session> {
+    return this.http.post<Session>(`${this.config.baseUrl}/sessions`, null);
   }
 
-  getSession(sessionId: string): Observable<Session> {
-    return this.http.get<Session>(`${this.config.baseUrl}/sessions/${sessionId}`);
+  getSession(sessionId: string, context?: HttpContext): Observable<Session> {
+    return this.http.get<Session>(`${this.config.baseUrl}/sessions/${sessionId}`, { context });
   }
 
   /** Runs the agent; with a local model on CPU the response can take a minute or more. */
@@ -28,8 +29,8 @@ export class AgentApi {
     return this.http.get<Run[]>(`${this.config.baseUrl}/sessions/${sessionId}/runs`);
   }
 
-  getRun(runId: string): Observable<Run> {
-    return this.http.get<Run>(`${this.config.baseUrl}/runs/${runId}`);
+  getRun(runId: string, context?: HttpContext): Observable<Run> {
+    return this.http.get<Run>(`${this.config.baseUrl}/runs/${runId}`, { context });
   }
 
   decide(runId: string, decision: ApprovalDecision): Observable<Run> {

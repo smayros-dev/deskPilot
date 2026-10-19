@@ -29,6 +29,10 @@ public class TicketService {
                 .orElseThrow(() -> new NotFoundException("Ticket " + id + " not found"));
     }
 
+    public List<Ticket> findByRequester(String requestedBy) {
+        return ticketRepository.findByRequestedByOrderByCreatedAtDesc(requestedBy);
+    }
+
     public List<Ticket> findAll() {
         return ticketRepository.findAllByOrderByCreatedAtDesc();
     }

@@ -157,7 +157,7 @@ class AgentOrchestratorTest {
                 .containsExactly("create_ticket");
         assertThat(ticketRepository.count()).isEqualTo(ticketsBefore);
 
-        AgentRun done = orchestrator.decide(paused.getId(), new AgentOrchestrator.ApprovalDecision(true, "ok"));
+        AgentRun done = orchestrator.decide(paused.getId(), new AgentOrchestrator.ApprovalDecision(true, "ok", "bob"));
 
         assertThat(done.getStatus()).isEqualTo(RunStatus.COMPLETED);
         assertThat(ticketRepository.count()).isEqualTo(ticketsBefore + 1);
@@ -174,7 +174,7 @@ class AgentOrchestratorTest {
         AgentRun paused = orchestrator.chat(sessionId, "Open a ticket for my VPN");
 
         AgentRun done = orchestrator.decide(paused.getId(),
-                new AgentOrchestrator.ApprovalDecision(false, "Try the KB article first"));
+                new AgentOrchestrator.ApprovalDecision(false, "Try the KB article first", "bob"));
 
         assertThat(done.getStatus()).isEqualTo(RunStatus.COMPLETED);
         assertThat(done.getToolErrors()).isEqualTo(1);
@@ -199,7 +199,7 @@ class AgentOrchestratorTest {
         givenModelReplies(answer("Hi"));
         AgentRun run = orchestrator.chat(sessionId, "Hi");
 
-        assertThatThrownBy(() -> orchestrator.decide(run.getId(), new AgentOrchestrator.ApprovalDecision(true, null)))
+        assertThatThrownBy(() -> orchestrator.decide(run.getId(), new AgentOrchestrator.ApprovalDecision(true, null, "bob")))
                 .isInstanceOf(ConflictException.class);
     }
 
@@ -357,7 +357,7 @@ class AgentOrchestratorTest {
 
         assertThat(pendingTurnRepository.existsById(paused.getId())).isTrue();
 
-        orchestrator.decide(paused.getId(), new AgentOrchestrator.ApprovalDecision(true, null));
+        orchestrator.decide(paused.getId(), new AgentOrchestrator.ApprovalDecision(true, null, "bob"));
 
         assertThat(pendingTurnRepository.existsById(paused.getId())).isFalse();
         List<Message> resumed = lastPromptMessages();

@@ -3,8 +3,9 @@
     <header class="chat-header">
       <h1>IT Helpdesk</h1>
       <div class="chat-tools">
-        <app-model-switcher [disabled]="store.sending()" />
-        <app-user-field [userId]="store.userId()" (userIdChange)="switchUser($event)" />
+        @if (auth.isAdmin()) {
+          <app-model-switcher [disabled]="store.sending()" />
+        }
         <button type="button" class="button" [disabled]="store.sending()" (click)="newConversation()">New conversation</button>
       </div>
     </header>
@@ -15,11 +16,15 @@
 
         @switch (run.status) {
           @case ('AWAITING_APPROVAL') {
-            <app-approval-card
-              [approvals]="run.pendingApprovals"
-              [busy]="store.sending()"
-              (decide)="decide(run, $event)"
-            />
+            @if (auth.isReviewer()) {
+              <app-approval-card
+                [approvals]="run.pendingApprovals"
+                [busy]="store.sending()"
+                (decide)="decide(run, $event)"
+              />
+            } @else {
+              <app-approval-card [approvals]="run.pendingApprovals" [readOnly]="true" />
+            }
           }
           @default {
             <div class="bubble agent" [class.failed]="run.status === 'FAILED'">
@@ -75,7 +80,13 @@
 
     <footer class="composer-area">
       @if (store.awaitingApproval()) {
-        <p class="muted">Approve or reject the pending action to continue the conversation.</p>
+        <p class="muted">
+          @if (auth.isReviewer()) {
+            Approve or reject the pending action to continue the conversation.
+          } @else {
+            A reviewer has to approve this action; the answer appears here as soon as they decide.
+          }
+        </p>
       }
       <app-chat-input [disabled]="!store.canSend()" (send)="send($event)" />
     </footer>

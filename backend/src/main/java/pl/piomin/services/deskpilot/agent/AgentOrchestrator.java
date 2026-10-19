@@ -80,7 +80,12 @@ public class AgentOrchestrator {
         this.systemPrompt = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
     }
 
-    public record ApprovalDecision(boolean approved, String comment) {
+    /** @param reviewer user name of the human who decided, recorded in the trace */
+    public record ApprovalDecision(boolean approved, String comment, String reviewer) {
+
+        String summary() {
+            return comment == null || comment.isBlank() ? "by " + reviewer : "by " + reviewer + ": " + comment;
+        }
     }
 
     /** Handles a new user message; returns the run, finished or paused for approval. */
@@ -112,7 +117,7 @@ public class AgentOrchestrator {
                     .orElseThrow(() -> new ConflictException("Run " + runId + " is not waiting for approval"));
             turnStore.delete(runId);
             runService.addStep(runId, StepType.APPROVAL_DECISION, decision.approved() ? "APPROVED" : "REJECTED",
-                    decision.comment(), false, 0);
+                    decision.summary(), false, 0);
             metrics.approval(decision.approved() ? "approved" : "rejected");
             runService.resume(runId);
             long start = System.nanoTime();

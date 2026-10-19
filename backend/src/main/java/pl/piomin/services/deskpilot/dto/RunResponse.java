@@ -9,6 +9,7 @@ import pl.piomin.services.deskpilot.model.StepType;
 public record RunResponse(
         String id,
         String sessionId,
+        String userId,
         String model,
         RunStatus status,
         String userInput,

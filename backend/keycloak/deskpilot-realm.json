@@ -1,0 +1,65 @@
+{
+  "realm": "deskpilot",
+  "enabled": true,
+  "displayName": "DeskPilot",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 3600,
+  "roles": {
+    "realm": [
+      { "name": "user", "description": "Chat with the agent and see own tickets and memories" },
+      { "name": "reviewer", "description": "Approve or reject gated agent actions" },
+      { "name": "admin", "description": "Change the agent settings" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "deskpilot-spa",
+      "name": "DeskPilot web app",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "redirectUris": ["http://localhost:4200/*"],
+      "webOrigins": ["http://localhost:4200"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:4200/*"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "firstName": "Alice",
+      "lastName": "Employee",
+      "email": "alice@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "alice", "temporary": false }],
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "bob",
+      "firstName": "Bob",
+      "lastName": "Reviewer",
+      "email": "bob@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "bob", "temporary": false }],
+      "realmRoles": ["user", "reviewer"]
+    },
+    {
+      "username": "admin",
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "email": "admin@example.com",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "admin", "temporary": false }],
+      "realmRoles": ["user", "reviewer", "admin"]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 
+import { hasRole } from './core/auth';
 import { leaveWhileBusyGuard, runResolver, unsavedChangesGuard } from './core/routing';
 
 export const routes: Routes = [
@@ -15,6 +16,12 @@ export const routes: Routes = [
     title: 'Run trace',
     resolve: { run: runResolver },
     loadComponent: () => import('./runs/run-page').then((m) => m.RunPage),
+  },
+  {
+    path: 'approvals',
+    title: 'Approvals',
+    canMatch: [hasRole('reviewer')],
+    loadComponent: () => import('./approvals/approvals-page').then((m) => m.ApprovalsPage),
   },
   {
     path: 'dashboard',

@@ -13,6 +13,8 @@ public interface AgentRunRepository extends JpaRepository<AgentRun, String> {
 
     List<AgentRun> findByStatusIn(List<RunStatus> statuses);
 
+    List<AgentRun> findByStatusOrderByCreatedAtAsc(RunStatus status);
+
     interface StatusTotals {
         RunStatus getStatus();
 

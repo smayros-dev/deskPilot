@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>pl.piomin.services</groupId>
 	<artifactId>deskpilot</artifactId>
-	<version>1.0.8</version>
+	<version>1.0.9</version>
 	<name>deskpilot</name>
 	<description>Agentic AI backend (Spring AI + Ollama + Spring Boot)</description>
 	<url/>
@@ -67,6 +67,10 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
@@ -111,6 +115,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security-oauth2-resource-server-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

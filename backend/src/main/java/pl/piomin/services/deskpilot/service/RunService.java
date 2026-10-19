@@ -83,6 +83,11 @@ public class RunService {
         return runRepository.findByStatusIn(List.of(RunStatus.RUNNING, RunStatus.AWAITING_APPROVAL));
     }
 
+    /** The reviewers' queue, oldest first. */
+    public List<AgentRun> findAwaitingApproval() {
+        return runRepository.findByStatusOrderByCreatedAtAsc(RunStatus.AWAITING_APPROVAL);
+    }
+
     public List<AgentRun> findBySession(String sessionId) {
         return runRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
     }

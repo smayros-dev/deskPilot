@@ -24,6 +24,12 @@ spring:
     hibernate:
       # Flyway owns the schema (db/migration); Hibernate only checks it matches the entities.
       ddl-auto: validate
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keycloak realm from compose.yaml; the browser and the backend must see the same URL.
+          issuer-uri: ${DESKPILOT_ISSUER_URI:http://localhost:8180/realms/deskpilot}
   ai:
     chat:
       memory:
@@ -62,7 +68,10 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: always
+      # Public: overall and per-component status (the UI shows whether the model is online). Details: admins only.
+      show-components: always
+      show-details: when-authorized
+      roles: admin
 
 agent:
   max-iterations: 8
