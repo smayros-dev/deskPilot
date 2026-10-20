@@ -18,8 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 import pl.piomin.services.deskpilot.dto.EvaluationResponse;
 import pl.piomin.services.deskpilot.eval.EvaluationService;
 import pl.piomin.services.deskpilot.eval.Scenario;
+import pl.piomin.services.deskpilot.model.AuditAction;
 import pl.piomin.services.deskpilot.model.Evaluation;
 import pl.piomin.services.deskpilot.model.EvaluationResult;
+import pl.piomin.services.deskpilot.service.AuditService;
 
 /** Runs the scenario catalogue against a model and reports the scores (admins only, see SecurityConfig). */
 @RestController
@@ -34,9 +36,11 @@ public class EvaluationController {
     }
 
     private final EvaluationService evaluationService;
+    private final AuditService auditService;
 
-    public EvaluationController(EvaluationService evaluationService) {
+    public EvaluationController(EvaluationService evaluationService, AuditService auditService) {
         this.evaluationService = evaluationService;
+        this.auditService = auditService;
     }
 
     @GetMapping("/scenarios")
@@ -49,6 +53,9 @@ public class EvaluationController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public EvaluationResponse start(@Valid @RequestBody StartRequest request, Authentication authentication) {
         Evaluation evaluation = evaluationService.start(request.model(), request.categories(), authentication.getName());
+        auditService.record(authentication.getName(), AuditAction.EVALUATION_STARTED, "evaluation", evaluation.getId(),
+                "model " + evaluation.getModel() + ", " + evaluation.getScenarioCount() + " scenario(s)"
+                        + (request.categories() == null || request.categories().isEmpty() ? "" : ", categories " + request.categories()));
         return EvaluationResponse.of(evaluation, List.of(), false);
     }
 
@@ -68,8 +75,9 @@ public class EvaluationController {
     }
 
     @PostMapping("/{id}/cancel")
-    public EvaluationResponse cancel(@PathVariable String id) {
+    public EvaluationResponse cancel(@PathVariable String id, Authentication authentication) {
         evaluationService.cancel(id);
+        auditService.record(authentication.getName(), AuditAction.EVALUATION_CANCELLED, "evaluation", id, null);
         return get(id);
     }
 }

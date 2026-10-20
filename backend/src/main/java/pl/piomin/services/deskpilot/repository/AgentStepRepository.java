@@ -1,8 +1,10 @@
 package pl.piomin.services.deskpilot.repository;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import pl.piomin.services.deskpilot.model.AgentStep;
 import pl.piomin.services.deskpilot.model.StepType;
@@ -10,6 +12,10 @@ import pl.piomin.services.deskpilot.model.StepType;
 public interface AgentStepRepository extends JpaRepository<AgentStep, Long> {
 
     List<AgentStep> findByRunIdOrderByIdAsc(String runId);
+
+    @Modifying
+    @Query("delete from AgentStep s where s.runId in :runIds")
+    int deleteByRunIdIn(Collection<String> runIds);
 
     // Dashboard figures count chat runs only, never evaluation runs.
     @Query("select count(s) from AgentStep s where s.type = :type and s.runId in (select r.id from AgentRun r where r.source = pl.piomin.services.deskpilot.model.RunSource.CHAT)")

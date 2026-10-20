@@ -1,0 +1,20 @@
+package pl.piomin.services.deskpilot.model;
+
+/** What an {@link AuditEvent} records. */
+public enum AuditAction {
+    APPROVAL_APPROVED,
+    APPROVAL_REJECTED,
+    SETTINGS_CHANGED,
+    SETTINGS_RESET,
+    DOCUMENT_UPLOADED,
+    DOCUMENT_REINDEXED,
+    DOCUMENT_DELETED,
+    EVALUATION_STARTED,
+    EVALUATION_CANCELLED,
+    CONVERSATION_DELETED,
+    MEMORY_DELETED,
+    MEMORIES_DELETED,
+    USER_DATA_EXPORTED,
+    USER_DATA_DELETED,
+    RETENTION_CLEANUP
+}

@@ -3,6 +3,7 @@ package pl.piomin.services.deskpilot.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import pl.piomin.services.deskpilot.model.AgentRun;
 import pl.piomin.services.deskpilot.model.RunSource;
@@ -11,6 +12,10 @@ import pl.piomin.services.deskpilot.model.RunStatus;
 public interface AgentRunRepository extends JpaRepository<AgentRun, String> {
 
     List<AgentRun> findBySessionIdOrderByCreatedAtAsc(String sessionId);
+
+    @Modifying
+    @Query("delete from AgentRun r where r.sessionId = :sessionId")
+    int deleteBySessionId(String sessionId);
 
     List<AgentRun> findByStatusIn(List<RunStatus> statuses);
 

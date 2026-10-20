@@ -1,0 +1,205 @@
+import { DatePipe } from '@angular/common';
+import { HttpClient, httpResource } from '@angular/common/http';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+
+import { API_CONFIG } from '../core/api-config';
+import { saveBlob } from '../core/download';
+
+export const AUDIT_ACTIONS = [
+  'APPROVAL_APPROVED',
+  'APPROVAL_REJECTED',
+  'SETTINGS_CHANGED',
+  'SETTINGS_RESET',
+  'DOCUMENT_UPLOADED',
+  'DOCUMENT_REINDEXED',
+  'DOCUMENT_DELETED',
+  'EVALUATION_STARTED',
+  'EVALUATION_CANCELLED',
+  'CONVERSATION_DELETED',
+  'MEMORY_DELETED',
+  'MEMORIES_DELETED',
+  'USER_DATA_EXPORTED',
+  'USER_DATA_DELETED',
+  'RETENTION_CLEANUP',
+] as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+export interface AuditEvent {
+  id: number;
+  at: string;
+  actor: string;
+  action: AuditAction;
+  targetType: string | null;
+  targetId: string | null;
+  details: string | null;
+}
+
+export interface AuditEventPage {
+  items: AuditEvent[];
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+}
+
+const PAGE_SIZE = 50;
+
+/** Admins: who approved what, changed which settings, managed documents or evaluations, deleted personal data. */
+@Component({
+  selector: 'app-audit-page',
+  imports: [DatePipe],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <header class="page-header">
+      <div>
+        <h1>Audit trail</h1>
+        <p class="muted">Approvals, settings changes, documents, evaluations and deletions of personal data, newest first.</p>
+      </div>
+      <button type="button" class="button" [disabled]="exporting()" (click)="exportCsv()">Export CSV</button>
+    </header>
+
+    <form class="card filters" (submit)="$event.preventDefault()">
+      <label>
+        <span>Action</span>
+        <select [value]="action()" (change)="setFilter(action, $any($event.target).value)">
+          <option value="">All actions</option>
+          @for (option of actions; track option) {
+            <option [value]="option">{{ label(option) }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>User</span>
+        <input type="text" placeholder="e.g. bob" [value]="actor()" (change)="setFilter(actor, $any($event.target).value)" />
+      </label>
+      <label>
+        <span>From</span>
+        <input type="date" [value]="from()" (change)="setFilter(from, $any($event.target).value)" />
+      </label>
+      <label>
+        <span>To (inclusive)</span>
+        <input type="date" [value]="to()" (change)="setFilter(to, $any($event.target).value)" />
+      </label>
+    </form>
+
+    @if (events.hasValue()) {
+      @let result = events.value();
+      <div class="card table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">User</th>
+              <th scope="col">Action</th>
+              <th scope="col">Target</th>
+              <th scope="col">Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (event of result.items; track event.id) {
+              <tr>
+                <td><time [attr.datetime]="event.at">{{ event.at | date: 'medium' }}</time></td>
+                <td>{{ event.actor }}</td>
+                <td><span class="action" [attr.data-action]="event.action">{{ label(event.action) }}</span></td>
+                <td>
+                  @if (event.targetType) {
+                    {{ event.targetType }} <code>{{ event.targetId }}</code>
+                  }
+                </td>
+                <td class="details">{{ event.details }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5" class="muted">No audit entries match these filters.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (result.totalPages > 1) {
+        <nav class="pager" aria-label="Pages">
+          <button type="button" class="button" [disabled]="page() === 0" (click)="page.set(page() - 1)">Newer</button>
+          <span class="muted">Page {{ result.page + 1 }} of {{ result.totalPages }} · {{ result.total }} entries</span>
+          <button type="button" class="button" [disabled]="page() + 1 >= result.totalPages" (click)="page.set(page() + 1)">Older</button>
+        </nav>
+      }
+    } @else if (events.isLoading()) {
+      <p class="muted">Loading…</p>
+    }
+  `,
+  styles: `
+    :host { display: grid; gap: 1rem; }
+    .filters { display: flex; flex-wrap: wrap; gap: 0.75rem 1rem; align-items: flex-end; }
+    .filters label { display: grid; gap: 0.25rem; font-size: 0.85rem; }
+    .table-wrap { overflow-x: auto; padding: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    td:first-child { white-space: nowrap; }
+    .details { overflow-wrap: anywhere; max-width: 40rem; }
+    .action { font-weight: 600; white-space: nowrap; }
+    .action[data-action$='DELETED'], .action[data-action='APPROVAL_REJECTED'] { color: var(--danger); }
+    .pager { display: flex; align-items: center; justify-content: center; gap: 1rem; }
+  `,
+})
+export class AuditPage {
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = `${inject(API_CONFIG).baseUrl}/audit`;
+
+  protected readonly actions = AUDIT_ACTIONS;
+  protected readonly action = signal('');
+  protected readonly actor = signal('');
+  protected readonly from = signal('');
+  protected readonly to = signal('');
+  protected readonly page = signal(0);
+  protected readonly exporting = signal(false);
+
+  /** Query parameters of the current filters (also used by the CSV export). */
+  private readonly filterParams = computed(() => {
+    const params: Record<string, string> = {};
+    if (this.action()) {
+      params['action'] = this.action();
+    }
+    if (this.actor().trim()) {
+      params['actor'] = this.actor().trim();
+    }
+    if (this.from()) {
+      params['from'] = new Date(`${this.from()}T00:00:00`).toISOString();
+    }
+    if (this.to()) {
+      // "To" is a whole day in the user's time zone: the backend bound is exclusive, so use the next midnight.
+      const end = new Date(`${this.to()}T00:00:00`);
+      end.setDate(end.getDate() + 1);
+      params['to'] = end.toISOString();
+    }
+    return params;
+  });
+
+  protected readonly events = httpResource<AuditEventPage>(() => ({
+    url: this.baseUrl,
+    params: { ...this.filterParams(), page: String(this.page()), size: String(PAGE_SIZE) },
+  }));
+
+  protected setFilter(filter: ReturnType<typeof signal<string>>, value: string): void {
+    filter.set(value);
+    this.page.set(0);
+  }
+
+  protected label(action: string): string {
+    const text = action.toLowerCase().replaceAll('_', ' ');
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  protected async exportCsv(): Promise<void> {
+    this.exporting.set(true);
+    try {
+      const csv = await firstValueFrom(
+        this.http.get(`${this.baseUrl}/export`, { params: this.filterParams(), responseType: 'blob' }),
+      );
+      saveBlob(csv, 'deskpilot-audit.csv');
+    } catch {
+      // Toast shown by the error interceptor.
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+}
