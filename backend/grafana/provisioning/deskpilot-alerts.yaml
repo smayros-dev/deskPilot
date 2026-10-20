@@ -1,0 +1,86 @@
+# Grafana-managed alert rules for DeskPilot (12p), evaluated every minute: Grafana > Alerting > Alert rules.
+# Thresholds follow the evaluation (84% of the scenarios pass) and the CPU latency of qwen3:8b (about a minute).
+apiVersion: 1
+groups:
+- orgId: 1
+  name: deskpilot
+  folder: DeskPilot
+  interval: 1m
+  rules:
+  - uid: deskpilot-success-rate
+    title: DeskPilot success rate below 70%
+    condition: C
+    for: 5m
+    noDataState: OK
+    execErrState: Error
+    annotations:
+      summary: Fewer than 70% of the agent runs finished in the last hour completed (escalated or failed instead).
+    labels:
+      service: deskpilot
+    data:
+    - refId: A
+      datasourceUid: prometheus
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      model:
+        refId: A
+        expr: (sum (increase(agent_runs_total{status="COMPLETED",job="deskpilot"}[1h])) or sum (increase(agent_runs_total{status=~"COMPLETED|ESCALATED|FAILED",job="deskpilot"}[1h])) * 0) / sum (increase(agent_runs_total{status=~"COMPLETED|ESCALATED|FAILED",job="deskpilot"}[1h]))
+          and sum(increase(agent_runs_total{status=~"COMPLETED|ESCALATED|FAILED"}[1h])) >= 5
+        instant: true
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: lt
+            params:
+            - 0.7
+  - uid: deskpilot-p95-latency
+    title: DeskPilot p95 run latency above 2 minutes
+    condition: C
+    for: 5m
+    noDataState: OK
+    execErrState: Error
+    annotations:
+      summary: The 95th percentile of the agent run time over the last hour is above 2 minutes.
+    labels:
+      service: deskpilot
+    data:
+    - refId: A
+      datasourceUid: prometheus
+      relativeTimeRange:
+        from: 3600
+        to: 0
+      model:
+        refId: A
+        expr: histogram_quantile(0.95, sum by (le) (rate(agent_run_duration_milliseconds_bucket[1h])))
+        instant: true
+    - refId: B
+      datasourceUid: __expr__
+      model:
+        refId: B
+        type: reduce
+        expression: A
+        reducer: last
+    - refId: C
+      datasourceUid: __expr__
+      model:
+        refId: C
+        type: threshold
+        expression: B
+        conditions:
+        - evaluator:
+            type: gt
+            params:
+            - 120000

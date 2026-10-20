@@ -1,0 +1,9 @@
+# Jaeger as a Grafana data source: the traces of the agent runs next to the metrics (12p).
+apiVersion: 1
+datasources:
+  - name: Jaeger
+    uid: jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: false

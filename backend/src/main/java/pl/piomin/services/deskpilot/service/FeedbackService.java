@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.piomin.services.deskpilot.agent.AgentMetrics;
 import pl.piomin.services.deskpilot.exception.ConflictException;
 import pl.piomin.services.deskpilot.exception.NotFoundException;
 import pl.piomin.services.deskpilot.model.AgentRun;
@@ -27,8 +28,11 @@ public class FeedbackService {
 
     private final RunFeedbackRepository feedbackRepository;
     private final AgentRunRepository runRepository;
+    private final AgentMetrics metrics;
 
-    public FeedbackService(RunFeedbackRepository feedbackRepository, AgentRunRepository runRepository) {
+    public FeedbackService(RunFeedbackRepository feedbackRepository, AgentRunRepository runRepository,
+                           AgentMetrics metrics) {
+        this.metrics = metrics;
         this.feedbackRepository = feedbackRepository;
         this.runRepository = runRepository;
     }
@@ -42,6 +46,9 @@ public class FeedbackService {
         }
         String text = comment == null || comment.isBlank() ? null : comment.strip();
         Optional<RunFeedback> existing = feedbackRepository.findByRunId(runId);
+        if (existing.isEmpty() || existing.get().getRating() != rating) {
+            metrics.feedback(rating, run.getModel());
+        }
         if (existing.isPresent()) {
             existing.get().change(rating, text);
             return existing.get();

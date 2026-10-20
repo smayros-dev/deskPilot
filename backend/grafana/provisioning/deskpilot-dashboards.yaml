@@ -1,0 +1,10 @@
+# Loads the DeskPilot dashboards (12p) into a "DeskPilot" folder.
+apiVersion: 1
+providers:
+  - name: deskpilot
+    folder: DeskPilot
+    type: file
+    disableDeletion: true
+    allowUiUpdates: true
+    options:
+      path: /deskpilot/dashboards

@@ -6,6 +6,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import pl.piomin.services.deskpilot.TestcontainersConfiguration;
 import pl.piomin.services.deskpilot.agent.AgentMetrics;
@@ -24,8 +26,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
-@Import({TestcontainersConfiguration.class, RunService.class, FeedbackService.class})
+@Import({TestcontainersConfiguration.class, RunService.class, FeedbackService.class, FeedbackServiceTest.Metrics.class})
 class FeedbackServiceTest {
+
+    @TestConfiguration
+    static class Metrics {
+
+        @Bean
+        SimpleMeterRegistry meterRegistry() {
+            return new SimpleMeterRegistry();
+        }
+
+        @Bean
+        AgentMetrics agentMetrics(SimpleMeterRegistry registry) {
+            return new AgentMetrics(registry);
+        }
+    }
+
+    @Autowired
+    private SimpleMeterRegistry meterRegistry;
 
     @Autowired
     private RunService runService;
@@ -44,7 +63,7 @@ class FeedbackServiceTest {
 
     @Test
     void ownerRatesAFinishedRunAndCanChangeTheRating() {
-        AgentRun run = finishedRun("alice", "qwen3:8b");
+        AgentRun run = finishedRun("alice", "rated-model");
 
         feedbackService.rate(run.getId(), "alice", FeedbackRating.DOWN, "  Wrong portal address  ");
         RunFeedback changed = feedbackService.rate(run.getId(), "alice", FeedbackRating.UP, " ");
@@ -53,6 +72,10 @@ class FeedbackServiceTest {
         assertThat(changed.getRating()).isEqualTo(FeedbackRating.UP);
         assertThat(changed.getComment()).isNull();
         assertThat(feedbackService.find(run.getId())).get().extracting(RunFeedback::getRating).isEqualTo(FeedbackRating.UP);
+        assertThat(meterRegistry.get("agent.feedback").tag("rating", "DOWN").tag("model", "rated-model").counter().count())
+                .isEqualTo(1);
+        assertThat(meterRegistry.get("agent.feedback").tag("rating", "UP").tag("model", "rated-model").counter().count())
+                .isEqualTo(1);
     }
 
     @Test
