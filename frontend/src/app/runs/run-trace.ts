@@ -5,6 +5,7 @@ import { I18n, TranslationKey } from '../core/i18n';
 import { Run, RunStep, StepType } from '../core/models';
 import { Answer } from '../shared/answer';
 import { DurationPipe } from '../shared/duration-pipe';
+import { SpecialistBadge } from '../shared/specialist-badge';
 
 interface StepView extends RunStep {
   body: string;
@@ -15,12 +16,15 @@ interface StepView extends RunStep {
 /** The ReAct trace of one run: thoughts, tool calls and results, approvals and the answer. */
 @Component({
   selector: 'app-run-trace',
-  imports: [DecimalPipe, DurationPipe, Answer],
+  imports: [DecimalPipe, DurationPipe, Answer, SpecialistBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="stats" role="list" [attr.aria-label]="i18n.t('trace.stats')">
       @if (run().model) {
         <span role="listitem"><code>{{ run().model }}</code></span>
+      }
+      @if (run().specialist; as specialist) {
+        <span role="listitem"><app-specialist-badge [specialist]="specialist" /></span>
       }
       <span role="listitem"><strong>{{ run().stats.activeMillis | duration: i18n.lang() }}</strong> {{ i18n.t('trace.active') }}</span>
       <span role="listitem"><strong>{{ run().stats.iterations }}</strong> {{ i18n.t('trace.modelCalls') }}</span>
@@ -46,6 +50,7 @@ interface StepView extends RunStep {
                 @case ('ANSWER') { 💬 }
                 @case ('GUARDRAIL') { 🛡️ }
                 @case ('IMAGE_ANALYSIS') { 🖼️ }
+                @case ('HANDOFF') { 🧭 }
                 @default { ❗ }
               }
             </span>
@@ -81,6 +86,7 @@ interface StepView extends RunStep {
     .step[data-type='TOOL_CALL'], .step[data-type='TOOL_RESULT'] { border-inline-start-color: var(--accent); }
     .step[data-type='APPROVAL_REQUESTED'], .step[data-type='APPROVAL_DECISION'] { border-inline-start-color: var(--warn); }
     .step[data-type='ANSWER'] { border-inline-start-color: var(--ok); }
+    .step[data-type='HANDOFF'] { border-inline-start-color: var(--accent); }
     .step.error, .step[data-type='GUARDRAIL'] { border-inline-start-color: var(--danger); }
     .step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
     .label { font-weight: 600; }

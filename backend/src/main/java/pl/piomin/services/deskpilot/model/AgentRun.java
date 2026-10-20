@@ -60,6 +60,10 @@ public class AgentRun {
     @Column(length = 1)
     private String variant;
 
+    /** Specialist agent the supervisor handed the run to (12f); null when routing is off. */
+    @Column(length = 40)
+    private String specialist;
+
     /** Time spent working (model + tools), excluding time waiting for a human decision. */
     private long activeMillis;
 
@@ -92,6 +96,10 @@ public class AgentRun {
     public void joinExperiment(String experimentId, String variant) {
         this.experimentId = experimentId;
         this.variant = variant;
+    }
+
+    public void handOffTo(String specialist) {
+        this.specialist = specialist;
     }
 
     public void recordModelCall(long promptTokens, long completionTokens) {
@@ -199,5 +207,9 @@ public class AgentRun {
 
     public String getVariant() {
         return variant;
+    }
+
+    public String getSpecialist() {
+        return specialist;
     }
 }

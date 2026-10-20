@@ -36,6 +36,10 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Guardrails v2**: per-user rate limits on chat messages and approvals (429 with `Retry-After`; admins exempt); a circuit breaker around the model (after 5 failures in a row, calls fail fast with 503 for 30 s; state in `/actuator/health`); optional model-based moderation of messages (`MODERATION_ENABLED`); IBANs and phone numbers redacted from answers like card numbers.
 - **Multilingual UI**: English, French and Arabic (right-to-left), switchable from the user menu; the choice is remembered per browser and the default follows the browser language. Dates and numbers follow the selected locale. Error details returned by the backend stay in English.
 - **Cloud models (optional)**: admins can enable Mistral and Gemini (free tiers) on the Settings page and pick their models for chat, vision or an evaluation, next to the local Ollama models. Keys come from `MISTRAL_API_KEY` / `GEMINI_API_KEY` or are entered once in the UI, stored encrypted (AES-256-GCM) and never shown again. A warning reminds that questions, articles and tickets are then sent to that provider; the local model stays the default.
+- **Prompt & model experiments**: admins save named versions of the system prompt and run an A/B experiment between two variants (local or cloud model + optional prompt version, configurable split). Each conversation stays on its variant; the Experiments page compares success rate, escalations, latency (avg/p95), tokens and 👍/👎 per variant.
+- **Knowledge gaps**: every week (and on demand) questions that were escalated, rated 👎 or found nothing in the knowledge base are grouped by meaning; questions already covered by an article are skipped. On the Knowledge page reviewers let the model draft an article for a gap, edit it, and publish it to the knowledge base or dismiss it.
+- **Specialist agents (optional)**: with "Specialist agents" on in Settings, each message is routed to a network/VPN, accounts/MFA, hardware or software specialist (keywords first, then embedding similarity, then the conversation's previous specialist; optionally the model) with its own instructions, examples and tool subset. The hand-off is a step in the trace, the answer shows a 🧭 badge, and the dashboard breaks results down per specialist. Off by default until measured with an evaluation.
+- **Grafana (optional)**: `docker compose --profile grafana up -d lgtm` in `backend/` starts Grafana at http://localhost:3000 (admin / admin) with a provisioned "DeskPilot — Agent" dashboard (success rate, p95 latency, outcomes, per model/provider, tokens, tools, feedback, approvals, guardrails) and alerts on success rate (< 70 % over 1 h) and p95 latency (> 2 min). Set `OTEL_METRICS_EXPORT_ENABLED=true` to send metrics.
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -151,6 +155,11 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `DESKPILOT_ISSUER_URI` | `http://localhost:8180/realms/deskpilot` | OIDC issuer whose tokens the API accepts |
 | `OTEL_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP endpoint for traces (Jaeger) |
 | `TRACING_EXPORT_ENABLED` | `true` | Set to `false` to stop exporting traces |
+| `OTEL_METRICS_EXPORT_ENABLED` | `false` | Export Micrometer metrics over OTLP to Grafana (lgtm) |
+| `OTEL_METRICS_ENDPOINT` / `OTEL_METRICS_STEP` | `http://localhost:4328/v1/metrics` / `15s` | OTLP metrics endpoint (host port 4328, Jaeger keeps 4318) and export interval |
+| `KNOWLEDGE_GAPS_CRON` | `0 0 6 * * MON` | Weekly knowledge-gap detection (`-` = only on demand); thresholds under `agent.knowledge-gaps.*` |
+| `AGENT_SPECIALISTS` | `false` | Default of the "Specialist agents" setting; thresholds under `agent.specialists.*` |
+| `AGENT_SPECIALISTS_MODEL_FALLBACK` | `false` | Let the chat model pick a specialist when keywords and embeddings don't decide |
 
 ## Frontend pages
 
@@ -161,6 +170,7 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `/runs/:id` | Full trace of one run (thoughts, tool calls, results, approvals, tokens, timing) |
 | `/dashboard` | Success metrics: task success, latency (avg/p95), tool accuracy, escalations, approvals, tokens |
 | `/helpdesk/tickets` · `/knowledge` · `/memories` | Tickets (own, or all for reviewers), KB articles, long-term memories of the signed-in user |
+| `/experiments` | Admins: prompt versions, start/stop A/B experiments, results per variant |
 | `/settings` | Agent configuration (read-only unless admin): cloud providers (admins), model (local or cloud), temperature, top-p, context window, max tokens, thinking, max steps, RAG, tools & approvals, system prompt |
 
 ## Run everything in Docker
@@ -272,6 +282,10 @@ OLLAMA_IT=true ./mvnw test -Dtest="*SmokeTest"   # real local model: chat, RAG, 
 | `GET` `DELETE` | `/api/me/export`, `/api/me/data`, `/api/me/memories[/{id}]` | Download your data; delete your conversations and memories |
 | `GET` | `/api/audit`, `/api/audit/export` | Admins: audit trail (filters action, actor, from, to; paging) and CSV export |
 | `GET` | `/api/runs/{id}` | One run with its steps |
+| `GET` `POST` `PUT` | `/api/knowledge-gaps`, `POST /detect`, `POST` `PUT /{id}/draft`, `POST /{id}/publish`, `POST /{id}/dismiss` | Reviewers: knowledge gaps, model drafts, publish to the knowledge base |
+| `GET` `POST` `DELETE` | `/api/prompts`, `/api/prompts/{id}` | Admins: immutable prompt versions (409 when used by an experiment) |
+| `GET` `POST` | `/api/experiments`, `/{id}`, `POST /{id}/stop` | Admins: A/B experiments (`{name, a:{provider, model, promptId}, b:{…}, bPercent}`) with per-variant results; one running at a time |
+| `GET` | `/api/specialists` | Specialist agents with their keywords and allowed tools |
 | `GET` `POST` `DELETE` | `/api/knowledge-base/documents`, `/{id}`, `POST /{id}/reindex` | Admins: upload (multipart `file`, optional `title`), list, re-index and delete documents |
 | `GET` | `/api/events` | Live updates as Server-Sent Events: `run` (your runs), `ticket` (your tickets; all for reviewers), `approvals` (`{"pending": n}`, reviewers) |
 | `GET` | `/api/runs` | Reviewers: runs waiting for approval, oldest first |
@@ -292,6 +306,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.22** — Prompt versions and A/B experiments (12m, V18); knowledge-gap detection with model-drafted articles (12d, V19); Grafana dashboard and alerts with OTLP metrics (12p); optional supervisor + specialist agents with hand-off in the trace (12f, V20).
 - **1.0.21** — Optional cloud models: Mistral and Gemini through their OpenAI-compatible APIs, enabled and keyed from the Settings page (keys encrypted, V17), usable for chat, vision and evaluations (12s).
 - **1.0.20** — Conversation summaries (12h, V16); guardrails v2: rate limits, circuit breaker around the model, optional moderation, IBAN/phone redaction (12n); English/French/Arabic UI with right-to-left layout (12q); fix: the page no longer gets wider than the screen when the header is long.
 - **1.0.19** — Conversation history (12r, V13), audit trail and privacy controls (12o, V14), e-mail/webhook notifications with Mailpit and an approval SLA (12j, V15).

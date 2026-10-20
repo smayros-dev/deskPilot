@@ -58,6 +58,11 @@ public class AgentMetrics {
                 .tag("model", model == null ? "unknown" : model).register(registry).increment();
     }
 
+    void handOff(String specialist, String method) {
+        Counter.builder("agent.handoffs").description("Messages routed to a specialist agent")
+                .tag("specialist", specialist).tag("method", method).register(registry).increment();
+    }
+
     void guardrailBlocked(String rule) {
         Counter.builder("agent.guardrail.blocked").tag("rule", rule).register(registry).increment();
     }

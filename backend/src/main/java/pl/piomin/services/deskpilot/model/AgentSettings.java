@@ -51,6 +51,9 @@ public class AgentSettings {
     /** Check answers and ticket requests against the retrieved articles (one extra model call each). */
     private boolean selfCheck;
 
+    /** Route each message to a specialist agent (12f). */
+    private boolean specialists;
+
     /** Model that reads screenshots; null when screenshots are off. */
     @Column(length = 100)
     private String visionModel;
@@ -92,7 +95,7 @@ public class AgentSettings {
     public record Values(String chatModel, double temperature, double topP, int contextWindow, int maxOutputTokens,
                          boolean thinking, int maxIterations, int ragTopK, double ragSimilarityThreshold,
                          boolean groundingCheck, boolean hybridSearch, boolean selfCheck, String visionModel, String chatProvider, String visionProvider,
-                         Set<String> disabledTools, Set<String> approvalTools, String systemPrompt) {
+                         Set<String> disabledTools, Set<String> approvalTools, String systemPrompt, boolean specialists) {
     }
 
     public void apply(Values values) {
@@ -115,13 +118,14 @@ public class AgentSettings {
         this.disabledTools = Set.copyOf(values.disabledTools());
         this.approvalTools = Set.copyOf(values.approvalTools());
         this.systemPrompt = values.systemPrompt() == null || values.systemPrompt().isBlank() ? null : values.systemPrompt();
+        this.specialists = values.specialists();
         this.updatedAt = Instant.now();
     }
 
     public Values values() {
         return new Values(chatModel, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations,
                 ragTopK, ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, chatProvider, visionProvider, disabledTools, approvalTools,
-                systemPrompt);
+                systemPrompt, specialists);
     }
 
     public Instant getUpdatedAt() {

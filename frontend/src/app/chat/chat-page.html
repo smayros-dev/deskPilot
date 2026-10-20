@@ -39,6 +39,9 @@
               <app-answer [text]="run.answer ?? i18n.t('chat.failedNoAnswer')" [run]="run" />
               <div class="meta">
                 <app-status-badge [status]="run.status" />
+                @if (run.specialist) {
+                  <app-specialist-badge [specialist]="run.specialist" />
+                }
                 <span>{{ run.stats.activeMillis | duration: i18n.lang() }}</span>
                 <button type="button" class="link-button" (click)="toggleTrace(run.id)" [attr.aria-expanded]="expanded().has(run.id)">
                   {{ expanded().has(run.id) ? i18n.t('chat.hideReasoning') : i18n.t('chat.showReasoning') }}
@@ -96,6 +99,7 @@
                     @case ('TOOL_RESULT') { {{ step.error ? '⚠️' : '📄' }} <code>{{ step.name }}</code> <span class="muted">{{ step.content }}</span> }
                     @case ('APPROVAL_DECISION') { {{ step.name === 'APPROVED' ? '✅' : '⛔' }} <span>{{ step.name?.toLowerCase() }} {{ step.content }}</span> }
                     @case ('ANSWER') { 💬 <span>{{ i18n.t('chat.answerReady') }}</span> }
+                    @case ('HANDOFF') { 🧭 <span>{{ i18n.t('chat.handedTo', { name: specialistName(step.name ?? '') }) }}</span> }
                     @case ('IMAGE_ANALYSIS') { 🖼️ <span>{{ i18n.t('chat.screenshotRead', { model: step.name ?? '' }) }} {{ step.content }}</span> }
                     @default { • <span>{{ i18n.t($any('step.' + step.type)) }}</span> }
                   }

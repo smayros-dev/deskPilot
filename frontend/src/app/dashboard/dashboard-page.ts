@@ -9,6 +9,7 @@ import { AuthService } from '../core/auth';
 import { I18n, TranslationKey } from '../core/i18n';
 import { AgentMetrics, RatedAnswer } from '../core/models';
 import { DurationPipe } from '../shared/duration-pipe';
+import { SpecialistBadge } from '../shared/specialist-badge';
 
 interface StatusSlice {
   key: string;
@@ -20,7 +21,7 @@ interface StatusSlice {
 /** Success metrics from step 10 of the brief: task success, latency, tool accuracy, escalations. */
 @Component({
   selector: 'app-dashboard-page',
-  imports: [DatePipe, DecimalPipe, PercentPipe, DurationPipe, RouterLink],
+  imports: [DatePipe, DecimalPipe, PercentPipe, DurationPipe, RouterLink, SpecialistBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dashboard-page.html',
   styleUrl: './dashboard-page.css',

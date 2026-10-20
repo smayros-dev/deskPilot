@@ -12,7 +12,8 @@ export type StepType =
   | 'ANSWER'
   | 'GUARDRAIL'
   | 'ERROR'
-  | 'IMAGE_ANALYSIS';
+  | 'IMAGE_ANALYSIS'
+  | 'HANDOFF';
 
 export interface Session {
   id: string;
@@ -83,6 +84,8 @@ export interface Run {
   sessionId: string;
   userId: string;
   model: string | null;
+  /** Specialist agent the supervisor handed the message to (12f); null when routing is off. */
+  specialist?: string | null;
   status: RunStatus;
   userInput: string;
   answer: string | null;
@@ -185,6 +188,16 @@ export interface AgentMetrics {
   tools: ToolStats[];
   models: ModelStats[];
   feedback: FeedbackStats;
+  /** Finished chat runs per specialist (12f); empty while routing has never been on. */
+  specialists?: SpecialistStats[];
+}
+
+export interface SpecialistStats {
+  specialist: string;
+  runs: number;
+  successRate: number;
+  escalationRate: number;
+  avgLatencyMillis: number;
 }
 
 /** Runtime agent configuration (GET/PUT /api/settings). */
@@ -212,6 +225,8 @@ export interface AgentSettings {
   disabledTools: string[];
   approvalTools: string[];
   systemPrompt: string | null;
+  /** Route each message to a specialist agent (network, accounts, hardware, software) (12f). */
+  specialists: boolean;
   updatedAt?: string;
 }
 

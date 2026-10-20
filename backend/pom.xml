@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>pl.piomin.services</groupId>
 	<artifactId>deskpilot</artifactId>
-	<version>1.0.21</version>
+	<version>1.0.22</version>
 	<name>deskpilot</name>
 	<description>Agentic AI backend (Spring AI + Ollama + Spring Boot)</description>
 	<url/>

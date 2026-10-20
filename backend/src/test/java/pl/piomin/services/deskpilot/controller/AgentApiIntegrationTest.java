@@ -479,7 +479,7 @@ class AgentApiIntegrationTest {
     private static AgentSettingsDto withModel(AgentSettingsDto s, String model, double temperature) {
         return new AgentSettingsDto(model, temperature, s.topP(), s.contextWindow(), s.maxOutputTokens(), s.thinking(),
                 s.maxIterations(), s.ragTopK(), s.ragSimilarityThreshold(), s.groundingCheck(), s.hybridSearch(), s.selfCheck(), s.visionModel(), s.chatProvider(), s.visionProvider(), s.disabledTools(), s.approvalTools(),
-                s.systemPrompt(), null);
+                s.systemPrompt(), s.specialists(), null);
     }
 
     private RestTestClient.ResponseSpec chat(String message) {
