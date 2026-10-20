@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, untracked } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { AuthService, Role } from './core/auth';
+import { EventsService } from './core/events';
 import { LoadingIndicator } from './core/notifications';
 import { HealthPill } from './shared/health-pill';
 import { ToastContainer } from './shared/toast-container';
@@ -23,6 +24,16 @@ interface NavLink {
 export class App {
   protected readonly loading = inject(LoadingIndicator);
   protected readonly auth = inject(AuthService);
+  protected readonly events = inject(EventsService);
+
+  constructor() {
+    // Live updates (runs, tickets, approval count) once the user is signed in.
+    effect(() => {
+      if (this.auth.isAuthenticated()) {
+        untracked(() => this.events.start());
+      }
+    });
+  }
 
   protected readonly links: NavLink[] = [
     { path: '/chat', label: 'Chat' },

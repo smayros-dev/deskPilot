@@ -1,9 +1,11 @@
 import { DatePipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { AgentApi } from '../core/agent-api';
 import { AuthService } from '../core/auth';
+import { EventsService } from '../core/events';
 import { Ticket, TicketPriority } from '../core/models';
 
 type PriorityFilter = TicketPriority | 'ALL';
@@ -89,6 +91,11 @@ export class TicketsPage {
 
   protected readonly priorities: PriorityFilter[] = ['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
   protected readonly tickets = httpResource<Ticket[]>(() => this.api.url('/tickets'), { defaultValue: [] });
+
+  constructor() {
+    // A ticket was created (after a reviewer approved it): show it without a manual refresh.
+    inject(EventsService).tickets$.pipe(takeUntilDestroyed()).subscribe(() => this.tickets.reload());
+  }
   protected readonly filter = signal<PriorityFilter>('ALL');
 
   protected readonly filtered = computed(() => {

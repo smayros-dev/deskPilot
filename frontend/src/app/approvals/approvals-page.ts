@@ -1,11 +1,12 @@
 import { DatePipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { ApprovalCard } from '../chat/approval-card';
 import { AgentApi } from '../core/agent-api';
+import { EventsService } from '../core/events';
 import { ApprovalDecision, Run } from '../core/models';
 import { Notifications } from '../core/notifications';
 
@@ -57,6 +58,19 @@ export class ApprovalsPage {
   protected readonly queue = httpResource<Run[]>(() => this.api.url('/runs'), { defaultValue: [] });
   /** Run whose decision is being sent; the model keeps working on it, which can take a while. */
   protected readonly deciding = signal<string | null>(null);
+
+  constructor() {
+    // Reload when the live count of pending approvals changes (a new request, or another reviewer decided).
+    const events = inject(EventsService);
+    let previous: number | null | undefined;
+    effect(() => {
+      const pending = events.pendingApprovals();
+      if (previous !== undefined && pending !== previous) {
+        untracked(() => this.queue.reload());
+      }
+      previous = pending;
+    });
+  }
 
   protected async decide(run: Run, decision: ApprovalDecision): Promise<void> {
     this.deciding.set(run.id);

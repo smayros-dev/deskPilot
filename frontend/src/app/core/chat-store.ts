@@ -1,17 +1,19 @@
 import { HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, firstValueFrom, lastValueFrom, tap } from 'rxjs';
 
 import { AgentApi } from './agent-api';
 import { SILENT_ERRORS } from './api-config';
 import { AuthService } from './auth';
+import { EventsService } from './events';
 import { ApprovalDecision, Run, RunFeedback, RunStep, Session } from './models';
 import { Notifications } from './notifications';
 import { RunEvent } from './run-stream';
 
 const SESSION_KEY = 'agent.sessionId';
-/** How often a run waiting for a reviewer is checked. */
-export const APPROVAL_POLL_MS = 5000;
+/** How often a run waiting for a reviewer is checked while the live event stream is down. */
+export const FALLBACK_POLL_MS = 15_000;
 
 /**
  * Signal-based store for the conversation of the signed-in user: the session, its runs, and whether the agent
@@ -22,6 +24,7 @@ export class ChatStore {
   private readonly api = inject(AgentApi);
   private readonly auth = inject(AuthService);
   private readonly notifications = inject(Notifications);
+  private readonly events = inject(EventsService);
 
   private readonly _session = signal<Session | null>(null);
   private readonly _runs = signal<Run[]>([]);
@@ -45,13 +48,20 @@ export class ChatStore {
 
   constructor() {
     effect(() => writeStorage(SESSION_KEY, this._session()?.id ?? null));
-    // A reviewer may approve from another browser: keep checking the paused run until it moves on.
+    // A reviewer decides from another browser: the live stream brings the run's new state. While this browser streams
+    // a run itself, that stream is authoritative.
+    this.events.runs$.pipe(takeUntilDestroyed()).subscribe((run) => {
+      if (!this._sending() && this._runs().some((r) => r.id === run.id)) {
+        this.upsert(run);
+      }
+    });
+    // Without the live stream (reconnecting, proxy issue), check the paused run now and then.
     effect((onCleanup) => {
       const run = this.lastRun();
-      if (run?.status !== 'AWAITING_APPROVAL' || this._sending()) {
+      if (run?.status !== 'AWAITING_APPROVAL' || this._sending() || this.events.connected()) {
         return;
       }
-      const timer = setInterval(() => void this.refresh(run.id), APPROVAL_POLL_MS);
+      const timer = setInterval(() => void this.refresh(run.id), FALLBACK_POLL_MS);
       onCleanup(() => clearInterval(timer));
     });
   }
