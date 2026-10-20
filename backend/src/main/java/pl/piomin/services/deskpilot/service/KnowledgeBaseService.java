@@ -1,6 +1,7 @@
 package pl.piomin.services.deskpilot.service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,22 @@ public class KnowledgeBaseService {
         return documents.size();
     }
 
+    /** Embeds the given articles (e.g. the chunks of an uploaded document); replaces earlier vectors of the same ids. */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void index(List<KnowledgeArticle> articles) {
+        if (!articles.isEmpty()) {
+            vectorStore.add(articles.stream().map(KnowledgeBaseService::toDocument).toList());
+        }
+    }
+
+    /** Removes the vectors of deleted articles, so semantic search no longer returns them. */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void removeFromIndex(Collection<Long> articleIds) {
+        if (!articleIds.isEmpty()) {
+            vectorStore.delete(articleIds.stream().map(KnowledgeBaseService::vectorId).toList());
+        }
+    }
+
     /** Outside a transaction for the same reason: embedding the query calls the model. */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<Hit> search(String query) {
@@ -130,8 +147,12 @@ public class KnowledgeBaseService {
         return repository.findAll();
     }
 
+    private static String vectorId(long articleId) {
+        return UUID.nameUUIDFromBytes(("kb-" + articleId).getBytes(StandardCharsets.UTF_8)).toString();
+    }
+
     private static Document toDocument(KnowledgeArticle article) {
-        String id = UUID.nameUUIDFromBytes(("kb-" + article.getId()).getBytes(StandardCharsets.UTF_8)).toString();
+        String id = vectorId(article.getId());
         // Title and tags are part of the embedded text: they carry most of the topical signal.
         return new Document(id, embeddedText(article), Map.of(ARTICLE_ID, article.getId(), TITLE, article.getTitle()));
     }

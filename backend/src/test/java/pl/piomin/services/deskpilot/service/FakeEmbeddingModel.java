@@ -16,7 +16,16 @@ import org.springframework.ai.embedding.EmbeddingResponse;
  */
 class FakeEmbeddingModel implements EmbeddingModel {
 
-    private static final int DIMENSIONS = 256;
+    private final int dimensions;
+
+    FakeEmbeddingModel() {
+        this(256);
+    }
+
+    /** @param dimensions 768 to match the pgvector table of the application context */
+    FakeEmbeddingModel(int dimensions) {
+        this.dimensions = dimensions;
+    }
 
     @Override
     public EmbeddingResponse call(EmbeddingRequest request) {
@@ -33,14 +42,14 @@ class FakeEmbeddingModel implements EmbeddingModel {
 
     @Override
     public int dimensions() {
-        return DIMENSIONS;
+        return dimensions;
     }
 
-    private static float[] vectorize(String text) {
-        float[] vector = new float[DIMENSIONS];
+    private float[] vectorize(String text) {
+        float[] vector = new float[dimensions];
         for (String word : text.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+")) {
             if (word.length() >= 3) {
-                vector[Math.floorMod(word.hashCode(), DIMENSIONS)] += 1f;
+                vector[Math.floorMod(word.hashCode(), dimensions)] += 1f;
             }
         }
         return vector;

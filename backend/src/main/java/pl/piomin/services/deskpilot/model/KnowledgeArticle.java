@@ -26,13 +26,21 @@ public class KnowledgeArticle {
     @Column(length = 300)
     private String tags;
 
+    /** The uploaded document this article is a chunk of; null for articles written directly. */
+    private Long documentId;
+
     protected KnowledgeArticle() {
     }
 
     public KnowledgeArticle(String title, String content, String tags) {
+        this(title, content, tags, null);
+    }
+
+    public KnowledgeArticle(String title, String content, String tags, Long documentId) {
         this.title = title;
         this.content = content;
         this.tags = tags;
+        this.documentId = documentId;
     }
 
     public Long getId() {
@@ -49,5 +57,9 @@ public class KnowledgeArticle {
 
     public String getTags() {
         return tags;
+    }
+
+    public Long getDocumentId() {
+        return documentId;
     }
 }
