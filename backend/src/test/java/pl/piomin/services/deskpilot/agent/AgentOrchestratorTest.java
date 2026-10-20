@@ -457,7 +457,7 @@ class AgentOrchestratorTest {
     void appliesSettingsToTheModelCallAndRecordsTheModel() {
         when(modelCatalog.find("llama3.2:3b")).thenReturn(Optional.of(toolModel("llama3.2:3b")));
         AgentSettings.Values values = settingsService.get().values();
-        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true, true, false, null,
+        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true, true, false, null, "ollama", null,
                 Set.of("save_memory"), values.approvalTools(), "You are a terse helpdesk bot."));
         givenModelReplies(answer("Done."));
 
@@ -480,7 +480,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.chatProvider(), v.visionProvider(),
                 v.disabledTools(), Set.of(), v.systemPrompt()));
         givenModelReplies(
                 toolCall("", "create_ticket", "{\"title\":\"Mouse\",\"description\":\"Broken\",\"priority\":\"LOW\"}"),
@@ -497,7 +497,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.chatProvider(), v.visionProvider(),
                 Set.of("escalate_to_human"), v.approvalTools(), v.systemPrompt()));
         givenModelReplies(toolCall("", "escalate_to_human", "{\"reason\":\"x\"}"), answer("OK"));
 
@@ -515,7 +515,7 @@ class AgentOrchestratorTest {
 
         assertThatThrownBy(() -> settingsService.update(new AgentSettings.Values("gemma:2b", v.temperature(), v.topP(),
                 v.contextWindow(), v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(),
-                v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
+                v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.chatProvider(), v.visionProvider(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not support tool calling");
     }
@@ -651,7 +651,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find(v.chatModel())).thenReturn(Optional.of(toolModel(v.chatModel())));
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
                 v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), grounding,
-                v.hybridSearch(), selfCheck, v.visionModel(), v.disabledTools(), v.approvalTools(), v.systemPrompt()));
+                v.hybridSearch(), selfCheck, v.visionModel(), v.chatProvider(), v.visionProvider(), v.disabledTools(), v.approvalTools(), v.systemPrompt()));
     }
 
     private void setVisionModel(String model) {
@@ -663,7 +663,7 @@ class AgentOrchestratorTest {
         }
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
                 v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(),
-                v.groundingCheck(), v.hybridSearch(), v.selfCheck(), model, v.disabledTools(), v.approvalTools(),
+                v.groundingCheck(), v.hybridSearch(), v.selfCheck(), model, v.chatProvider(), "ollama", v.disabledTools(), v.approvalTools(),
                 v.systemPrompt()));
     }
 

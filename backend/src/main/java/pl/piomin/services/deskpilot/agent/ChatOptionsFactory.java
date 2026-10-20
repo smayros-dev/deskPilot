@@ -22,6 +22,19 @@ public class ChatOptionsFactory {
         this.chatModel = chatModel;
     }
 
+    /** Options for a cloud provider's model (12s), starting from that client's defaults (base URL, key, timeouts). */
+    public ToolCallingChatOptions createCloud(AgentConfig config, List<ToolCallback> tools, ChatModel cloudModel) {
+        ToolCallingChatOptions.Builder<?> builder = cloudModel.getDefaultOptions() instanceof ToolCallingChatOptions defaults
+                ? defaults.mutate()
+                : ToolCallingChatOptions.builder();
+        return builder.model(config.chatModel())
+                .temperature(config.temperature())
+                .topP(config.topP())
+                .maxTokens(config.maxOutputTokens())
+                .toolCallbacks(tools)
+                .build();
+    }
+
     public ToolCallingChatOptions create(AgentConfig config, List<ToolCallback> tools) {
         if (chatModel.getDefaultOptions() instanceof OllamaChatOptions defaults) {
             OllamaChatOptions.Builder builder = defaults.mutate()

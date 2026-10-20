@@ -19,22 +19,36 @@
   <p class="notice" role="note">{{ i18n.t('settings.readOnly') }}</p>
 }
 
+@if (auth.isAdmin()) {
+  <section class="card providers" aria-labelledby="providers-title">
+    <app-providers-panel />
+  </section>
+}
+
 <form [formGroup]="form" (ngSubmit)="save()" class="settings">
   <section class="card" aria-labelledby="model-title">
     <h2 id="model-title">{{ i18n.t('settings.model') }}</h2>
     <label for="chatModel">{{ i18n.t('settings.chatModel') }}</label>
     <select id="chatModel" formControlName="chatModel">
-      @for (model of chatModels(); track model.name) {
-        <option [value]="model.name" [disabled]="!model.supportsTools">
-          {{ model.name }}
-          @if (model.parameterSize) { · {{ model.parameterSize }} }
-          · {{ model.sizeBytes / gib | number: '1.1-1' : i18n.locale() }} GB
-          @if (!model.supportsTools) { {{ i18n.t('settings.noTools') }} }
-        </option>
-      } @empty {
-        <option value="" disabled>{{ models.isLoading() ? i18n.t('settings.loadingModels') : i18n.t('settings.noModels') }}</option>
+      @if (unlistedChat(); as unlisted) {
+        <option [value]="unlisted">{{ unlisted.replace('|', ' · ') }}</option>
+      }
+      @for (group of options.groups(); track group.provider) {
+        <optgroup [label]="group.cloud ? '☁ ' + group.label : group.label">
+          @for (option of group.options; track option.value) {
+            <option [value]="option.value" [disabled]="!option.supportsTools">
+              {{ option.label }}
+              @if (!option.supportsTools) { {{ i18n.t('settings.noTools') }} }
+            </option>
+          } @empty {
+            <option value="" disabled>{{ options.loading() ? i18n.t('settings.loadingModels') : i18n.t('settings.noModels') }}</option>
+          }
+        </optgroup>
       }
     </select>
+    @if (selectedIsCloud()) {
+      <p class="notice cloud cloud-model" role="note">☁ {{ i18n.t('settings.cloudWarning', { provider: selectedProviderLabel() }) }}</p>
+    }
     @if (selectedModel(); as model) {
       <ul class="capabilities" [attr.aria-label]="i18n.t('settings.capabilities')">
         @for (capability of model.capabilities; track capability) {
@@ -47,8 +61,17 @@
     <label for="visionModel">{{ i18n.t('settings.visionModel') }}</label>
     <select id="visionModel" formControlName="visionModel">
       <option value="">{{ i18n.t('settings.visionOff') }}</option>
-      @for (model of visionModels(); track model.name) {
-        <option [value]="model.name">{{ model.name }} @if (model.parameterSize) { · {{ model.parameterSize }} }</option>
+      @if (unlistedVision(); as unlisted) {
+        <option [value]="unlisted">{{ unlisted.replace('|', ' · ') }}</option>
+      }
+      @for (group of options.groups(); track group.provider) {
+        <optgroup [label]="group.cloud ? '☁ ' + group.label : group.label">
+          @for (option of group.options; track option.value) {
+            @if (option.supportsVision) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          }
+        </optgroup>
       }
     </select>
     <p class="hint">{{ i18n.t('settings.visionHint') }}</p>

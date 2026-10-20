@@ -16,6 +16,7 @@ import pl.piomin.services.deskpilot.agent.AgentOrchestrator;
 import pl.piomin.services.deskpilot.agent.AgentSettingsService;
 import pl.piomin.services.deskpilot.agent.ModelCatalog;
 import pl.piomin.services.deskpilot.agent.SessionService;
+import pl.piomin.services.deskpilot.cloud.CloudProviderService;
 import pl.piomin.services.deskpilot.exception.ConflictException;
 import pl.piomin.services.deskpilot.exception.NotFoundException;
 import pl.piomin.services.deskpilot.guardrail.GuardrailViolationException;
@@ -49,11 +50,13 @@ public class EvaluationService {
     private final RunService runService;
     private final AgentSettingsService settingsService;
     private final ModelCatalog modelCatalog;
+    private final CloudProviderService cloudProviders;
     private final EvaluationRepository evaluations;
     private final EvaluationResultRepository results;
 
     public EvaluationService(ScenarioCatalog catalog, AgentOrchestrator orchestrator, SessionService sessionService,
                              RunService runService, AgentSettingsService settingsService, ModelCatalog modelCatalog,
+                             CloudProviderService cloudProviders,
                              EvaluationRepository evaluations, EvaluationResultRepository results) {
         this.catalog = catalog;
         this.orchestrator = orchestrator;
@@ -61,6 +64,7 @@ public class EvaluationService {
         this.runService = runService;
         this.settingsService = settingsService;
         this.modelCatalog = modelCatalog;
+        this.cloudProviders = cloudProviders;
         this.evaluations = evaluations;
         this.results = results;
     }
@@ -75,10 +79,25 @@ public class EvaluationService {
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Evaluation start(String model, Collection<String> categories, String startedBy) {
-        ModelCatalog.ModelInfo info = modelCatalog.find(model)
-                .orElseThrow(() -> new IllegalArgumentException("Model '" + model + "' is not installed in Ollama"));
-        if (!info.supportsTools()) {
-            throw new IllegalArgumentException("Model '" + model + "' does not support tool calling");
+        return start("ollama", model, categories, startedBy);
+    }
+
+    /** With a cloud provider (12s), the same scenarios compare a cloud model with the local one. */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Evaluation start(String provider, String model, Collection<String> categories, String startedBy) {
+        if (CloudProviderService.isCloud(provider)) {
+            if (!cloudProviders.isAvailable(provider)) {
+                throw new IllegalArgumentException("Provider '" + provider + "' is not enabled or has no API key");
+            }
+            if (cloudProviders.models(provider).stream().noneMatch(m -> m.id().equals(model) && m.supportsTools())) {
+                throw new IllegalArgumentException("Model '" + model + "' is not offered by " + provider + " with tool calling");
+            }
+        } else {
+            ModelCatalog.ModelInfo info = modelCatalog.find(model)
+                    .orElseThrow(() -> new IllegalArgumentException("Model '" + model + "' is not installed in Ollama"));
+            if (!info.supportsTools()) {
+                throw new IllegalArgumentException("Model '" + model + "' does not support tool calling");
+            }
         }
         List<Scenario> scenarios = catalog.select(categories);
         if (scenarios.isEmpty()) {
@@ -87,8 +106,8 @@ public class EvaluationService {
         if (evaluations.existsByStatus(EvaluationStatus.RUNNING)) {
             throw new ConflictException("Another evaluation is running; wait for it or cancel it");
         }
-        AgentConfig config = settingsService.current().withChatModel(model);
-        Evaluation evaluation = evaluations.save(new Evaluation(model, scenarios.size(), startedBy));
+        AgentConfig config = settingsService.current().withChat(CloudProviderService.isCloud(provider) ? provider : "ollama", model);
+        Evaluation evaluation = evaluations.save(new Evaluation(config.modelLabel(), scenarios.size(), startedBy));
         Thread.ofVirtual().name("evaluation-" + evaluation.getId()).start(() -> runAll(evaluation.getId(), scenarios, config));
         return evaluation;
     }

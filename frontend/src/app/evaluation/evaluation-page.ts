@@ -4,9 +4,9 @@ import { ChangeDetectionStrategy, Component, InjectionToken, computed, effect, i
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import { AgentApi } from '../core/agent-api';
+import { parseModelChoice } from '../core/cloud';
 import { I18n, TranslationKey } from '../core/i18n';
-import { ModelInfo } from '../core/models';
+import { ModelOptions } from '../core/model-options';
 import { Notifications } from '../core/notifications';
 import { DurationPipe } from '../shared/duration-pipe';
 import { Evaluation, EvaluationApi, EvaluationStatus, Scenario } from './evaluation-api';
@@ -35,19 +35,21 @@ export class EvaluationPage {
     return `evalStatus.${status}`;
   }
   private readonly api = inject(EvaluationApi);
-  private readonly agentApi = inject(AgentApi);
   private readonly notifications = inject(Notifications);
   private readonly pollMs = inject(EVALUATION_POLL_MS);
 
   protected readonly scenarios = httpResource<Scenario[]>(() => this.api.scenariosUrl, { defaultValue: [] });
-  protected readonly models = httpResource<ModelInfo[]>(() => this.agentApi.url('/models'), { defaultValue: [] });
   protected readonly evaluations = httpResource<Evaluation[]>(() => this.api.listUrl, { defaultValue: [] });
 
-  protected readonly toolModels = computed(() => this.models.value().filter((m) => m.chatModel && m.supportsTools));
+  /** Local and cloud models (12s) that can call tools, grouped by provider. */
+  protected readonly options = inject(ModelOptions);
+  protected readonly groups = computed(() =>
+    this.options.groups().map((g) => ({ ...g, options: g.options.filter((o) => o.supportsTools) })),
+  );
   protected readonly categories = computed(() => [...new Set(this.scenarios.value().map((s) => s.category))]);
 
   /** Model to evaluate: the first tool-capable model until the user picks one. */
-  protected readonly model = linkedSignal(() => this.toolModels()[0]?.name ?? '');
+  protected readonly model = linkedSignal(() => this.groups()[0]?.options[0]?.value ?? '');
   /** Categories to run; none selected means all. */
   protected readonly selectedCategories = signal<ReadonlySet<string>>(new Set());
   protected readonly scenarioCount = computed(() => {
@@ -109,7 +111,7 @@ export class EvaluationPage {
   protected async start(): Promise<void> {
     this.starting.set(true);
     try {
-      const evaluation = await firstValueFrom(this.api.start(this.model(), [...this.selectedCategories()]));
+      const evaluation = await firstValueFrom(this.api.start(parseModelChoice(this.model()).model, [...this.selectedCategories()], parseModelChoice(this.model()).provider));
       this.notifications.info(this.i18n.t('evaluation.started', { model: evaluation.model, count: evaluation.scenarioCount }));
       this.evaluations.reload();
       this.selectedId.set(evaluation.id);

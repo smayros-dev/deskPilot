@@ -138,6 +138,9 @@ management:
 
 agent:
   max-iterations: 8
+  # Master key (base64 of 32 bytes) encrypting the cloud API keys stored from the UI; generated into
+  # ~/.deskpilot/secret.key when empty (development only).
+  secret-key: ${DESKPILOT_SECRET_KEY:}
   # Guardrails v2 (12n)
   rate-limit:
     # Chat messages and approval decisions per user (admins are not limited); 0 = off.

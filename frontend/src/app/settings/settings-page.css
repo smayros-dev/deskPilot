@@ -64,3 +64,10 @@ td input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
   font-weight: 600;
   vertical-align: middle;
 }
+
+.notice.cloud {
+  margin: 0.5rem 0 0;
+  border-inline-start-color: var(--accent);
+  font-size: 0.85rem;
+}
+.providers { margin-bottom: 1rem; }

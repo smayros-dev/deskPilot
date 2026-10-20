@@ -82,6 +82,7 @@ public class AgentOrchestrator {
     private final SelfCheck selfCheck;
     private final VisionReader visionReader;
     private final ConversationSummarizer summarizer;
+    private final ModelGateway modelGateway;
     private final String systemPrompt;
 
     public AgentOrchestrator(ChatModel chatModel, ChatMemory chatMemory, ToolRegistry toolRegistry,
@@ -90,6 +91,7 @@ public class AgentOrchestrator {
                              ChatOptionsFactory chatOptionsFactory, GuardrailService guardrails, AgentMetrics metrics,
                              ObservationRegistry observations, SelfCheck selfCheck,
                              VisionReader visionReader, ConversationSummarizer summarizer,
+                             ModelGateway modelGateway,
                              @Value("classpath:prompts/system-prompt.txt") Resource systemPrompt) throws IOException {
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
@@ -105,6 +107,7 @@ public class AgentOrchestrator {
         this.selfCheck = selfCheck;
         this.visionReader = visionReader;
         this.summarizer = summarizer;
+        this.modelGateway = modelGateway;
         this.systemPrompt = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
     }
 
@@ -166,7 +169,7 @@ public class AgentOrchestrator {
             if (image != null && config.visionModel() == null) {
                 throw new IllegalArgumentException("Screenshots are off: an admin can choose a vision model in Settings");
             }
-            AgentRun run = runService.start(sessionId, session.getUserId(), userMessage, config.chatModel(), source);
+            AgentRun run = runService.start(sessionId, session.getUserId(), userMessage, config.modelLabel(), source);
             sessionService.recordMessage(sessionId, userMessage);
             tagCurrentObservation(run);
             listener.runStarted(run);
@@ -310,7 +313,7 @@ public class AgentOrchestrator {
                 .toList();
 
         long start = System.nanoTime();
-        ChatResponse response = chatModel.call(new Prompt(messages, chatOptionsFactory.create(config, tools)));
+        ChatResponse response = modelGateway.call(config, messages, tools);
         long durationMillis = elapsedMillis(start);
 
         Usage usage = response.getMetadata().getUsage();

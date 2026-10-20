@@ -44,10 +44,10 @@ export class SettingsStore {
     }
   }
 
-  async switchModel(model: string): Promise<void> {
+  async switchModel(model: string, provider = 'ollama'): Promise<void> {
     const current = this._settings() ?? (await this.load());
-    if (current && current.chatModel !== model) {
-      await this.save({ ...current, chatModel: model });
+    if (current && (current.chatModel !== model || current.chatProvider !== provider)) {
+      await this.save({ ...current, chatModel: model, chatProvider: provider });
     }
   }
 

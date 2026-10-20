@@ -1,4 +1,6 @@
 agent:
+  # Fixed test master key, so tests never write ~/.deskpilot.
+  secret-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
   # Rate limits have their own test; off for the others.
   rate-limit:
     per-minute: 0

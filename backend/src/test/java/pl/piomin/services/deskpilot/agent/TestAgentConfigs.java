@@ -9,7 +9,7 @@ public final class TestAgentConfigs {
     }
 
     public static AgentConfig defaults() {
-        return new AgentConfig("qwen3:8b", 0.2, 0.9, 8192, 2048, false, 8, 3, 0.55, true, true, false, null,
+        return new AgentConfig("qwen3:8b", 0.2, 0.9, 8192, 2048, false, 8, 3, 0.55, true, true, false, null, "ollama", null,
                 Set.of(), Set.of("create_ticket"), null);
     }
 }

@@ -61,6 +61,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    /** A cloud model provider refused or failed the request (12s). */
+    @ExceptionHandler(ModelProviderException.class)
+    ProblemDetail handleModelProvider(ModelProviderException e) {
+        LOG.warn("Model provider {} failed with HTTP {}: {}", e.getProvider(), e.getStatus(), e.getMessage());
+        ProblemDetail problem = problem(HttpStatus.BAD_GATEWAY, "Model provider error", e.explanation());
+        problem.setProperty("provider", e.getProvider());
+        return problem;
+    }
+
     /** The model server (Ollama) could not be reached or timed out. */
     @ExceptionHandler(ResourceAccessException.class)
     ProblemDetail handleModelUnavailable(ResourceAccessException e) {
@@ -78,6 +87,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case UnsupportedDocumentException u -> handleUnsupportedDocument(u);
             case IllegalArgumentException i -> handleIllegalArgument(i);
             case ResourceAccessException r -> handleModelUnavailable(r);
+            case ModelProviderException m -> handleModelProvider(m);
             case ModelUnavailableException m -> circuitOpenProblem(m);
             default -> {
                 LOG.error("Request failed", e);

@@ -11,10 +11,14 @@
     <label>
       <span>{{ i18n.t('evaluation.model') }}</span>
       <select [value]="model()" (change)="model.set($any($event.target).value)" [disabled]="!!running()">
-        @for (option of toolModels(); track option.name) {
-          <option [value]="option.name">{{ option.name }} @if (option.parameterSize) { · {{ option.parameterSize }} }</option>
-        } @empty {
-          <option value="" disabled>{{ models.isLoading() ? i18n.t('evaluation.loadingModels') : i18n.t('evaluation.noModel') }}</option>
+        @for (group of groups(); track group.provider) {
+          <optgroup [label]="group.cloud ? '☁ ' + group.label : group.label">
+            @for (option of group.options; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            } @empty {
+              <option value="" disabled>{{ options.loading() ? i18n.t('evaluation.loadingModels') : i18n.t('evaluation.noModel') }}</option>
+            }
+          </optgroup>
         }
       </select>
     </label>

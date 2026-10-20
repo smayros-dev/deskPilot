@@ -7,8 +7,11 @@ import { FormControl, FormGroup, FormRecord, NonNullableFormBuilder, ReactiveFor
 import { AgentApi } from '../core/agent-api';
 import { AuthService } from '../core/auth';
 import { I18n, TranslationKey } from '../core/i18n';
-import { AgentSettings, ModelInfo, ToolInfo } from '../core/models';
+import { AgentSettings, ToolInfo } from '../core/models';
+import { ModelOptions } from '../core/model-options';
 import { SettingsStore } from '../core/settings-store';
+import { isCloudProvider, modelChoice, parseModelChoice } from '../core/cloud';
+import { ProvidersPanel } from './providers-panel';
 
 type ToolControls = FormGroup<{ enabled: FormControl<boolean>; approval: FormControl<boolean> }>;
 
@@ -29,7 +32,7 @@ const GIB = 1024 ** 3;
 
 @Component({
   selector: 'app-settings-page',
-  imports: [ReactiveFormsModule, DatePipe, DecimalPipe],
+  imports: [ReactiveFormsModule, DatePipe, DecimalPipe, ProvidersPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './settings-page.html',
   styleUrl: './settings-page.css',
@@ -43,7 +46,8 @@ export class SettingsPage {
 
   protected readonly presets = PRESETS;
   protected readonly gib = GIB;
-  protected readonly models = httpResource<ModelInfo[]>(() => this.api.url('/models'), { defaultValue: [] });
+  protected readonly options = inject(ModelOptions);
+  protected readonly models = this.options.local;
   protected readonly tools = httpResource<ToolInfo[]>(() => this.api.url('/tools'), { defaultValue: [] });
 
   protected readonly form = this.fb.group({
@@ -67,9 +71,24 @@ export class SettingsPage {
   private readonly value = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
   private readonly loaded = signal(false);
 
-  protected readonly chatModels = computed(() => this.models.value().filter((m) => m.chatModel));
-  protected readonly visionModels = computed(() => this.models.value().filter((m) => m.supportsVision));
-  protected readonly selectedModel = computed(() => this.chatModels().find((m) => m.name === this.value().chatModel) ?? null);
+  /** The chat select holds provider and model together, e.g. "mistral|mistral-small-latest" (12s). */
+  protected readonly selectedChoice = computed(() => parseModelChoice(this.value().chatModel ?? ''));
+  protected readonly selectedModel = computed(() =>
+    this.selectedChoice().provider === 'ollama'
+      ? (this.models.value().find((m) => m.name === this.selectedChoice().model) ?? null)
+      : null,
+  );
+  protected readonly selectedIsCloud = computed(() => isCloudProvider(this.selectedChoice().provider));
+  protected readonly selectedProviderLabel = computed(() => this.options.providerLabel(this.selectedChoice().provider));
+  /** Shown when the saved model is not in the lists (e.g. a cloud model, whose list only admins can load). */
+  protected readonly unlistedChat = computed(() => {
+    const value = this.value().chatModel ?? '';
+    return value && !this.options.find(value) ? value : null;
+  });
+  protected readonly unlistedVision = computed(() => {
+    const value = this.value().visionModel ?? '';
+    return value && !this.options.find(value) ? value : null;
+  });
   protected readonly toolNames = computed(() => this.tools.value().map((t) => t.name));
 
   constructor() {
@@ -117,7 +136,8 @@ export class SettingsPage {
     const v = this.form.getRawValue();
     const tools = Object.entries(v.tools);
     const saved = await this.store.save({
-      chatModel: v.chatModel,
+      chatModel: parseModelChoice(v.chatModel).model,
+      chatProvider: parseModelChoice(v.chatModel).provider,
       temperature: v.temperature,
       topP: v.topP,
       contextWindow: v.contextWindow,
@@ -129,7 +149,8 @@ export class SettingsPage {
       groundingCheck: v.groundingCheck,
       hybridSearch: v.hybridSearch,
       selfCheck: v.selfCheck,
-      visionModel: v.visionModel || null,
+      visionModel: v.visionModel ? parseModelChoice(v.visionModel).model : null,
+      visionProvider: v.visionModel ? parseModelChoice(v.visionModel).provider : null,
       disabledTools: tools.filter(([, t]) => !t.enabled).map(([name]) => name),
       approvalTools: tools.filter(([, t]) => t.approval).map(([name]) => name),
       systemPrompt: v.systemPrompt.trim() || null,
@@ -176,7 +197,12 @@ export class SettingsPage {
         record.addControl(tool.name, group);
       }
     }
-    this.form.patchValue({ ...settings, systemPrompt: settings.systemPrompt ?? '', visionModel: settings.visionModel ?? '' });
+    this.form.patchValue({
+      ...settings,
+      chatModel: modelChoice(settings.chatProvider, settings.chatModel),
+      systemPrompt: settings.systemPrompt ?? '',
+      visionModel: settings.visionModel ? modelChoice(settings.visionProvider, settings.visionModel) : '',
+    });
     this.form.markAsPristine();
   }
 }

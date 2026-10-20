@@ -6,11 +6,13 @@ import { TestBed } from '@angular/core/testing';
 import { errorInterceptor } from '../core/interceptors';
 import { Role } from '../core/auth';
 import { provideFakeAuth } from '../core/testing';
+import { ProviderStatus } from '../core/cloud';
 import { AgentSettings, ModelInfo, ToolInfo } from '../core/models';
 import { SettingsPage } from './settings-page';
 
 const SETTINGS: AgentSettings = {
   chatModel: 'qwen3:8b',
+  chatProvider: 'ollama',
   temperature: 0.2,
   topP: 0.9,
   contextWindow: 8192,
@@ -23,6 +25,7 @@ const SETTINGS: AgentSettings = {
   hybridSearch: true,
   selfCheck: true,
   visionModel: null,
+  visionProvider: null,
   disabledTools: [],
   approvalTools: ['create_ticket'],
   systemPrompt: null,
@@ -45,7 +48,20 @@ const TOOLS: ToolInfo[] = [
 describe('SettingsPage', () => {
   let http: HttpTestingController;
 
-  async function render(roles: Role[] = ['user', 'admin']) {
+const MISTRAL: ProviderStatus = {
+  id: 'mistral',
+  label: 'Mistral AI',
+  baseUrl: 'https://api.mistral.ai/v1',
+  keysUrl: 'https://console.mistral.ai/api-keys',
+  enabled: true,
+  keySource: 'STORED',
+  keyHint: 'abcd',
+  available: true,
+  updatedBy: 'admin',
+  updatedAt: '2026-10-20T10:00:00Z',
+};
+
+  async function render(roles: Role[] = ['user', 'admin'], providers: ProviderStatus[] = []) {
     TestBed.configureTestingModule({
       imports: [SettingsPage],
       providers: [
@@ -61,6 +77,19 @@ describe('SettingsPage', () => {
     http.expectOne('/api/settings').flush(SETTINGS);
     http.expectOne('/api/models').flush(MODELS);
     http.expectOne('/api/tools').flush(TOOLS);
+    if (roles.includes('admin')) {
+      http.expectOne('/api/providers').flush(providers);
+      // Cloud model lists are requested once the provider list has arrived.
+      for (let i = 0; i < 3; i++) {
+        await Promise.resolve();
+        TestBed.tick();
+      }
+      for (const provider of providers.filter((p) => p.available)) {
+        http.expectOne(`/api/providers/${provider.id}/models`).flush([
+          { id: 'mistral-small-latest', supportsTools: true, supportsVision: true },
+        ]);
+      }
+    }
     await fixture.whenStable();
     return { fixture, element: fixture.nativeElement as HTMLElement };
   }
@@ -71,14 +100,33 @@ describe('SettingsPage', () => {
     const { element } = await render();
 
     const options = Array.from(element.querySelectorAll<HTMLOptionElement>('#chatModel option'));
-    expect(options.map((o) => o.value)).toEqual(['qwen3:8b', 'qwen3:4b', 'gemma:2b']);
-    expect(options.find((o) => o.value === 'gemma:2b')!.disabled).toBe(true);
+    expect(options.map((o) => o.value)).toEqual(['ollama|qwen3:8b', 'ollama|qwen3:4b', 'ollama|gemma:2b']);
+    expect(options.find((o) => o.value === 'ollama|gemma:2b')!.disabled).toBe(true);
+  });
+
+  it('lists the models of an available cloud provider, warns and saves provider and model', async () => {
+    const { fixture, element } = await render(['user', 'admin'], [MISTRAL]);
+    const select = element.querySelector<HTMLSelectElement>('#chatModel')!;
+    expect(Array.from(select.querySelectorAll('optgroup')).map((g) => g.label)).toEqual(['Ollama (local)', '☁ Mistral AI']);
+    expect(element.querySelector('app-providers-panel')?.textContent).toContain('Mistral AI');
+
+    select.value = 'mistral|mistral-small-latest';
+    select.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(element.querySelector('.cloud-model')?.textContent).toContain('Mistral AI');
+
+    element.querySelector<HTMLButtonElement>('button[type=submit]')!.click();
+    const req = http.expectOne({ method: 'PUT', url: '/api/settings' });
+    expect(req.request.body.chatProvider).toBe('mistral');
+    expect(req.request.body.chatModel).toBe('mistral-small-latest');
+    expect(req.request.body.visionProvider).toBeNull();
+    req.flush({ ...req.request.body, updatedAt: '2026-10-20T11:00:00Z' });
   });
 
   it('fills the form from the saved settings and starts pristine', async () => {
     const { fixture, element } = await render();
 
-    expect(element.querySelector<HTMLSelectElement>('#chatModel')!.value).toBe('qwen3:8b');
+    expect(element.querySelector<HTMLSelectElement>('#chatModel')!.value).toBe('ollama|qwen3:8b');
     expect(fixture.componentInstance.hasUnsavedChanges()).toBe(false);
     expect(element.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(true);
   });
@@ -86,7 +134,7 @@ describe('SettingsPage', () => {
   it('saves the edited values, turning tool checkboxes into enabled/approval lists', async () => {
     const { fixture, element } = await render();
     const select = element.querySelector<HTMLSelectElement>('#chatModel')!;
-    select.value = 'qwen3:4b';
+    select.value = 'ollama|qwen3:4b';
     select.dispatchEvent(new Event('change'));
     const approval = element.querySelector<HTMLInputElement>('input[aria-label="Require approval for create_ticket"]')!;
     approval.click();
@@ -113,7 +161,7 @@ describe('SettingsPage', () => {
   it('presets change several values at once and only enable thinking when the model supports it', async () => {
     const { fixture, element } = await render();
     const select = element.querySelector<HTMLSelectElement>('#chatModel')!;
-    select.value = 'qwen3:4b';
+    select.value = 'ollama|qwen3:4b';
     select.dispatchEvent(new Event('change'));
     await fixture.whenStable();
 

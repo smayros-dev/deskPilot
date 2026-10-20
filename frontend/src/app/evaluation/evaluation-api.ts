@@ -74,8 +74,8 @@ export class EvaluationApi {
     return `${this.baseUrl}/${id}`;
   }
 
-  start(model: string, categories: string[]): Observable<Evaluation> {
-    return this.http.post<Evaluation>(this.baseUrl, { model, categories });
+  start(model: string, categories: string[], provider = 'ollama'): Observable<Evaluation> {
+    return this.http.post<Evaluation>(this.baseUrl, { model, categories, provider });
   }
 
   cancel(id: string): Observable<Evaluation> {

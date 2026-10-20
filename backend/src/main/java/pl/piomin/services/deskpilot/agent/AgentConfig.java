@@ -20,6 +20,8 @@ public record AgentConfig(
         boolean hybridSearch,
         boolean selfCheck,
         String visionModel,
+        String chatProvider,
+        String visionProvider,
         Set<String> disabledTools,
         Set<String> approvalTools,
         String systemPrompt) {
@@ -27,7 +29,25 @@ public record AgentConfig(
     /** The same settings with another chat model, e.g. to evaluate a model without switching the live agent. */
     public AgentConfig withChatModel(String model) {
         return new AgentConfig(model, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations, ragTopK,
-                ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, disabledTools, approvalTools, systemPrompt);
+                ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, chatProvider, visionProvider, disabledTools, approvalTools,
+                systemPrompt);
+    }
+
+    /** The same settings with another provider and model, e.g. to evaluate a cloud model. */
+    public AgentConfig withChat(String provider, String model) {
+        return new AgentConfig(model, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations, ragTopK,
+                ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, provider, visionProvider,
+                disabledTools, approvalTools, systemPrompt);
+    }
+
+    /** Settings for reading a screenshot: the vision provider and model take the place of the chat ones. */
+    public AgentConfig forVision() {
+        return withChat(visionProvider == null ? "ollama" : visionProvider, visionModel);
+    }
+
+    /** How the model is shown in runs and metrics: cloud models carry their provider, e.g. "mistral:mistral-small-latest". */
+    public String modelLabel() {
+        return chatProvider == null || "ollama".equals(chatProvider) ? chatModel : chatProvider + ":" + chatModel;
     }
 
     public boolean isToolEnabled(String tool) {

@@ -7,9 +7,7 @@ import java.util.Optional;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.Usage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Component;
 import pl.piomin.services.deskpilot.service.RunService;
 
@@ -38,14 +36,12 @@ class SelfCheck {
     static final String NO_TICKET = "Not created: the knowledge base says no ticket is needed for this request. "
             + "Answer the user from the article instead: ";
 
-    private final ChatModel chatModel;
-    private final ChatOptionsFactory chatOptionsFactory;
+    private final ModelGateway modelGateway;
     private final RunService runService;
     private final AgentMetrics metrics;
 
-    SelfCheck(ChatModel chatModel, ChatOptionsFactory chatOptionsFactory, RunService runService, AgentMetrics metrics) {
-        this.chatModel = chatModel;
-        this.chatOptionsFactory = chatOptionsFactory;
+    SelfCheck(ModelGateway modelGateway, RunService runService, AgentMetrics metrics) {
+        this.modelGateway = modelGateway;
         this.runService = runService;
         this.metrics = metrics;
     }
@@ -78,8 +74,7 @@ class SelfCheck {
     private String ask(ActiveTurn turn, String instructions, String material) {
         AgentConfig config = turn.context().config();
         long start = System.nanoTime();
-        ChatResponse response = chatModel.call(new Prompt(List.of(new SystemMessage(instructions), new UserMessage(material)),
-                chatOptionsFactory.create(config, List.of())));
+        ChatResponse response = modelGateway.call(config, List.of(new SystemMessage(instructions), new UserMessage(material)), List.of());
         long durationMillis = (System.nanoTime() - start) / 1_000_000;
         Usage usage = response.getMetadata().getUsage();
         long promptTokens = usage == null || usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();

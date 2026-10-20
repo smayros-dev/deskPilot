@@ -94,6 +94,7 @@ describe('EvaluationPage', () => {
     http.expectOne('/api/evaluations/scenarios').flush(SCENARIOS);
     http.expectOne('/api/models').flush(MODELS);
     http.expectOne('/api/evaluations').flush(evaluations);
+    http.expectOne('/api/providers').flush([]);
     // The selected evaluation (the newest) is requested once the list has arrived.
     await settle();
     http.expectOne(`/api/evaluations/${detail.id}`).flush(detail);
@@ -132,7 +133,7 @@ describe('EvaluationPage', () => {
     const { fixture, element } = await render([evaluation({})], evaluation({}));
 
     const options = Array.from(element.querySelectorAll<HTMLOptionElement>('.start-form option')).map((o) => o.value);
-    expect(options).toEqual(['qwen3:8b']);
+    expect(options).toEqual(['ollama|qwen3:8b']);
 
     Array.from(element.querySelectorAll<HTMLButtonElement>('.categories button')).find((b) => b.textContent?.trim() === 'ticket')!.click();
     await fixture.whenStable();
@@ -141,7 +142,7 @@ describe('EvaluationPage', () => {
 
     start.click();
     const req = http.expectOne({ method: 'POST', url: '/api/evaluations' });
-    expect(req.request.body).toEqual({ model: 'qwen3:8b', categories: ['ticket'] });
+    expect(req.request.body).toEqual({ model: 'qwen3:8b', categories: ['ticket'], provider: 'ollama' });
     req.flush(evaluation({ id: 'e2', status: 'RUNNING', completed: 0, passed: 0, scenarioCount: 1, categories: [] }));
     await settle();
     http.expectOne('/api/evaluations').flush([evaluation({ id: 'e2', status: 'RUNNING', completed: 0, scenarioCount: 1 })]);

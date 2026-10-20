@@ -35,6 +35,7 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Long conversations**: once a conversation is long, older messages are condensed by the model into a summary that the agent keeps in its instructions; only the recent messages stay verbatim.
 - **Guardrails v2**: per-user rate limits on chat messages and approvals (429 with `Retry-After`; admins exempt); a circuit breaker around the model (after 5 failures in a row, calls fail fast with 503 for 30 s; state in `/actuator/health`); optional model-based moderation of messages (`MODERATION_ENABLED`); IBANs and phone numbers redacted from answers like card numbers.
 - **Multilingual UI**: English, French and Arabic (right-to-left), switchable from the user menu; the choice is remembered per browser and the default follows the browser language. Dates and numbers follow the selected locale. Error details returned by the backend stay in English.
+- **Cloud models (optional)**: admins can enable Mistral and Gemini (free tiers) on the Settings page and pick their models for chat, vision or an evaluation, next to the local Ollama models. Keys come from `MISTRAL_API_KEY` / `GEMINI_API_KEY` or are entered once in the UI, stored encrypted (AES-256-GCM) and never shown again. A warning reminds that questions, articles and tickets are then sent to that provider; the local model stays the default.
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -136,6 +137,8 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `AGENT_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model for RAG |
 | `AGENT_THINK` | `false` | qwen3 reasoning mode. About 15x slower on CPU; enable on a GPU |
 | `AGENT_VISION_MODEL` | (empty) | Default vision model for screenshots, e.g. `gemma4:26b`; empty = off (can be set on the Settings page) |
+| `MISTRAL_API_KEY` / `GEMINI_API_KEY` | (empty) | Cloud provider keys; take precedence over keys entered on the Settings page |
+| `DESKPILOT_SECRET_KEY` | (empty) | Base64 AES-256 key that encrypts keys stored from the UI; empty = generated once into `~/.deskpilot/secret.key` |
 | `RATE_LIMIT_PER_MINUTE` / `RATE_LIMIT_PER_DAY` | `10` / `100` | Chat messages and approval decisions per user (0 = off) |
 | `MODERATION_ENABLED` | `false` | Classify each message SAFE/UNSAFE with the model before the agent runs |
 | `MODERATION_MODEL` | (empty) | Model used for moderation; empty = the chat model |
@@ -158,7 +161,7 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `/runs/:id` | Full trace of one run (thoughts, tool calls, results, approvals, tokens, timing) |
 | `/dashboard` | Success metrics: task success, latency (avg/p95), tool accuracy, escalations, approvals, tokens |
 | `/helpdesk/tickets` · `/knowledge` · `/memories` | Tickets (own, or all for reviewers), KB articles, long-term memories of the signed-in user |
-| `/settings` | Agent configuration (read-only unless admin): model, temperature, top-p, context window, max tokens, thinking, max steps, RAG, tools & approvals, system prompt |
+| `/settings` | Agent configuration (read-only unless admin): cloud providers (admins), model (local or cloud), temperature, top-p, context window, max tokens, thinking, max steps, RAG, tools & approvals, system prompt |
 
 ## Run everything in Docker
 
@@ -281,6 +284,7 @@ OLLAMA_IT=true ./mvnw test -Dtest="*SmokeTest"   # real local model: chat, RAG, 
 | `GET` | `/api/metrics` | Success metrics (success rate, latency, tool accuracy, escalations…), also per model |
 | `GET` `PUT` `DELETE` | `/api/settings` | Read / change / reset the runtime agent settings (applied from the next request) |
 | `GET` | `/api/models`, `/api/tools` | Installed Ollama models with capabilities; available tools |
+| `GET` `PATCH` `POST` | `/api/providers`, `/{id}` (`{"enabled": true, "apiKey": "...", "removeKey": false}`), `/{id}/test`, `GET /{id}/models` | Admins: cloud providers (keys are write-only), connection test, chat models of a provider |
 
 Every `/api` call needs `Authorization: Bearer <access token>` from Keycloak (401 without, 403 without the role). Other users' sessions, runs and tickets answer 404. `PUT`/`DELETE /api/settings` need the admin role.
 
@@ -288,6 +292,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.21** — Optional cloud models: Mistral and Gemini through their OpenAI-compatible APIs, enabled and keyed from the Settings page (keys encrypted, V17), usable for chat, vision and evaluations (12s).
 - **1.0.20** — Conversation summaries (12h, V16); guardrails v2: rate limits, circuit breaker around the model, optional moderation, IBAN/phone redaction (12n); English/French/Arabic UI with right-to-left layout (12q); fix: the page no longer gets wider than the screen when the header is long.
 - **1.0.19** — Conversation history (12r, V13), audit trail and privacy controls (12o, V14), e-mail/webhook notifications with Mailpit and an approval SLA (12j, V15).
 - **1.0.18** — Document ingestion (12b): PDF/Markdown/text/HTML uploads split into searchable articles (Flyway V12).

@@ -1,10 +1,9 @@
-import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { AgentApi } from '../core/agent-api';
+import { modelChoice, parseModelChoice } from '../core/cloud';
 import { I18n } from '../core/i18n';
-import { ModelInfo } from '../core/models';
+import { ModelOptions } from '../core/model-options';
 import { SettingsStore } from '../core/settings-store';
 
 /** Quick model switch from the chat; the full configuration lives on the settings page. */
@@ -16,12 +15,18 @@ import { SettingsStore } from '../core/settings-store';
     <label class="field">
       <span>{{ i18n.t('modelSwitcher.model') }}</span>
       <select
-        [value]="store.chatModel() ?? ''"
-        [disabled]="disabled() || store.saving() || toolModels().length === 0"
+        [value]="current()"
+        [disabled]="disabled() || store.saving() || options.groups()[0].options.length === 0"
         (change)="switch($any($event.target).value)"
       >
-        @for (model of toolModels(); track model.name) {
-          <option [value]="model.name" [selected]="model.name === store.chatModel()">{{ model.name }}</option>
+        @for (group of options.groups(); track group.provider) {
+          <optgroup [label]="group.cloud ? '☁ ' + group.label : group.label">
+            @for (option of group.options; track option.value) {
+              @if (option.supportsTools) {
+                <option [value]="option.value" [selected]="option.value === current()">{{ option.model }}</option>
+              }
+            }
+          </optgroup>
         }
       </select>
     </label>
@@ -39,10 +44,11 @@ export class ModelSwitcher {
 
   protected readonly store = inject(SettingsStore);
   protected readonly i18n = inject(I18n);
-  private readonly api = inject(AgentApi);
-  private readonly models = httpResource<ModelInfo[]>(() => this.api.url('/models'), { defaultValue: [] });
-
-  protected readonly toolModels = computed(() => this.models.value().filter((m) => m.chatModel && m.supportsTools));
+  protected readonly options = inject(ModelOptions);
+  protected readonly current = computed(() => {
+    const settings = this.store.settings();
+    return settings ? modelChoice(settings.chatProvider, settings.chatModel) : '';
+  });
 
   constructor() {
     if (!this.store.settings()) {
@@ -50,7 +56,8 @@ export class ModelSwitcher {
     }
   }
 
-  protected switch(model: string): void {
-    void this.store.switchModel(model);
+  protected switch(value: string): void {
+    const { provider, model } = parseModelChoice(value);
+    void this.store.switchModel(model, provider);
   }
 }

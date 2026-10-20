@@ -32,7 +32,12 @@ public class EvaluationController {
      * @param model      installed Ollama model with tool calling
      * @param categories scenario categories to run; all when empty
      */
-    public record StartRequest(@NotBlank @Size(max = 100) String model, List<@NotBlank String> categories) {
+    public record StartRequest(@NotBlank @Size(max = 100) String model, List<@NotBlank String> categories,
+                               @Size(max = 30) String provider) {
+
+        public StartRequest(String model, List<String> categories) {
+            this(model, categories, null);
+        }
     }
 
     private final EvaluationService evaluationService;
@@ -52,7 +57,8 @@ public class EvaluationController {
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
     public EvaluationResponse start(@Valid @RequestBody StartRequest request, Authentication authentication) {
-        Evaluation evaluation = evaluationService.start(request.model(), request.categories(), authentication.getName());
+        Evaluation evaluation = evaluationService.start(request.provider() == null ? "ollama" : request.provider(),
+                request.model(), request.categories(), authentication.getName());
         auditService.record(authentication.getName(), AuditAction.EVALUATION_STARTED, "evaluation", evaluation.getId(),
                 "model " + evaluation.getModel() + ", " + evaluation.getScenarioCount() + " scenario(s)"
                         + (request.categories() == null || request.categories().isEmpty() ? "" : ", categories " + request.categories()));

@@ -55,6 +55,13 @@ public class AgentSettings {
     @Column(length = 100)
     private String visionModel;
 
+    /** Provider of the chat model: 'ollama' (local) or a cloud provider such as 'mistral' or 'gemini'. */
+    @Column(nullable = false, length = 30)
+    private String chatProvider;
+
+    @Column(length = 30)
+    private String visionProvider;
+
     @Convert(converter = StringSetConverter.class)
     @Column(nullable = false, length = 1000)
     private Set<String> disabledTools;
@@ -84,7 +91,8 @@ public class AgentSettings {
     /** All editable values at once, so the entity is never half-updated. */
     public record Values(String chatModel, double temperature, double topP, int contextWindow, int maxOutputTokens,
                          boolean thinking, int maxIterations, int ragTopK, double ragSimilarityThreshold,
-                         boolean groundingCheck, boolean hybridSearch, boolean selfCheck, String visionModel, Set<String> disabledTools, Set<String> approvalTools, String systemPrompt) {
+                         boolean groundingCheck, boolean hybridSearch, boolean selfCheck, String visionModel, String chatProvider, String visionProvider,
+                         Set<String> disabledTools, Set<String> approvalTools, String systemPrompt) {
     }
 
     public void apply(Values values) {
@@ -101,6 +109,9 @@ public class AgentSettings {
         this.hybridSearch = values.hybridSearch();
         this.selfCheck = values.selfCheck();
         this.visionModel = values.visionModel() == null || values.visionModel().isBlank() ? null : values.visionModel().strip();
+        this.chatProvider = values.chatProvider() == null || values.chatProvider().isBlank() ? "ollama" : values.chatProvider();
+        this.visionProvider = this.visionModel == null ? null
+                : values.visionProvider() == null || values.visionProvider().isBlank() ? "ollama" : values.visionProvider();
         this.disabledTools = Set.copyOf(values.disabledTools());
         this.approvalTools = Set.copyOf(values.approvalTools());
         this.systemPrompt = values.systemPrompt() == null || values.systemPrompt().isBlank() ? null : values.systemPrompt();
@@ -109,7 +120,8 @@ public class AgentSettings {
 
     public Values values() {
         return new Values(chatModel, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations,
-                ragTopK, ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, disabledTools, approvalTools, systemPrompt);
+                ragTopK, ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, chatProvider, visionProvider, disabledTools, approvalTools,
+                systemPrompt);
     }
 
     public Instant getUpdatedAt() {

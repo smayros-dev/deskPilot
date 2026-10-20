@@ -206,6 +206,9 @@ export interface AgentSettings {
   selfCheck: boolean;
   /** Model that reads screenshots (vision capability); null when screenshots are off. */
   visionModel: string | null;
+  /** 'ollama' (local) or a cloud provider such as 'mistral' or 'gemini'. */
+  chatProvider: string;
+  visionProvider: string | null;
   disabledTools: string[];
   approvalTools: string[];
   systemPrompt: string | null;

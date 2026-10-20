@@ -11,9 +11,7 @@ import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.Usage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -34,21 +32,19 @@ class ConversationSummarizer {
             tried and the outcome, tickets requested, and anything still open. Keep facts like error codes, product \
             names and ticket numbers. Do not include passwords or other secrets. Write in the language of the conversation.""";
 
-    private final ChatModel chatModel;
+    private final ModelGateway modelGateway;
     private final ChatMemory chatMemory;
-    private final ChatOptionsFactory chatOptionsFactory;
     private final SessionService sessionService;
     private final AgentMetrics metrics;
     private final int summarizeAfter;
     private final int keepRecent;
 
-    ConversationSummarizer(ChatModel chatModel, ChatMemory chatMemory, ChatOptionsFactory chatOptionsFactory,
+    ConversationSummarizer(ModelGateway modelGateway, ChatMemory chatMemory, ChatOptionsFactory chatOptionsFactory,
                            SessionService sessionService, AgentMetrics metrics,
                            @Value("${agent.memory.summarize-after:12}") int summarizeAfter,
                            @Value("${agent.memory.keep-recent:4}") int keepRecent) {
-        this.chatModel = chatModel;
+        this.modelGateway = modelGateway;
         this.chatMemory = chatMemory;
-        this.chatOptionsFactory = chatOptionsFactory;
         this.sessionService = sessionService;
         this.metrics = metrics;
         this.summarizeAfter = summarizeAfter;
@@ -82,8 +78,7 @@ class ConversationSummarizer {
                 + "Messages to add to the summary:\n" + transcript(older);
 
         long start = System.nanoTime();
-        ChatResponse response = chatModel.call(new Prompt(List.of(new SystemMessage(PROMPT), new UserMessage(material)),
-                chatOptionsFactory.create(config, List.of())));
+        ChatResponse response = modelGateway.call(config, List.of(new SystemMessage(PROMPT), new UserMessage(material)), List.of());
         Usage usage = response.getMetadata().getUsage();
         metrics.modelCall((System.nanoTime() - start) / 1_000_000,
                 usage == null || usage.getPromptTokens() == null ? 0 : usage.getPromptTokens(),

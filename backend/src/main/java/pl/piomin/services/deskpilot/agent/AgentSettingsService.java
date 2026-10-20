@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pl.piomin.services.deskpilot.agent.tool.ExternalTools;
 import pl.piomin.services.deskpilot.agent.tool.ToolRegistry;
+import pl.piomin.services.deskpilot.cloud.CloudProviderService;
 import pl.piomin.services.deskpilot.config.AgentProperties;
 import pl.piomin.services.deskpilot.model.AgentSettings;
 import pl.piomin.services.deskpilot.repository.AgentSettingsRepository;
@@ -26,9 +27,11 @@ public class AgentSettingsService {
     private final AgentSettingsRepository repository;
     private final ModelCatalog modelCatalog;
     private final ToolRegistry toolRegistry;
+    private final CloudProviderService cloudProviders;
     private final AgentSettings.Values defaults;
 
     public AgentSettingsService(AgentSettingsRepository repository, ModelCatalog modelCatalog, ToolRegistry toolRegistry,
+                                CloudProviderService cloudProviders,
                                 AgentProperties properties,
                                 @Value("${spring.ai.ollama.chat.model}") String chatModel,
                                 @Value("${spring.ai.ollama.chat.temperature:0.2}") double temperature,
@@ -39,10 +42,11 @@ public class AgentSettingsService {
         this.repository = repository;
         this.modelCatalog = modelCatalog;
         this.toolRegistry = toolRegistry;
+        this.cloudProviders = cloudProviders;
         this.defaults = new AgentSettings.Values(chatModel, temperature, 0.9, DEFAULT_CONTEXT_WINDOW,
                 DEFAULT_MAX_OUTPUT_TOKENS, Boolean.parseBoolean(think), properties.maxIterations(),
                 properties.rag().topK(), properties.rag().similarityThreshold(), groundingCheck, properties.rag().hybridSearch(), selfCheck,
-                visionModel.isBlank() ? null : visionModel, Set.of(),
+                visionModel.isBlank() ? null : visionModel, "ollama", visionModel.isBlank() ? null : "ollama", Set.of(),
                 toolRegistry.defaultApprovalTools(), null);
     }
 
@@ -62,13 +66,24 @@ public class AgentSettingsService {
      */
     @Transactional
     public AgentSettings update(AgentSettings.Values values) {
-        ModelCatalog.ModelInfo model = modelCatalog.find(values.chatModel())
-                .orElseThrow(() -> new IllegalArgumentException("Model '" + values.chatModel()
-                        + "' is not installed in Ollama. Run: ollama pull " + values.chatModel()));
-        if (!model.supportsTools()) {
-            throw new IllegalArgumentException("Model '" + model.name() + "' does not support tool calling");
+        if (CloudProviderService.isCloud(values.chatProvider())) {
+            CloudProviderService.CloudModel model = cloudModel(values.chatProvider(), values.chatModel());
+            if (!model.supportsTools()) {
+                throw new IllegalArgumentException("Model '" + model.id() + "' does not support tool calling");
+            }
+        } else {
+            ModelCatalog.ModelInfo model = modelCatalog.find(values.chatModel())
+                    .orElseThrow(() -> new IllegalArgumentException("Model '" + values.chatModel()
+                            + "' is not installed in Ollama. Run: ollama pull " + values.chatModel()));
+            if (!model.supportsTools()) {
+                throw new IllegalArgumentException("Model '" + model.name() + "' does not support tool calling");
+            }
         }
-        if (values.visionModel() != null && !values.visionModel().isBlank()) {
+        if (values.visionModel() != null && !values.visionModel().isBlank() && CloudProviderService.isCloud(values.visionProvider())) {
+            if (!cloudModel(values.visionProvider(), values.visionModel().strip()).supportsVision()) {
+                throw new IllegalArgumentException("Model '" + values.visionModel() + "' cannot read images (no vision capability)");
+            }
+        } else if (values.visionModel() != null && !values.visionModel().isBlank()) {
             ModelCatalog.ModelInfo vision = modelCatalog.find(values.visionModel().strip())
                     .orElseThrow(() -> new IllegalArgumentException("Vision model '" + values.visionModel()
                             + "' is not installed in Ollama. Run: ollama pull " + values.visionModel().strip()));
@@ -89,6 +104,15 @@ public class AgentSettingsService {
         return settings;
     }
 
+    /** The model must be offered by an enabled cloud provider that has a key. */
+    private CloudProviderService.CloudModel cloudModel(String provider, String model) {
+        if (!cloudProviders.isAvailable(provider)) {
+            throw new IllegalArgumentException("Provider '" + provider + "' is not enabled or has no API key (Settings > Providers)");
+        }
+        return cloudProviders.models(provider).stream().filter(m -> m.id().equals(model)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Model '" + model + "' is not offered by " + provider));
+    }
+
     @Transactional
     public AgentSettings reset() {
         AgentSettings settings = load();
@@ -104,6 +128,7 @@ public class AgentSettingsService {
     private static AgentConfig toConfig(AgentSettings.Values v) {
         return new AgentConfig(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(), v.maxOutputTokens(),
                 v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
-                v.hybridSearch(), v.selfCheck(), v.visionModel(), v.disabledTools(), v.approvalTools(), v.systemPrompt());
+                v.hybridSearch(), v.selfCheck(), v.visionModel(),
+                v.chatProvider(), v.visionProvider(), v.disabledTools(), v.approvalTools(), v.systemPrompt());
     }
 }
