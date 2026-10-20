@@ -150,6 +150,10 @@ agent:
   grounding-check: true
   # Default of the Settings toggle: check answers and ticket requests against the retrieved articles.
   self-check: true
+  memory:
+    # Long conversations: once short-term memory holds more messages than this, older ones are summarized (0 = off).
+    summarize-after: 12
+    keep-recent: 4
   # Default of the Settings choice: model that reads screenshots (needs the vision capability). Empty = off.
   vision-model: ${AGENT_VISION_MODEL:}
   rag:

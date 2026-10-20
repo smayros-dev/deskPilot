@@ -37,6 +37,10 @@ public class AgentSession {
 
     private Instant lastActivityAt;
 
+    /** Condensed older messages of a long conversation (12h); null while the conversation is short. */
+    @Column(columnDefinition = "text")
+    private String summary;
+
     protected AgentSession() {
     }
 
@@ -53,6 +57,10 @@ public class AgentSession {
             title = titleFrom(message);
         }
         lastActivityAt = at;
+    }
+
+    public void updateSummary(String newSummary) {
+        this.summary = newSummary;
     }
 
     public void rename(String newTitle) {
@@ -91,5 +99,9 @@ public class AgentSession {
 
     public Instant getLastActivityAt() {
         return lastActivityAt;
+    }
+
+    public String getSummary() {
+        return summary;
     }
 }

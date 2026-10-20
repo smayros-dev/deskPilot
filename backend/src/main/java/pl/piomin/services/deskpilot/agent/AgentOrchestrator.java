@@ -81,6 +81,7 @@ public class AgentOrchestrator {
     private final ObservationRegistry observations;
     private final SelfCheck selfCheck;
     private final VisionReader visionReader;
+    private final ConversationSummarizer summarizer;
     private final String systemPrompt;
 
     public AgentOrchestrator(ChatModel chatModel, ChatMemory chatMemory, ToolRegistry toolRegistry,
@@ -88,7 +89,7 @@ public class AgentOrchestrator {
                              AgentSettingsService settingsService,
                              ChatOptionsFactory chatOptionsFactory, GuardrailService guardrails, AgentMetrics metrics,
                              ObservationRegistry observations, SelfCheck selfCheck,
-                             VisionReader visionReader,
+                             VisionReader visionReader, ConversationSummarizer summarizer,
                              @Value("classpath:prompts/system-prompt.txt") Resource systemPrompt) throws IOException {
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
@@ -103,6 +104,7 @@ public class AgentOrchestrator {
         this.observations = observations;
         this.selfCheck = selfCheck;
         this.visionReader = visionReader;
+        this.summarizer = summarizer;
         this.systemPrompt = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
     }
 
@@ -294,7 +296,13 @@ public class AgentOrchestrator {
     private AssistantMessage callModel(ActiveTurn turn) {
         AgentConfig config = turn.context().config();
         List<Message> messages = new ArrayList<>();
-        messages.add(new SystemMessage(config.systemPrompt() != null ? config.systemPrompt() : systemPrompt));
+        String instructions = config.systemPrompt() != null ? config.systemPrompt() : systemPrompt;
+        String summary = sessionService.get(turn.context().sessionId()).getSummary();
+        if (summary != null) {
+            // Long conversation (12h): older messages are condensed; the recent ones follow verbatim.
+            instructions += "\n\nSummary of the earlier part of this conversation:\n" + summary;
+        }
+        messages.add(new SystemMessage(instructions));
         messages.addAll(chatMemory.get(turn.context().sessionId()));
         messages.addAll(turn.messages());
         List<ToolCallback> tools = toolRegistry.all().stream()
@@ -494,6 +502,7 @@ public class AgentOrchestrator {
         metrics.runFinished(status, run.getActiveMillis());
         // Short-term memory keeps only the question and the answer; tool chatter stays in the run trace.
         chatMemory.add(turn.context().sessionId(), List.of(new UserMessage(turn.userInput()), new AssistantMessage(answer)));
+        summarizer.summarizeIfLongAsync(turn.context().sessionId(), turn.context().config());
         return run;
     }
 

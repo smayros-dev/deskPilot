@@ -44,6 +44,11 @@ public class SessionService {
     }
 
     @Transactional
+    public void updateSummary(String sessionId, String summary) {
+        get(sessionId).updateSummary(summary);
+    }
+
+    @Transactional
     public AgentSession rename(String sessionId, String title) {
         AgentSession session = get(sessionId);
         session.rename(title);
