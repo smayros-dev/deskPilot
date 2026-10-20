@@ -30,7 +30,14 @@ public class ModelCatalog {
 
     public record ModelInfo(String name, long sizeBytes, String parameterSize, String family,
                             List<String> capabilities, boolean supportsTools, boolean supportsThinking,
-                            boolean chatModel) {
+                            boolean chatModel,
+                            boolean supportsVision) {
+
+        public ModelInfo(String name, long sizeBytes, String parameterSize, String family, List<String> capabilities,
+                         boolean supportsTools, boolean supportsThinking, boolean chatModel) {
+            this(name, sizeBytes, parameterSize, family, capabilities, supportsTools, supportsThinking, chatModel,
+                    capabilities.contains("vision"));
+        }
     }
 
     public List<ModelInfo> list() {

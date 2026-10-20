@@ -34,13 +34,15 @@ public class AgentSettingsService {
                                 @Value("${spring.ai.ollama.chat.temperature:0.2}") double temperature,
                                 @Value("${spring.ai.ollama.chat.think:false}") String think,
                                 @Value("${agent.grounding-check:true}") boolean groundingCheck,
-                                @Value("${agent.self-check:true}") boolean selfCheck) {
+                                @Value("${agent.self-check:true}") boolean selfCheck,
+                                @Value("${agent.vision-model:}") String visionModel) {
         this.repository = repository;
         this.modelCatalog = modelCatalog;
         this.toolRegistry = toolRegistry;
         this.defaults = new AgentSettings.Values(chatModel, temperature, 0.9, DEFAULT_CONTEXT_WINDOW,
                 DEFAULT_MAX_OUTPUT_TOKENS, Boolean.parseBoolean(think), properties.maxIterations(),
-                properties.rag().topK(), properties.rag().similarityThreshold(), groundingCheck, properties.rag().hybridSearch(), selfCheck, Set.of(),
+                properties.rag().topK(), properties.rag().similarityThreshold(), groundingCheck, properties.rag().hybridSearch(), selfCheck,
+                visionModel.isBlank() ? null : visionModel, Set.of(),
                 toolRegistry.defaultApprovalTools(), null);
     }
 
@@ -65,6 +67,14 @@ public class AgentSettingsService {
                         + "' is not installed in Ollama. Run: ollama pull " + values.chatModel()));
         if (!model.supportsTools()) {
             throw new IllegalArgumentException("Model '" + model.name() + "' does not support tool calling");
+        }
+        if (values.visionModel() != null && !values.visionModel().isBlank()) {
+            ModelCatalog.ModelInfo vision = modelCatalog.find(values.visionModel().strip())
+                    .orElseThrow(() -> new IllegalArgumentException("Vision model '" + values.visionModel()
+                            + "' is not installed in Ollama. Run: ollama pull " + values.visionModel().strip()));
+            if (!vision.supportsVision()) {
+                throw new IllegalArgumentException("Model '" + vision.name() + "' cannot read images (no vision capability)");
+            }
         }
         Set<String> unknown = new HashSet<>(values.disabledTools());
         unknown.addAll(values.approvalTools());
@@ -94,6 +104,6 @@ public class AgentSettingsService {
     private static AgentConfig toConfig(AgentSettings.Values v) {
         return new AgentConfig(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(), v.maxOutputTokens(),
                 v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
-                v.hybridSearch(), v.selfCheck(), v.disabledTools(), v.approvalTools(), v.systemPrompt());
+                v.hybridSearch(), v.selfCheck(), v.visionModel(), v.disabledTools(), v.approvalTools(), v.systemPrompt());
     }
 }

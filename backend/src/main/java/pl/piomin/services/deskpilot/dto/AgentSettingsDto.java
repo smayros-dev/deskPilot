@@ -22,6 +22,7 @@ import pl.piomin.services.deskpilot.model.AgentSettings;
  * @param groundingCheck  when the model answers without any tool call, ask it once to search the knowledge base
  * @param hybridSearch    combine keyword (full-text) and semantic ranking in knowledge-base searches
  * @param selfCheck       check answers and ticket requests against the retrieved articles (extra model call)
+ * @param visionModel     model with the {@code vision} capability that reads screenshots; null turns screenshots off
  */
 public record AgentSettingsDto(
         @NotBlank @Size(max = 100) String chatModel,
@@ -36,6 +37,7 @@ public record AgentSettingsDto(
         boolean groundingCheck,
         boolean hybridSearch,
         boolean selfCheck,
+        @Size(max = 100) String visionModel,
         @NotNull Set<@NotBlank String> disabledTools,
         @NotNull Set<@NotBlank String> approvalTools,
         @Size(max = 8000) String systemPrompt,
@@ -45,11 +47,11 @@ public record AgentSettingsDto(
         AgentSettings.Values v = settings.values();
         return new AgentSettingsDto(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(), v.maxOutputTokens(),
                 v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
-                v.hybridSearch(), v.selfCheck(), v.disabledTools(), v.approvalTools(), v.systemPrompt(), settings.getUpdatedAt());
+                v.hybridSearch(), v.selfCheck(), v.visionModel(), v.disabledTools(), v.approvalTools(), v.systemPrompt(), settings.getUpdatedAt());
     }
 
     public AgentSettings.Values toValues() {
         return new AgentSettings.Values(chatModel.strip(), temperature, topP, contextWindow, maxOutputTokens, thinking,
-                maxIterations, ragTopK, ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, disabledTools, approvalTools, systemPrompt);
+                maxIterations, ragTopK, ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, disabledTools, approvalTools, systemPrompt);
     }
 }

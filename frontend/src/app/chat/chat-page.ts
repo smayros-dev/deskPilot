@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../core/auth';
 import { ChatStore } from '../core/chat-store';
+import { SettingsStore } from '../core/settings-store';
 import { ApprovalDecision, Run } from '../core/models';
 import { RunTrace } from '../runs/run-trace';
 import { Answer } from '../shared/answer';
@@ -11,7 +12,7 @@ import { DurationPipe } from '../shared/duration-pipe';
 import { FeedbackButtons } from '../shared/feedback-buttons';
 import { StatusBadge } from '../shared/status-badge';
 import { ApprovalCard } from './approval-card';
-import { ChatInput } from './chat-input';
+import { ChatInput, ChatSubmission } from './chat-input';
 import { ModelSwitcher } from './model-switcher';
 
 const EXAMPLES = [
@@ -32,6 +33,9 @@ const EXAMPLES = [
 export class ChatPage implements OnInit {
   protected readonly store = inject(ChatStore);
   protected readonly auth = inject(AuthService);
+  private readonly settings = inject(SettingsStore);
+  /** Screenshots can be attached once an admin has chosen a vision model in Settings. */
+  protected readonly allowImages = computed(() => !!this.settings.settings()?.visionModel);
   protected readonly examples = EXAMPLES;
 
   private readonly chatInput = viewChild.required(ChatInput);
@@ -54,13 +58,20 @@ export class ChatPage implements OnInit {
   }
 
   ngOnInit(): void {
+    if (!this.settings.settings()) {
+      void this.settings.load();
+    }
     void this.store.init();
   }
 
-  protected async send(message: string): Promise<void> {
-    const accepted = await this.store.send(message);
+  protected hasScreenshot(run: Run): boolean {
+    return run.steps.some((step) => step.type === 'IMAGE_ANALYSIS');
+  }
+
+  protected async send(submission: ChatSubmission): Promise<void> {
+    const accepted = await this.store.send(submission.message, submission.image);
     if (!accepted) {
-      this.chatInput().restore(message);
+      this.chatInput().restore(submission);
     }
   }
 

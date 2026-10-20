@@ -7,7 +7,7 @@ import { AgentApi } from './agent-api';
 import { SILENT_ERRORS } from './api-config';
 import { AuthService } from './auth';
 import { EventsService } from './events';
-import { ApprovalDecision, Run, RunFeedback, RunStep, Session } from './models';
+import { ApprovalDecision, ImageAttachment, Run, RunFeedback, RunStep, Session } from './models';
 import { Notifications } from './notifications';
 import { RunEvent } from './run-stream';
 
@@ -94,13 +94,13 @@ export class ChatStore {
   }
 
   /** @returns false if the backend rejected the message (the error toast explains why) */
-  async send(message: string): Promise<boolean> {
+  async send(message: string, image: ImageAttachment | null = null): Promise<boolean> {
     const session = this._session();
     if (!session || !this.canSend()) {
       return false;
     }
     try {
-      return await this.follow(this.api.streamMessage(session.id, message));
+      return await this.follow(this.api.streamMessage(session.id, message, image));
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 404) {
         await this.newConversation();

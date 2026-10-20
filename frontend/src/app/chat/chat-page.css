@@ -125,3 +125,12 @@ app-approval-card { align-self: stretch; max-width: 36rem; }
   .side { position: static; max-height: none; }
   .bubble { max-width: 92%; }
 }
+
+.screenshot-chip {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.75rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}

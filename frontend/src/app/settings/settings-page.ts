@@ -57,6 +57,7 @@ export class SettingsPage {
     groundingCheck: [true],
     hybridSearch: [true],
     selfCheck: [true],
+    visionModel: [''],
     systemPrompt: ['', Validators.maxLength(8000)],
     tools: new FormRecord<ToolControls>({}),
   });
@@ -65,6 +66,7 @@ export class SettingsPage {
   private readonly loaded = signal(false);
 
   protected readonly chatModels = computed(() => this.models.value().filter((m) => m.chatModel));
+  protected readonly visionModels = computed(() => this.models.value().filter((m) => m.supportsVision));
   protected readonly selectedModel = computed(() => this.chatModels().find((m) => m.name === this.value().chatModel) ?? null);
   protected readonly toolNames = computed(() => this.tools.value().map((t) => t.name));
 
@@ -125,6 +127,7 @@ export class SettingsPage {
       groundingCheck: v.groundingCheck,
       hybridSearch: v.hybridSearch,
       selfCheck: v.selfCheck,
+      visionModel: v.visionModel || null,
       disabledTools: tools.filter(([, t]) => !t.enabled).map(([name]) => name),
       approvalTools: tools.filter(([, t]) => t.approval).map(([name]) => name),
       systemPrompt: v.systemPrompt.trim() || null,
@@ -171,7 +174,7 @@ export class SettingsPage {
         record.addControl(tool.name, group);
       }
     }
-    this.form.patchValue({ ...settings, systemPrompt: settings.systemPrompt ?? '' });
+    this.form.patchValue({ ...settings, systemPrompt: settings.systemPrompt ?? '', visionModel: settings.visionModel ?? '' });
     this.form.markAsPristine();
   }
 }

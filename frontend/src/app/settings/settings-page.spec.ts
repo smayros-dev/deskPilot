@@ -22,6 +22,7 @@ const SETTINGS: AgentSettings = {
   groundingCheck: true,
   hybridSearch: true,
   selfCheck: true,
+  visionModel: null,
   disabledTools: [],
   approvalTools: ['create_ticket'],
   systemPrompt: null,
@@ -29,10 +30,10 @@ const SETTINGS: AgentSettings = {
 };
 
 const MODELS: ModelInfo[] = [
-  { name: 'qwen3:8b', sizeBytes: 5.2e9, parameterSize: '8.2B', family: 'qwen3', capabilities: ['completion', 'tools', 'thinking'], supportsTools: true, supportsThinking: true, chatModel: true },
-  { name: 'qwen3:4b', sizeBytes: 2.5e9, parameterSize: '4B', family: 'qwen3', capabilities: ['completion', 'tools'], supportsTools: true, supportsThinking: false, chatModel: true },
-  { name: 'gemma:2b', sizeBytes: 1.7e9, parameterSize: '2B', family: 'gemma', capabilities: ['completion'], supportsTools: false, supportsThinking: false, chatModel: true },
-  { name: 'nomic-embed-text:latest', sizeBytes: 2.7e8, parameterSize: '137M', family: 'nomic-bert', capabilities: ['embedding'], supportsTools: false, supportsThinking: false, chatModel: false },
+  { name: 'qwen3:8b', sizeBytes: 5.2e9, parameterSize: '8.2B', family: 'qwen3', capabilities: ['completion', 'tools', 'thinking'], supportsTools: true, supportsThinking: true, supportsVision: false, chatModel: true },
+  { name: 'qwen3:4b', sizeBytes: 2.5e9, parameterSize: '4B', family: 'qwen3', capabilities: ['completion', 'tools'], supportsTools: true, supportsThinking: false, supportsVision: false, chatModel: true },
+  { name: 'gemma:2b', sizeBytes: 1.7e9, parameterSize: '2B', family: 'gemma', capabilities: ['completion'], supportsTools: false, supportsThinking: false, supportsVision: false, chatModel: true },
+  { name: 'nomic-embed-text:latest', sizeBytes: 2.7e8, parameterSize: '137M', family: 'nomic-bert', capabilities: ['embedding'], supportsTools: false, supportsThinking: false, supportsVision: false, chatModel: false },
 ];
 
 const TOOLS: ToolInfo[] = [

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pl.piomin.services.deskpilot.agent.AgentOrchestrator;
+import pl.piomin.services.deskpilot.agent.RunListener;
 import pl.piomin.services.deskpilot.agent.SessionService;
 import pl.piomin.services.deskpilot.dto.ChatRequest;
 import pl.piomin.services.deskpilot.dto.RunResponse;
@@ -61,7 +62,7 @@ public class SessionController {
     public RunResponse chat(@PathVariable String sessionId, @Valid @RequestBody ChatRequest request,
                             Authentication authentication) {
         ownSession(sessionId, authentication);
-        return mapper.toResponse(orchestrator.chat(sessionId, request.message()));
+        return mapper.toResponse(orchestrator.chat(sessionId, request.message(), request.image(), RunListener.NONE));
     }
 
     /** Same as {@link #chat}, streamed as Server-Sent Events (see {@link RunStream}). */
@@ -69,7 +70,7 @@ public class SessionController {
     public SseEmitter chatStream(@PathVariable String sessionId, @Valid @RequestBody ChatRequest request,
                                  Authentication authentication) {
         ownSession(sessionId, authentication);
-        return RunStream.start(mapper, errors, listener -> orchestrator.chat(sessionId, request.message(), listener));
+        return RunStream.start(mapper, errors, listener -> orchestrator.chat(sessionId, request.message(), request.image(), listener));
     }
 
     @GetMapping("/{sessionId}/runs")

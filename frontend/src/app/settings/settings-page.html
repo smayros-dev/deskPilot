@@ -44,6 +44,15 @@
     }
     <p class="hint">Install more models with <code>ollama pull &lt;name&gt;</code>, e.g. <code>qwen3:4b</code> (faster) or <code>qwen3:14b</code> (smarter). Only models that support tool calling can run the agent.</p>
 
+    <label for="visionModel">Vision model (reads screenshots attached to messages)</label>
+    <select id="visionModel" formControlName="visionModel">
+      <option value="">Off — screenshots cannot be attached</option>
+      @for (model of visionModels(); track model.name) {
+        <option [value]="model.name">{{ model.name }} @if (model.parameterSize) { · {{ model.parameterSize }} }</option>
+      }
+    </select>
+    <p class="hint">Needs a model with the <code>vision</code> capability. Large ones (e.g. <code>gemma4:26b</code>) take minutes per screenshot on a CPU; a small one such as <code>qwen2.5vl:7b</code> is much faster.</p>
+
     <div class="presets" role="group" aria-label="Presets">
       @for (preset of presets; track preset.name) {
         <button type="button" class="chip" [title]="preset.hint" [disabled]="!auth.isAdmin()" (click)="applyPreset(preset)">{{ preset.name }}</button>

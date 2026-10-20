@@ -17,8 +17,8 @@ const SCENARIOS: Scenario[] = [
 ];
 
 const MODELS: ModelInfo[] = [
-  { name: 'qwen3:8b', sizeBytes: 5e9, parameterSize: '8.2B', family: 'qwen3', capabilities: ['tools'], supportsTools: true, supportsThinking: true, chatModel: true },
-  { name: 'gemma:2b', sizeBytes: 2e9, parameterSize: '2B', family: 'gemma', capabilities: [], supportsTools: false, supportsThinking: false, chatModel: true },
+  { name: 'qwen3:8b', sizeBytes: 5e9, parameterSize: '8.2B', family: 'qwen3', capabilities: ['tools'], supportsTools: true, supportsThinking: true, supportsVision: false, chatModel: true },
+  { name: 'gemma:2b', sizeBytes: 2e9, parameterSize: '2B', family: 'gemma', capabilities: [], supportsTools: false, supportsThinking: false, supportsVision: false, chatModel: true },
 ];
 
 function scenario(id: string, category: string): Scenario {

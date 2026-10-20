@@ -27,6 +27,7 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Self-check**: before answering, the draft is compared with the retrieved articles (missing key facts are added); before a ticket goes to a reviewer, the model checks that the articles really require one.
 - **Real-time updates**: a per-user Server-Sent Events channel (`GET /api/events`) pushes run changes to their owner, new tickets, and the number of runs waiting for approval to reviewers (live badge on the Approvals link). The chat only polls while the stream is down.
 - **MCP**: DeskPilot's read-only knowledge-base tools are available to other agents and IDEs over the Model Context Protocol, and tools of external MCP servers can be given to the agent (always behind the approval gate).
+- **Screenshots**: users attach or paste a screenshot of an error; the vision model chosen in Settings (e.g. `gemma4:26b`) transcribes it, and the agent works with that text (marked as data). The image is not stored; the trace keeps what was read.
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -127,6 +128,7 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `AGENT_CHAT_MODEL` | `qwen3:8b` | Chat/tool-calling model |
 | `AGENT_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model for RAG |
 | `AGENT_THINK` | `false` | qwen3 reasoning mode. About 15x slower on CPU; enable on a GPU |
+| `AGENT_VISION_MODEL` | (empty) | Default vision model for screenshots, e.g. `gemma4:26b`; empty = off (can be set on the Settings page) |
 | `DESKPILOT_ISSUER_URI` | `http://localhost:8180/realms/deskpilot` | OIDC issuer whose tokens the API accepts |
 | `OTEL_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP endpoint for traces (Jaeger) |
 | `TRACING_EXPORT_ENABLED` | `true` | Set to `false` to stop exporting traces |
@@ -243,7 +245,7 @@ OLLAMA_IT=true ./mvnw test -Dtest="*SmokeTest"   # real local model: chat, RAG, 
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/sessions` | Start a conversation for the signed-in user |
-| `POST` | `/api/sessions/{id}/messages` | Ask the agent (`{"message": "..."}`) → run with trace |
+| `POST` | `/api/sessions/{id}/messages` | Ask the agent (`{"message": "...", "image": {"mimeType": "image/png", "data": "<base64>"}}`, image optional) → run with trace |
 | `POST` | `/api/sessions/{id}/messages/stream` | Same, as `text/event-stream`: `run`, `thinking`, `step`… then `done` (final run) or `error` (Problem Detail) |
 | `GET` | `/api/sessions/{id}/runs` | Conversation history |
 | `GET` | `/api/runs/{id}` | One run with its steps |
@@ -265,6 +267,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.17** — Screenshots (12e): attach or paste an error screenshot; a vision model from the Settings (Flyway V11) reads it before the agent starts.
 - **1.0.16** — Self-check of answers and tickets (12g, Flyway V10); real-time updates over a per-user SSE channel with a live approval badge (12k); MCP server for the knowledge base and MCP client for external tools behind the approval gate (12i).
 - **1.0.15** — Hybrid search (12c): Postgres full-text ranking merged with pgvector by Reciprocal Rank Fusion (Flyway V7), Settings toggle; knowledge scenarios 10/13 → 11/13.
 - **1.0.14** — Step 10 results: prompt v2 and the grounding check (answers and tickets, Settings toggle, Flyway V6); qwen3:8b from 64% to 84% of the scenarios.

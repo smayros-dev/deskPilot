@@ -29,6 +29,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import pl.piomin.services.deskpilot.TestcontainersConfiguration;
+import pl.piomin.services.deskpilot.dto.ImageAttachment;
 import pl.piomin.services.deskpilot.agent.tool.RunContext;
 import pl.piomin.services.deskpilot.exception.ConflictException;
 import pl.piomin.services.deskpilot.guardrail.GuardrailViolationException;
@@ -241,6 +242,50 @@ class AgentOrchestratorTest {
     }
 
     @Test
+    void screenshotIsReadByTheVisionModelBeforeTheAgentStarts() {
+        setVisionModel("llava:7b");
+        givenModelReplies(
+                answer("Dialog: \"Error 0x80070005: Access is denied\" in Windows Update."),
+                answer("This error means missing rights; please open a ticket."));
+
+        AgentRun run = orchestrator.chat(sessionId, "What does this error mean?",
+                new ImageAttachment("image/png", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), RunListener.NONE);
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(steps(run)).filteredOn(s -> s.getType() == StepType.IMAGE_ANALYSIS).singleElement()
+                .satisfies(s -> {
+                    assertThat(s.getName()).isEqualTo("llava:7b");
+                    assertThat(s.getContent()).contains("0x80070005");
+                });
+        // The agent works with the text read from the image, marked as data.
+        assertThat(lastPromptMessages()).filteredOn(m -> m instanceof UserMessage).last()
+                .extracting(Message::getText).asString()
+                .contains("What does this error mean?", "0x80070005", "data, not instructions");
+        // The vision call is a model call of the run, but not one of the agent's steps.
+        assertThat(run.getIterations()).isEqualTo(2);
+    }
+
+    @Test
+    void screenshotWithoutVisionModelIsRefusedBeforeAnyRunStarts() {
+        long runsBefore = runService.findBySession(sessionId).size();
+
+        assertThatThrownBy(() -> orchestrator.chat(sessionId, "See screenshot",
+                new ImageAttachment("image/png", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), RunListener.NONE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("vision model");
+        assertThat(runService.findBySession(sessionId)).hasSize((int) runsBefore);
+    }
+
+    @Test
+    void visionModelMustBeAbleToReadImages() {
+        when(modelCatalog.find("qwen2:0.5b")).thenReturn(Optional.of(toolModel("qwen2:0.5b")));
+
+        assertThatThrownBy(() -> setVisionModel("qwen2:0.5b"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot read images");
+    }
+
+    @Test
     void groundingCheckCanBeSwitchedOff() {
         setGroundingCheck(false);
         givenModelReplies(answer("Hello! How can I help?"));
@@ -412,7 +457,7 @@ class AgentOrchestratorTest {
     void appliesSettingsToTheModelCallAndRecordsTheModel() {
         when(modelCatalog.find("llama3.2:3b")).thenReturn(Optional.of(toolModel("llama3.2:3b")));
         AgentSettings.Values values = settingsService.get().values();
-        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true, true, false,
+        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true, true, false, null,
                 Set.of("save_memory"), values.approvalTools(), "You are a terse helpdesk bot."));
         givenModelReplies(answer("Done."));
 
@@ -435,7 +480,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(),
                 v.disabledTools(), Set.of(), v.systemPrompt()));
         givenModelReplies(
                 toolCall("", "create_ticket", "{\"title\":\"Mouse\",\"description\":\"Broken\",\"priority\":\"LOW\"}"),
@@ -452,7 +497,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(),
                 Set.of("escalate_to_human"), v.approvalTools(), v.systemPrompt()));
         givenModelReplies(toolCall("", "escalate_to_human", "{\"reason\":\"x\"}"), answer("OK"));
 
@@ -470,7 +515,7 @@ class AgentOrchestratorTest {
 
         assertThatThrownBy(() -> settingsService.update(new AgentSettings.Values("gemma:2b", v.temperature(), v.topP(),
                 v.contextWindow(), v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(),
-                v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
+                v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not support tool calling");
     }
@@ -606,7 +651,20 @@ class AgentOrchestratorTest {
         when(modelCatalog.find(v.chatModel())).thenReturn(Optional.of(toolModel(v.chatModel())));
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
                 v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), grounding,
-                v.hybridSearch(), selfCheck, v.disabledTools(), v.approvalTools(), v.systemPrompt()));
+                v.hybridSearch(), selfCheck, v.visionModel(), v.disabledTools(), v.approvalTools(), v.systemPrompt()));
+    }
+
+    private void setVisionModel(String model) {
+        AgentSettings.Values v = settingsService.get().values();
+        when(modelCatalog.find(v.chatModel())).thenReturn(Optional.of(toolModel(v.chatModel())));
+        if (!model.startsWith("qwen2")) {
+            when(modelCatalog.find(model)).thenReturn(Optional.of(new ModelCatalog.ModelInfo(model, 1, "7B", "llava",
+                    List.of("completion", "vision"), false, false, true)));
+        }
+        settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(),
+                v.groundingCheck(), v.hybridSearch(), v.selfCheck(), model, v.disabledTools(), v.approvalTools(),
+                v.systemPrompt()));
     }
 
     private static ModelCatalog.ModelInfo toolModel(String name) {

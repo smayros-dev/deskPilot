@@ -12,7 +12,12 @@
 
     <div class="messages" [appAutoScroll]="scrollTrigger()" aria-live="polite">
       @for (run of store.runs(); track run.id) {
-        <div class="bubble user">{{ run.userInput }}</div>
+        <div class="bubble user">
+          {{ run.userInput }}
+          @if (hasScreenshot(run)) {
+            <span class="screenshot-chip" title="A screenshot was attached and read by the vision model">🖼️ screenshot</span>
+          }
+        </div>
 
         @switch (run.status) {
           @case ('RUNNING') {
@@ -64,7 +69,7 @@
             <ul class="examples">
               @for (example of examples; track example) {
                 <li>
-                  <button type="button" class="chip" [disabled]="!store.canSend()" (click)="send(example)">{{ example }}</button>
+                  <button type="button" class="chip" [disabled]="!store.canSend()" (click)="send({ message: example, image: null })">{{ example }}</button>
                 </li>
               }
             </ul>
@@ -91,6 +96,7 @@
                     @case ('TOOL_RESULT') { {{ step.error ? '⚠️' : '📄' }} <code>{{ step.name }}</code> <span class="muted">{{ step.content }}</span> }
                     @case ('APPROVAL_DECISION') { {{ step.name === 'APPROVED' ? '✅' : '⛔' }} <span>{{ step.name?.toLowerCase() }} {{ step.content }}</span> }
                     @case ('ANSWER') { 💬 <span>Answer ready</span> }
+                    @case ('IMAGE_ANALYSIS') { 🖼️ <span>Screenshot read by {{ step.name }}: {{ step.content }}</span> }
                     @default { • <span>{{ step.type.toLowerCase().replace('_', ' ') }}</span> }
                   }
                 </li>
@@ -111,7 +117,7 @@
           }
         </p>
       }
-      <app-chat-input [disabled]="!store.canSend()" (send)="send($event)" />
+      <app-chat-input [disabled]="!store.canSend()" [allowImages]="allowImages()" (send)="send($event)" />
     </footer>
   </section>
 

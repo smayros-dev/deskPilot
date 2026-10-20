@@ -21,6 +21,7 @@ const STEP_LABELS: Record<StepType, string> = {
   ANSWER: 'Answer',
   GUARDRAIL: 'Guardrail',
   ERROR: 'Error',
+  IMAGE_ANALYSIS: 'Screenshot read',
 };
 
 /** The ReAct trace of one run: thoughts, tool calls and results, approvals and the answer. */
@@ -56,6 +57,7 @@ const STEP_LABELS: Record<StepType, string> = {
                 @case ('APPROVAL_DECISION') { {{ step.name === 'APPROVED' ? '✅' : '⛔' }} }
                 @case ('ANSWER') { 💬 }
                 @case ('GUARDRAIL') { 🛡️ }
+                @case ('IMAGE_ANALYSIS') { 🖼️ }
                 @default { ❗ }
               }
             </span>

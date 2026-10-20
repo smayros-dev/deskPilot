@@ -11,7 +11,8 @@ export type StepType =
   | 'APPROVAL_DECISION'
   | 'ANSWER'
   | 'GUARDRAIL'
-  | 'ERROR';
+  | 'ERROR'
+  | 'IMAGE_ANALYSIS';
 
 export interface Session {
   id: string;
@@ -177,6 +178,8 @@ export interface AgentSettings {
   hybridSearch: boolean;
   /** Check answers and ticket requests against the retrieved articles. */
   selfCheck: boolean;
+  /** Model that reads screenshots (vision capability); null when screenshots are off. */
+  visionModel: string | null;
   disabledTools: string[];
   approvalTools: string[];
   systemPrompt: string | null;
@@ -192,6 +195,7 @@ export interface ModelInfo {
   capabilities: string[];
   supportsTools: boolean;
   supportsThinking: boolean;
+  supportsVision: boolean;
   chatModel: boolean;
 }
 
@@ -215,4 +219,11 @@ export interface ProblemDetail {
   status?: number;
   detail?: string;
   rule?: string;
+}
+
+/** A screenshot sent with a message: read by the vision model, not stored. */
+export interface ImageAttachment {
+  mimeType: string;
+  /** Base64 of the image bytes. */
+  data: string;
 }

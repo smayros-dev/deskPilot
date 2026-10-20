@@ -124,6 +124,8 @@ agent:
   grounding-check: true
   # Default of the Settings toggle: check answers and ticket requests against the retrieved articles.
   self-check: true
+  # Default of the Settings choice: model that reads screenshots (needs the vision capability). Empty = off.
+  vision-model: ${AGENT_VISION_MODEL:}
   rag:
     similarity-threshold: 0.55
     top-k: 3

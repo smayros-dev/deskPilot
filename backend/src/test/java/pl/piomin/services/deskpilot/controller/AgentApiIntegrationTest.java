@@ -214,6 +214,19 @@ class AgentApiIntegrationTest {
     }
 
     @Test
+    void screenshotWithAnUnsupportedTypeOrWithoutVisionModelIsBadRequest() {
+        alice.post().uri("/api/sessions/{id}/messages", sessionId)
+                .body(Map.of("message", "See screenshot", "image", Map.of("mimeType", "image/gif", "data", "R0lGODlh")))
+                .exchange()
+                .expectStatus().isBadRequest();
+        alice.post().uri("/api/sessions/{id}/messages", sessionId)
+                .body(Map.of("message", "See screenshot", "image", Map.of("mimeType", "image/png", "data", "iVBORw0KGgo=")))
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody().jsonPath("$.detail").value(d -> assertThat((String) d).contains("vision model"));
+    }
+
+    @Test
     void blankMessageIsBadRequest() {
         chat(" ").expectStatus().isBadRequest();
     }
@@ -431,7 +444,7 @@ class AgentApiIntegrationTest {
 
     private static AgentSettingsDto withModel(AgentSettingsDto s, String model, double temperature) {
         return new AgentSettingsDto(model, temperature, s.topP(), s.contextWindow(), s.maxOutputTokens(), s.thinking(),
-                s.maxIterations(), s.ragTopK(), s.ragSimilarityThreshold(), s.groundingCheck(), s.hybridSearch(), s.selfCheck(), s.disabledTools(), s.approvalTools(),
+                s.maxIterations(), s.ragTopK(), s.ragSimilarityThreshold(), s.groundingCheck(), s.hybridSearch(), s.selfCheck(), s.visionModel(), s.disabledTools(), s.approvalTools(),
                 s.systemPrompt(), null);
     }
 

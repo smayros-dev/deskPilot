@@ -138,7 +138,7 @@ order of the recommended path below. Value / effort are rough estimates for this
 - [ ] **12d — Knowledge-gap detection:** questions answered "not found" or escalated are clustered weekly; reviewers get suggested new articles drafted by the model. *Value: medium · Effort: M*
 
 ### B. Smarter agent
-- [ ] **12e — Multimodal tickets:** the user attaches a screenshot of an error; a vision model (`gemma4:26b` is installed and supports images) reads it, and the text goes into the search and the ticket. *Value: high · Effort: M*
+- [x] **12e — Multimodal tickets ✅ (verified live: gemma4:26b transcribed a GlobalProtect "Gateway not found / GP-1017" dialog in 83 s, the agent found the VPN article and answered "reinstall from the Company Portal [1]"; 10 min in total on CPU because two large models swap in memory):** the user attaches a screenshot of an error; a vision model (`gemma4:26b` is installed and supports images) reads it, and the text goes into the search and the ticket. *Value: high · Effort: M*
 - [ ] **12f — Supervisor + specialist agents:** a router sends each request to a specialist (network/VPN, accounts/MFA, hardware, software) with its own prompt, tools and examples; the trace shows the hand-off. *Value: medium · Effort: L*
 - [x] **12g — Self-check before answering ✅ (answers and tickets; knowledge 12/13, tickets 4/4):** a reflection pass compares the draft answer with the retrieved articles and rewrites or escalates unsupported claims (configurable, off on CPU). *Value: medium · Effort: S*
 - [ ] **12h — Conversation summarization:** long sessions are summarized into memory instead of truncated, so the context window holds more history. *Value: medium · Effort: S*

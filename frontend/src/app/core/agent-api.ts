@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_CONFIG } from './api-config';
-import { AgentSettings, ApprovalDecision, FeedbackRating, Run, RunFeedback, Session } from './models';
+import { AgentSettings, ApprovalDecision, FeedbackRating, ImageAttachment, Run, RunFeedback, Session } from './models';
 import { RunEvent, toRunEvents } from './run-stream';
 
 /** Commands and lookups against the agent REST API. Read-only lists are loaded with httpResource in the pages. */
@@ -27,8 +27,8 @@ export class AgentApi {
   }
 
   /** Like {@link sendMessage}, but emits the run's steps as the agent works (Server-Sent Events). */
-  streamMessage(sessionId: string, message: string): Observable<RunEvent> {
-    return this.stream(`${this.config.baseUrl}/sessions/${sessionId}/messages/stream`, { message });
+  streamMessage(sessionId: string, message: string, image: ImageAttachment | null = null): Observable<RunEvent> {
+    return this.stream(`${this.config.baseUrl}/sessions/${sessionId}/messages/stream`, image ? { message, image } : { message });
   }
 
   listRuns(sessionId: string): Observable<Run[]> {
