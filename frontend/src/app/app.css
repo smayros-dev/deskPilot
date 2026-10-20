@@ -1,5 +1,7 @@
 :host {
   display: grid;
+  /* The column never grows wider than the viewport, whatever the header contains (long labels, many links). */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   min-height: 100dvh;
 }
@@ -53,7 +55,8 @@
 }
 .logo { color: var(--accent); }
 
-nav { flex: 1; overflow-x: auto; }
+/* min-width: 0 lets the nav shrink and scroll by itself instead of widening the page (long labels, e.g. French). */
+nav { flex: 1; min-width: 0; overflow-x: auto; }
 nav ul { display: flex; gap: 0.25rem; list-style: none; margin: 0; padding: 0; }
 nav a {
   display: block;

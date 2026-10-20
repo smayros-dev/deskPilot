@@ -32,6 +32,9 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Conversation history**: past conversations in the chat sidebar, titled after their first question; search, reopen, rename, delete.
 - **Notifications**: reviewers get an e-mail when an action waits for approval, requesters when their ticket is created, and admins when an approval waits longer than the SLA (default 30 min). Optional Slack/Teams webhook. In development the e-mails land in Mailpit: http://localhost:8026.
 - **Audit & privacy**: an audit trail of approvals, settings changes, documents, evaluations and data deletions (admin Audit page with CSV export); users can download everything stored about them and delete their conversations and memories (tickets stay with the helpdesk); optional retention (`agent.retention.conversations-days`).
+- **Long conversations**: once a conversation is long, older messages are condensed by the model into a summary that the agent keeps in its instructions; only the recent messages stay verbatim.
+- **Guardrails v2**: per-user rate limits on chat messages and approvals (429 with `Retry-After`; admins exempt); a circuit breaker around the model (after 5 failures in a row, calls fail fast with 503 for 30 s; state in `/actuator/health`); optional model-based moderation of messages (`MODERATION_ENABLED`); IBANs and phone numbers redacted from answers like card numbers.
+- **Multilingual UI**: English, French and Arabic (right-to-left), switchable from the user menu; the choice is remembered per browser and the default follows the browser language. Dates and numbers follow the selected locale. Error details returned by the backend stay in English.
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -133,6 +136,9 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `AGENT_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model for RAG |
 | `AGENT_THINK` | `false` | qwen3 reasoning mode. About 15x slower on CPU; enable on a GPU |
 | `AGENT_VISION_MODEL` | (empty) | Default vision model for screenshots, e.g. `gemma4:26b`; empty = off (can be set on the Settings page) |
+| `RATE_LIMIT_PER_MINUTE` / `RATE_LIMIT_PER_DAY` | `10` / `100` | Chat messages and approval decisions per user (0 = off) |
+| `MODERATION_ENABLED` | `false` | Classify each message SAFE/UNSAFE with the model before the agent runs |
+| `MODERATION_MODEL` | (empty) | Model used for moderation; empty = the chat model |
 | `NOTIFICATIONS_ENABLED` | `true` | E-mail/webhook notifications |
 | `NOTIFICATIONS_REVIEWERS` / `NOTIFICATIONS_ADMINS` | `bob@example.com,admin@example.com` / `admin@example.com` | Who gets approval requests / SLA escalations |
 | `NOTIFICATIONS_APPROVAL_SLA` | `PT30M` | Escalate approvals waiting longer than this |
@@ -282,6 +288,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.20** — Conversation summaries (12h, V16); guardrails v2: rate limits, circuit breaker around the model, optional moderation, IBAN/phone redaction (12n); English/French/Arabic UI with right-to-left layout (12q); fix: the page no longer gets wider than the screen when the header is long.
 - **1.0.19** — Conversation history (12r, V13), audit trail and privacy controls (12o, V14), e-mail/webhook notifications with Mailpit and an approval SLA (12j, V15).
 - **1.0.18** — Document ingestion (12b): PDF/Markdown/text/HTML uploads split into searchable articles (Flyway V12).
 - **1.0.17** — Screenshots (12e): attach or paste an error screenshot; a vision model from the Settings (Flyway V11) reads it before the agent starts.

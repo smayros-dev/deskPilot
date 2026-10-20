@@ -138,6 +138,20 @@ management:
 
 agent:
   max-iterations: 8
+  # Guardrails v2 (12n)
+  rate-limit:
+    # Chat messages and approval decisions per user (admins are not limited); 0 = off.
+    per-minute: ${RATE_LIMIT_PER_MINUTE:10}
+    per-day: ${RATE_LIMIT_PER_DAY:100}
+  model-circuit-breaker:
+    # After this many model failures in a row (unreachable, timeout, 5xx), calls fail fast for open-duration.
+    enabled: true
+    failure-threshold: 5
+    open-duration: 30s
+  moderation:
+    # Ask the model to classify each message as SAFE/UNSAFE before the agent runs (one extra call per message).
+    enabled: ${MODERATION_ENABLED:false}
+    model: ${MODERATION_MODEL:}
   notifications:
     # E-mails to reviewers (approval needed), requesters (ticket created) and admins (approval overdue).
     enabled: ${NOTIFICATIONS_ENABLED:true}

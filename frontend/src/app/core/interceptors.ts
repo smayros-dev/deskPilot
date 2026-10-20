@@ -37,6 +37,18 @@ export function problemMessage(error: HttpErrorResponse): string {
   if (error.status === 403) {
     return 'You do not have permission to do this.';
   }
+  if (error.status === 429) {
+    const retryAfter = Number(error.headers?.get('Retry-After'));
+    return Number.isFinite(retryAfter) && retryAfter > 0
+      ? `You are sending messages too fast. Try again in ${retryAfter} s.`
+      : 'You are sending messages too fast. Try again in a moment.';
+  }
+  if (error.status === 503) {
+    const retryAfter = Number(error.headers?.get('Retry-After'));
+    return Number.isFinite(retryAfter) && retryAfter > 0
+      ? `The language model is unavailable right now. Try again in ${retryAfter} s.`
+      : 'The language model is unavailable right now. Try again shortly.';
+  }
   const problem = error.error as ProblemDetail | null;
   if (problem && typeof problem === 'object' && (problem.detail || problem.title)) {
     return problem.detail ?? problem.title ?? `Request failed (${error.status})`;
