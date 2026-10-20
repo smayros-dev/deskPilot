@@ -3,11 +3,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { APPROVAL_POLL_MS, ChatStore } from './chat-store';
+import { ChatStore, FALLBACK_POLL_MS } from './chat-store';
 import { errorInterceptor } from './interceptors';
 import { Run, RunStep, StepType } from './models';
 import { Notifications } from './notifications';
-import { provideFakeAuth } from './testing';
+import { FakeEvents, provideFakeAuth, provideFakeEvents } from './testing';
 
 function run(overrides: Partial<Run>): Run {
   return {
@@ -41,16 +41,19 @@ data:${JSON.stringify(data)}
 
 describe('ChatStore', () => {
   let store: ChatStore;
+  let fakeEvents: FakeEvents;
   let http: HttpTestingController;
 
   beforeEach(async () => {
     localStorage.clear();
+    fakeEvents = new FakeEvents();
     TestBed.configureTestingModule({
       providers: [
         provideZonelessChangeDetection(),
         provideHttpClient(withInterceptors([errorInterceptor])),
         provideHttpClientTesting(),
         provideFakeAuth('alice'),
+        provideFakeEvents(fakeEvents),
       ],
     });
     store = TestBed.inject(ChatStore);
@@ -162,15 +165,15 @@ describe('ChatStore', () => {
       await sending;
       TestBed.tick();
 
-      await vi.advanceTimersByTimeAsync(APPROVAL_POLL_MS);
+      await vi.advanceTimersByTimeAsync(FALLBACK_POLL_MS);
       http.expectOne('/api/runs/run-1').flush(run({ status: 'AWAITING_APPROVAL', answer: null }));
-      await vi.advanceTimersByTimeAsync(APPROVAL_POLL_MS);
+      await vi.advanceTimersByTimeAsync(FALLBACK_POLL_MS);
       http.expectOne('/api/runs/run-1').flush(run({ answer: 'Ticket #7 created' }));
       await vi.advanceTimersByTimeAsync(0);
       TestBed.tick();
 
       expect(store.lastRun()?.answer).toBe('Ticket #7 created');
-      await vi.advanceTimersByTimeAsync(APPROVAL_POLL_MS * 2);
+      await vi.advanceTimersByTimeAsync(FALLBACK_POLL_MS * 2);
       http.expectNone('/api/runs/run-1');
     } finally {
       vi.useRealTimers();
@@ -187,5 +190,28 @@ describe('ChatStore', () => {
 
     store.setFeedback('run-1', null);
     expect(store.lastRun()?.feedback).toBeNull();
+  });
+
+  it('applies run updates from the live stream to the paused run, without polling', async () => {
+    vi.useFakeTimers();
+    try {
+      fakeEvents.connected.set(true);
+      const sending = store.send('Open a ticket');
+      http.expectOne('/api/sessions/s1/messages/stream').flush(sse(['done', run({ status: 'AWAITING_APPROVAL', answer: null })]));
+      await sending;
+      TestBed.tick();
+
+      await vi.advanceTimersByTimeAsync(FALLBACK_POLL_MS * 2);
+      http.expectNone('/api/runs/run-1');
+
+      fakeEvents.runs.next(run({ answer: 'Ticket #9 created' }));
+      fakeEvents.runs.next(run({ id: 'someone-elses-run', answer: 'not mine' }));
+
+      expect(store.runs()).toHaveLength(1);
+      expect(store.lastRun()?.answer).toBe('Ticket #9 created');
+      expect(store.canSend()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

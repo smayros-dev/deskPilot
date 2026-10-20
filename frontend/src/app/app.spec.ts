@@ -6,10 +6,13 @@ import { provideRouter } from '@angular/router';
 
 import { App } from './app';
 import { Role } from './core/auth';
-import { provideFakeAuth } from './core/testing';
+import { FakeEvents, provideFakeAuth, provideFakeEvents } from './core/testing';
 
 describe('App', () => {
+  let events: FakeEvents;
+
   function setUp(username = 'alice', roles: Role[] = ['user']) {
+    events = new FakeEvents();
     TestBed.configureTestingModule({
       imports: [App],
       providers: [
@@ -18,6 +21,7 @@ describe('App', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideFakeAuth(username, roles),
+        provideFakeEvents(events),
       ],
     });
   }
@@ -49,6 +53,18 @@ describe('App', () => {
 
     expect(navLinks(element)).toContain('Approvals');
     expect(element.querySelector('.user-menu .role')?.textContent).toBe('reviewer');
+  });
+
+  it('opens the live event stream and shows the number of pending approvals to reviewers', async () => {
+    setUp('bob', ['user', 'reviewer']);
+    const element = await render();
+    expect(events.started).toBe(true);
+    expect(element.querySelector('nav .badge')).toBeNull();
+
+    events.pendingApprovals.set(3);
+    TestBed.tick();
+
+    expect(element.querySelector('nav a[href="/approvals"] .badge')?.textContent?.trim()).toBe('3');
   });
 
   it('shows the model as online when Ollama is UP', async () => {

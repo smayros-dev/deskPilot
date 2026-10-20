@@ -2,8 +2,10 @@ package pl.piomin.services.deskpilot.service;
 
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.piomin.services.deskpilot.events.RunStatusChanged;
 import pl.piomin.services.deskpilot.exception.NotFoundException;
 import pl.piomin.services.deskpilot.model.AgentRun;
 import pl.piomin.services.deskpilot.model.AgentStep;
@@ -23,10 +25,13 @@ public class RunService {
 
     private final AgentRunRepository runRepository;
     private final AgentStepRepository stepRepository;
+    private final ApplicationEventPublisher events;
 
-    public RunService(AgentRunRepository runRepository, AgentStepRepository stepRepository) {
+    public RunService(AgentRunRepository runRepository, AgentStepRepository stepRepository,
+                      ApplicationEventPublisher events) {
         this.runRepository = runRepository;
         this.stepRepository = stepRepository;
+        this.events = events;
     }
 
     @Transactional
@@ -64,11 +69,14 @@ public class RunService {
         AgentRun run = get(runId);
         run.addActiveMillis(activeMillis);
         run.pauseForApproval();
+        statusChanged(run);
     }
 
     @Transactional
     public void resume(String runId) {
-        get(runId).resume();
+        AgentRun run = get(runId);
+        run.resume();
+        statusChanged(run);
     }
 
     @Transactional
@@ -76,7 +84,15 @@ public class RunService {
         AgentRun run = get(runId);
         run.addActiveMillis(activeMillis);
         run.finish(status, answer);
+        statusChanged(run);
         return run;
+    }
+
+    /** Live updates for the browser (delivered after commit); evaluation runs stay out of them. */
+    private void statusChanged(AgentRun run) {
+        if (run.getSource() == RunSource.CHAT) {
+            events.publishEvent(new RunStatusChanged(run.getId()));
+        }
     }
 
     public AgentRun get(String runId) {

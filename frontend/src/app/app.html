@@ -13,7 +13,12 @@
     <ul>
       @for (link of visibleLinks(); track link.path) {
         <li>
-          <a [routerLink]="link.path" routerLinkActive="active" ariaCurrentWhenActive="page">{{ link.label }}</a>
+          <a [routerLink]="link.path" routerLinkActive="active" ariaCurrentWhenActive="page">
+            {{ link.label }}
+            @if (link.path === '/approvals' && events.pendingApprovals(); as pending) {
+              <span class="badge" [attr.aria-label]="pending + ' waiting'">{{ pending }}</span>
+            }
+          </a>
         </li>
       }
     </ul>
