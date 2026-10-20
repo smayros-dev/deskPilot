@@ -57,6 +57,21 @@ services:
       - ./grafana/provisioning/deskpilot-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/deskpilot.yaml:ro
       - ./grafana/provisioning/deskpilot-datasources.yaml:/otel-lgtm/grafana/conf/provisioning/datasources/deskpilot.yaml:ro
       - ./grafana/provisioning/deskpilot-alerts.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/deskpilot.yaml:ro
+      - ./grafana/provisioning/deskpilot-notifications.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/deskpilot-notifications.yaml:ro
+      # E-mail only, or e-mail + chat webhook when GRAFANA_ALERT_WEBHOOK_URL is set (an empty URL would break provisioning).
+      - ./grafana/provisioning/deskpilot-contacts${GRAFANA_ALERT_WEBHOOK_URL:+-webhook}.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/deskpilot-contacts.yaml:ro
+    environment:
+      # Alert notifications by e-mail through Mailpit (http://localhost:8026).
+      GF_SMTP_ENABLED: "true"
+      GF_SMTP_HOST: mailpit:1025
+      GF_SMTP_FROM_ADDRESS: grafana@deskpilot.local
+      GF_SMTP_FROM_NAME: DeskPilot alerts
+      GF_SMTP_STARTTLS_POLICY: NoStartTLS
+      # Links in notifications ("Go to dashboard", "Silence") point here.
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
+      GRAFANA_ALERT_EMAILS: ${GRAFANA_ALERT_EMAILS:-admin@example.com}
+      GRAFANA_ALERT_WEBHOOK_URL: ${GRAFANA_ALERT_WEBHOOK_URL:-}
+      GRAFANA_ALERT_WEBHOOK_TYPE: ${GRAFANA_ALERT_WEBHOOK_TYPE:-slack}
     labels:
       # Not a service connection: traces keep going to Jaeger, metrics go to OTEL_METRICS_ENDPOINT.
       org.springframework.boot.ignore: "true"

@@ -1,0 +1,11 @@
+# Where DeskPilot alerts go (B1): every alert of the "deskpilot" service is sent to the "deskpilot" contact point,
+# which is defined in deskpilot-contacts.yaml (e-mail) or deskpilot-contacts-webhook.yaml (e-mail + Slack/Teams);
+# compose mounts the second one only when GRAFANA_ALERT_WEBHOOK_URL is set.
+apiVersion: 1
+policies:
+  - orgId: 1
+    receiver: deskpilot
+    group_by: [grafana_folder, alertname]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h

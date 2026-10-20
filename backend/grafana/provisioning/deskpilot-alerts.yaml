@@ -15,6 +15,10 @@ groups:
     execErrState: Error
     annotations:
       summary: Fewer than 70% of the agent runs finished in the last hour completed (escalated or failed instead).
+      description: 'Success rate over the last hour: {{ humanizePercentage $values.B.Value }} (threshold 70%). Check the latest failed or escalated runs on the DeskPilot dashboard and in Jaeger.'
+      # Links the alert to the dashboard: notifications then carry a "Go to dashboard" link.
+      __dashboardUid__: deskpilot-agent
+      __panelId__: "1"
     labels:
       service: deskpilot
     data:
@@ -54,6 +58,9 @@ groups:
     execErrState: Error
     annotations:
       summary: The 95th percentile of the agent run time over the last hour is above 2 minutes.
+      description: 'p95 run time over the last hour: {{ humanize $values.B.Value }} ms (threshold 120 000 ms = 2 min). Slow model calls show as spans in Jaeger.'
+      __dashboardUid__: deskpilot-agent
+      __panelId__: "7"
     labels:
       service: deskpilot
     data:
