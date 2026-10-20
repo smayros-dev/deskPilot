@@ -35,6 +35,27 @@ export interface VariantResult {
   satisfactionRate: number;
 }
 
+/** B compared with A at the 95 % level. */
+export type Verdict = 'NOT_ENOUGH_DATA' | 'NO_SIGNIFICANT_DIFFERENCE' | 'B_BETTER' | 'B_WORSE';
+
+export interface Significance {
+  samplesA: number;
+  samplesB: number;
+  rateA: number;
+  rateB: number;
+  /** 'z' (two-proportion z-test) or 'fisher' (exact test, small counts); null without enough data. */
+  test: 'z' | 'fisher' | null;
+  pValue: number | null;
+  verdict: Verdict;
+}
+
+export interface Comparison {
+  /** Finished runs (or ratings) each variant needs before a verdict. */
+  minSample: number;
+  success: Significance;
+  satisfaction: Significance;
+}
+
 export interface Experiment {
   id: string;
   name: string;
@@ -45,7 +66,10 @@ export interface Experiment {
   startedAt: string;
   stoppedBy: string | null;
   stoppedAt: string | null;
+  /** Why DeskPilot stopped it itself (provider disabled, repeated provider errors); null otherwise. */
+  stopReason?: string | null;
   variants: VariantResult[];
+  comparison?: Comparison;
 }
 
 export interface VariantRequest {

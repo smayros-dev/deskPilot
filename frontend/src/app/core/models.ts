@@ -79,6 +79,13 @@ export interface FeedbackStats {
   models: { model: string; up: number; down: number; satisfactionRate: number }[];
 }
 
+/** A/B experiment and variant of a run (12m); only sent to reviewers and admins. */
+export interface RunExperiment {
+  id: string;
+  name: string | null;
+  variant: 'A' | 'B';
+}
+
 export interface Run {
   id: string;
   sessionId: string;
@@ -86,6 +93,7 @@ export interface Run {
   model: string | null;
   /** Specialist agent the supervisor handed the message to (12f); null when routing is off. */
   specialist?: string | null;
+  experiment?: RunExperiment | null;
   status: RunStatus;
   userInput: string;
   answer: string | null;

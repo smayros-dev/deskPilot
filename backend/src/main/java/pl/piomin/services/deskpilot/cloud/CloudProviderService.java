@@ -16,6 +16,7 @@ import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
@@ -73,16 +74,18 @@ public class CloudProviderService {
     private final Environment environment;
     private final ObservationRegistry observations;
     private final JsonMapper jsonMapper;
+    private final ApplicationEventPublisher events;
     private final Map<String, CachedClient> clients = new ConcurrentHashMap<>();
     private final Map<String, CachedModels> modelLists = new ConcurrentHashMap<>();
 
     public CloudProviderService(CloudProviderRepository repository, SecretCipher cipher, Environment environment,
-                                ObservationRegistry observations, JsonMapper jsonMapper) {
+                                ObservationRegistry observations, JsonMapper jsonMapper, ApplicationEventPublisher events) {
         this.repository = repository;
         this.cipher = cipher;
         this.environment = environment;
         this.observations = observations;
         this.jsonMapper = jsonMapper;
+        this.events = events;
     }
 
     public static boolean isCloud(String provider) {
@@ -113,7 +116,12 @@ public class CloudProviderService {
         }
         clients.remove(id);
         modelLists.remove(id);
-        return status(definition, provider);
+        Status status = status(definition, provider);
+        if (!status.available()) {
+            // Whatever runs on it must stop now, e.g. a running A/B experiment (12m).
+            events.publishEvent(new ProviderUnavailable(id, status.label()));
+        }
+        return status;
     }
 
     /** Enabled and with a key: the agent may use it. */

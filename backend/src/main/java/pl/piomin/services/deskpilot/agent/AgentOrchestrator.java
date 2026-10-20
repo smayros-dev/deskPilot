@@ -314,7 +314,17 @@ public class AgentOrchestrator {
             record(turn, StepType.ERROR, e.getClass().getSimpleName(), e.getMessage(), true, 0);
             AgentRun failed = runService.finish(runId, RunStatus.FAILED, null, elapsedMillis(startNanos));
             metrics.runFinished(failed);
+            experimentOutcome(failed, e);
             throw e;
+        }
+    }
+
+    /** Lets a running experiment stop itself when a variant keeps failing at its provider (12m); never fails the run. */
+    private void experimentOutcome(AgentRun run, RuntimeException failure) {
+        try {
+            experiments.recordOutcome(run, failure);
+        } catch (RuntimeException e) {
+            LOG.warn("Could not record the experiment outcome of run {}", run.getId(), e);
         }
     }
 
@@ -559,6 +569,7 @@ public class AgentOrchestrator {
         record(turn, StepType.ANSWER, status.name(), answer, status == RunStatus.FAILED, 0);
         AgentRun run = runService.finish(turn.runId(), status, answer, elapsedMillis(startNanos));
         metrics.runFinished(run);
+        experimentOutcome(run, null);
         // Short-term memory keeps only the question and the answer; tool chatter stays in the run trace.
         chatMemory.add(turn.context().sessionId(), List.of(new UserMessage(turn.userInput()), new AssistantMessage(answer)));
         summarizer.summarizeIfLongAsync(turn.context().sessionId(), turn.context().config());

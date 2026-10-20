@@ -42,6 +42,9 @@
                 @if (run.specialist) {
                   <app-specialist-badge [specialist]="run.specialist" />
                 }
+                @if (run.experiment; as experiment) {
+                  <app-experiment-badge [experiment]="experiment" />
+                }
                 <span>{{ run.stats.activeMillis | duration: i18n.lang() }}</span>
                 <button type="button" class="link-button" (click)="toggleTrace(run.id)" [attr.aria-expanded]="expanded().has(run.id)">
                   {{ expanded().has(run.id) ? i18n.t('chat.hideReasoning') : i18n.t('chat.showReasoning') }}

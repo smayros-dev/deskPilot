@@ -5,6 +5,7 @@ import { I18n, TranslationKey } from '../core/i18n';
 import { Run, RunStep, StepType } from '../core/models';
 import { Answer } from '../shared/answer';
 import { DurationPipe } from '../shared/duration-pipe';
+import { ExperimentBadge } from '../shared/experiment-badge';
 import { SpecialistBadge } from '../shared/specialist-badge';
 
 interface StepView extends RunStep {
@@ -16,7 +17,7 @@ interface StepView extends RunStep {
 /** The ReAct trace of one run: thoughts, tool calls and results, approvals and the answer. */
 @Component({
   selector: 'app-run-trace',
-  imports: [DecimalPipe, DurationPipe, Answer, SpecialistBadge],
+  imports: [DecimalPipe, DurationPipe, Answer, SpecialistBadge, ExperimentBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="stats" role="list" [attr.aria-label]="i18n.t('trace.stats')">
@@ -25,6 +26,9 @@ interface StepView extends RunStep {
       }
       @if (run().specialist; as specialist) {
         <span role="listitem"><app-specialist-badge [specialist]="specialist" /></span>
+      }
+      @if (run().experiment; as experiment) {
+        <span role="listitem"><app-experiment-badge [experiment]="experiment" /></span>
       }
       <span role="listitem"><strong>{{ run().stats.activeMillis | duration: i18n.lang() }}</strong> {{ i18n.t('trace.active') }}</span>
       <span role="listitem"><strong>{{ run().stats.iterations }}</strong> {{ i18n.t('trace.modelCalls') }}</span>

@@ -35,3 +35,11 @@ h2 { font-size: 1rem; margin: 0 0 0.75rem; }
 .prompt-form { display: grid; gap: 0.5rem; }
 .prompt-form label { display: grid; gap: 0.25rem; }
 .prompt-form .button { justify-self: start; }
+
+.significance { display: grid; gap: 0.25rem; margin: 0.75rem 0 0; font-size: 0.88rem; }
+.significance div { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.significance dt { min-width: 9rem; color: var(--text-muted); }
+.significance dd { margin: 0; }
+.significance [data-verdict='B_BETTER'] strong { color: var(--ok); }
+.significance [data-verdict='B_WORSE'] strong { color: var(--danger); }
+.auto-stopped { margin: 0.25rem 0 0.5rem; font-size: 0.88rem; color: var(--danger); }
