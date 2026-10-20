@@ -163,6 +163,13 @@ agent:
     approval-sla: ${NOTIFICATIONS_APPROVAL_SLA:PT30M}
     webhook-url: ${NOTIFICATIONS_WEBHOOK_URL:}
     base-url: ${NOTIFICATIONS_BASE_URL:http://localhost:4200}
+  knowledge-gaps:
+    # Unanswered questions grouped into gaps for reviewers (12d); "-" turns the weekly run off (manual detection stays).
+    cron: ${KNOWLEDGE_GAPS_CRON:0 0 6 * * MON}
+    lookback-days: 30
+    similarity: 0.8
+    min-questions: 2
+    covered-similarity: 0.75
   # Default of the Settings toggle: remind the model to search the knowledge base before answering or opening a ticket.
   grounding-check: true
   # Default of the Settings toggle: check answers and ticket requests against the retrieved articles.

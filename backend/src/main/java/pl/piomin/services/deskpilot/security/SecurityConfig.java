@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/settings").hasRole(ADMIN)
                         .requestMatchers("/api/evaluations", "/api/evaluations/**").hasRole(ADMIN)
                         .requestMatchers("/api/providers", "/api/providers/**").hasRole(ADMIN)
+                        .requestMatchers("/api/knowledge-gaps", "/api/knowledge-gaps/**").hasAnyRole(REVIEWER, ADMIN)
                         .requestMatchers("/api/audit", "/api/audit/**").hasRole(ADMIN)
                         .requestMatchers("/api/knowledge-base/documents", "/api/knowledge-base/documents/**").hasRole(ADMIN)
                         .requestMatchers("/actuator/**").hasRole(ADMIN)

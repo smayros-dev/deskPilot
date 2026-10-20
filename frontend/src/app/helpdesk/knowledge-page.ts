@@ -6,10 +6,11 @@ import { AuthService } from '../core/auth';
 import { I18n } from '../core/i18n';
 import { Article } from '../core/models';
 import { DocumentsPanel } from './documents-panel';
+import { KnowledgeGapsPanel } from './knowledge-gaps-panel';
 
 @Component({
   selector: 'app-knowledge-page',
-  imports: [DocumentsPanel],
+  imports: [DocumentsPanel, KnowledgeGapsPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-header">
@@ -21,6 +22,9 @@ import { DocumentsPanel } from './documents-panel';
 
     @if (auth.isAdmin()) {
       <app-documents-panel (changed)="articles.reload()" />
+    }
+    @if (auth.isReviewer() || auth.isAdmin()) {
+      <app-knowledge-gaps-panel (published)="articles.reload()" />
     }
 
     <label class="search">
@@ -60,7 +64,7 @@ import { DocumentsPanel } from './documents-panel';
     .tags li { font-size: 0.72rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--accent-bg); color: var(--accent); }
     p { margin: 0; font-size: 0.9rem; line-height: 1.5; white-space: pre-line; }
     .source { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.6rem; }
-    app-documents-panel { display: block; margin: 1rem 0; }
+    app-documents-panel, app-knowledge-gaps-panel { display: block; margin: 1rem 0; }
     .highlight { outline: 2px solid var(--accent); outline-offset: 2px; }
   `,
 })
