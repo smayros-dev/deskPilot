@@ -168,3 +168,14 @@ order of the recommended path below. Value / effort are rough estimates for this
 3. Better knowledge: **12b** ingestion, then **12c** hybrid search (measured with Step 10).
 4. Differentiators: **12e** screenshots, **12i** MCP / real ticket system.
 5. Then by need: 12j, 12r, 12n, 12o, 12m, 12f, 12g, 12h, 12d, 12q, 12p.
+
+## Step 13 — Follow-ups and quality
+- [x] **13a — Measured specialists and thresholds ✅:** evaluation 25/25 with specialists vs 24/25 without → on by default; routing and knowledge-gap thresholds tuned on real embeddings (1.0.23).
+- [x] **13b — Architecture documentation ✅:** `docs/ARCHITECTURE.md` (use cases, classes, components, sequence, states in Mermaid) and interactive Archify diagrams (1.0.24).
+- [x] **13c — Alert notifications ✅:** Grafana contact points (e-mail via Mailpit, optional Slack/Teams webhook) and a notification policy (1.0.25).
+- [x] **13d — Experiment follow-ups ✅:** variant badge on runs, automatic stop with a reason when a provider breaks, significance test per metric (1.0.25).
+- [x] **13e — End-to-end tests ✅ (scripted fake Ollama; self-check and specialists off in that profile):** Playwright suite over the whole stack, run in CI (1.0.25).
+- [ ] **13f — Cloud model measured:** evaluation of a Mistral/Gemini model against qwen3:8b (needs a key).
+- [ ] **13g — Specialists editable from the UI** instead of a classpath file.
+- [ ] **13h — Several backend instances:** shared rate limits, SSE fan-out and circuit-breaker state (e.g. Redis or Postgres LISTEN/NOTIFY).
+- [ ] **13i — Backups and real identities:** database backups, production Keycloak realm without demo users.

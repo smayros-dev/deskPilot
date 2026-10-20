@@ -36,10 +36,10 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Guardrails v2**: per-user rate limits on chat messages and approvals (429 with `Retry-After`; admins exempt); a circuit breaker around the model (after 5 failures in a row, calls fail fast with 503 for 30 s; state in `/actuator/health`); optional model-based moderation of messages (`MODERATION_ENABLED`); IBANs and phone numbers redacted from answers like card numbers.
 - **Multilingual UI**: English, French and Arabic (right-to-left), switchable from the user menu; the choice is remembered per browser and the default follows the browser language. Dates and numbers follow the selected locale. Error details returned by the backend stay in English.
 - **Cloud models (optional)**: admins can enable Mistral and Gemini (free tiers) on the Settings page and pick their models for chat, vision or an evaluation, next to the local Ollama models. Keys come from `MISTRAL_API_KEY` / `GEMINI_API_KEY` or are entered once in the UI, stored encrypted (AES-256-GCM) and never shown again. A warning reminds that questions, articles and tickets are then sent to that provider; the local model stays the default.
-- **Prompt & model experiments**: admins save named versions of the system prompt and run an A/B experiment between two variants (local or cloud model + optional prompt version, configurable split). Each conversation stays on its variant; the Experiments page compares success rate, escalations, latency (avg/p95), tokens and 👍/👎 per variant.
+- **Prompt & model experiments**: admins save named versions of the system prompt and run an A/B experiment between two variants (local or cloud model + optional prompt version, configurable split). Each conversation stays on its variant; the Experiments page compares success rate, escalations, latency (avg/p95), tokens and 👍/👎 per variant, with a significance verdict (two-proportion z-test, Fisher's exact test for small samples, 5 % level; "not enough data" below `EXPERIMENT_MIN_SAMPLE` runs). Reviewers and admins see the variant as a 🧪 badge on answers and runs. An experiment stops by itself, with the reason shown and an e-mail to admins, when a cloud provider it uses is disabled or loses its key, or after `EXPERIMENT_MAX_PROVIDER_FAILURES` provider errors in a row.
 - **Knowledge gaps**: every week (and on demand) questions that were escalated, rated 👎 or found nothing in the knowledge base are grouped by meaning; questions already covered by an article are skipped. On the Knowledge page reviewers let the model draft an article for a gap, edit it, and publish it to the knowledge base or dismiss it.
 - **Specialist agents**: with "Specialist agents" on in Settings (the default), each message is routed to a network/VPN, accounts/MFA, hardware or software specialist (keywords first, then embedding similarity, then the conversation's previous specialist; optionally the model) with its own instructions, examples and tool subset. The hand-off is a step in the trace, the answer shows a 🧭 badge, and the dashboard breaks results down per specialist. Measured: 25/25 scenarios with specialists vs 24/25 without, same latency.
-- **Grafana (optional)**: `docker compose --profile grafana up -d lgtm` in `backend/` starts Grafana at http://localhost:3000 (admin / admin) with a provisioned "DeskPilot — Agent" dashboard (success rate, p95 latency, outcomes, per model/provider, tokens, tools, feedback, approvals, guardrails) and alerts on success rate (< 70 % over 1 h) and p95 latency (> 2 min). Set `OTEL_METRICS_EXPORT_ENABLED=true` to send metrics.
+- **Grafana (optional)**: `docker compose --profile grafana up -d lgtm` in `backend/` starts Grafana at http://localhost:3000 (admin / admin) with a provisioned "DeskPilot — Agent" dashboard (success rate, p95 latency, outcomes, per model/provider, tokens, tools, feedback, approvals, guardrails) and alerts on success rate (< 70 % over 1 h) and p95 latency (> 2 min). Set `OTEL_METRICS_EXPORT_ENABLED=true` to send metrics. Alerts are e-mailed (also when resolved) to `GRAFANA_ALERT_EMAILS` through Mailpit, and to a Slack/Teams/generic webhook when `GRAFANA_ALERT_WEBHOOK_URL` is set.
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -158,6 +158,9 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `OTEL_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP endpoint for traces (Jaeger) |
 | `TRACING_EXPORT_ENABLED` | `true` | Set to `false` to stop exporting traces |
 | `OTEL_METRICS_EXPORT_ENABLED` | `false` | Export Micrometer metrics over OTLP to Grafana (lgtm) |
+| `GRAFANA_ALERT_EMAILS` | `admin@example.com` | Recipients of Grafana alerts (compose, `grafana` profile) |
+| `GRAFANA_ALERT_WEBHOOK_URL` / `GRAFANA_ALERT_WEBHOOK_TYPE` | (empty) / `slack` | Also send alerts to a `slack`, `teams` or generic `webhook` URL |
+| `EXPERIMENT_MIN_SAMPLE` / `EXPERIMENT_MAX_PROVIDER_FAILURES` | `10` / `3` | Runs per variant before a significance verdict; provider errors in a row that stop an experiment |
 | `OTEL_METRICS_ENDPOINT` / `OTEL_METRICS_STEP` | `http://localhost:4328/v1/metrics` / `15s` | OTLP metrics endpoint (host port 4328, Jaeger keeps 4318) and export interval |
 | `KNOWLEDGE_GAPS_CRON` | `0 0 6 * * MON` | Weekly knowledge-gap detection (`-` = only on demand); thresholds under `agent.knowledge-gaps.*` |
 | `AGENT_SPECIALISTS` | `true` | Default of the "Specialist agents" setting; thresholds under `agent.specialists.*` |
@@ -273,7 +276,7 @@ What the evaluation found and what fixed it:
 ## CI
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request: backend build and tests
-(Testcontainers starts Postgres on the runner), frontend tests and production build, then builds both Docker images.
+(Testcontainers starts Postgres on the runner), frontend tests and production build, then builds both Docker images. An `e2e` job then starts Postgres, Keycloak, a scripted fake Ollama and the backend (`e2e` profile) with the frontend, and runs the Playwright tests; the report and logs are uploaded when it fails.
 
 ## Tests
 
@@ -282,6 +285,10 @@ cd frontend && npx ng test --watch=false   # Vitest component/service tests
 cd backend && ./mvnw test                  # unit + integration tests on Postgres via Testcontainers (Docker needed, no Ollama)
 OLLAMA_IT=true ./mvnw test -Dtest="*SmokeTest"   # real local model: chat, RAG, full agent runs (slow on CPU)
 ```
+
+End-to-end tests ([`e2e/`](e2e/README.md)): Playwright drives the real UI through Keycloak sign-in, a cited answer, a ticket
+approved by a reviewer, role checks and the French/Arabic UI, against the backend's `e2e` profile and a scripted
+stand-in for Ollama (no model needed, about 30 s). See [`e2e/README.md`](e2e/README.md) to run them locally.
 
 ## REST API
 
@@ -320,6 +327,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.25** — Grafana alerts e-mailed through Mailpit and optionally to a Slack/Teams webhook; experiments: variant badge on answers and runs, automatic stop with a reason when a provider breaks (V21), significance verdict per metric; Playwright end-to-end tests with a fake Ollama, run in CI.
 - **1.0.24** — Documentation: `docs/ARCHITECTURE.md` with use-case, class, component, sequence and state diagrams (Mermaid) and interactive Archify diagrams of the architecture, the chat → approval sequence, the run lifecycle and the agent loop.
 - **1.0.23** — Measured with the evaluation: specialist agents on by default (25/25 vs 24/25), routing similarity threshold 0.7; knowledge-gap thresholds tuned on real embeddings (grouping 0.55, covered 0.65).
 - **1.0.22** — Prompt versions and A/B experiments (12m, V18); knowledge-gap detection with model-drafted articles (12d, V19); Grafana dashboard and alerts with OTLP metrics (12p); optional supervisor + specialist agents with hand-off in the trace (12f, V20).
