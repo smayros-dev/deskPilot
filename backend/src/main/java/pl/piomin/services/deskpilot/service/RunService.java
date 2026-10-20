@@ -49,6 +49,17 @@ public class RunService {
         return run;
     }
 
+    /** Starts a chat run that belongs to an A/B experiment (12m). */
+    @Transactional
+    public AgentRun start(String sessionId, String userId, String userInput, String model, RunSource source,
+                          String experimentId, String variant) {
+        AgentRun run = new AgentRun(sessionId, userId, userInput, model, source);
+        run.joinExperiment(experimentId, variant);
+        run = runRepository.save(run);
+        stepRepository.save(new AgentStep(run.getId(), StepType.USER_INPUT, null, userInput, false, 0));
+        return run;
+    }
+
     @Transactional
     public AgentStep addStep(String runId, StepType type, String name, String content, boolean error, long durationMillis) {
         return stepRepository.save(new AgentStep(runId, type, name, content, error, durationMillis));

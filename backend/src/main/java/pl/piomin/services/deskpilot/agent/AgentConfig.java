@@ -40,6 +40,13 @@ public record AgentConfig(
                 disabledTools, approvalTools, systemPrompt);
     }
 
+    /** The same settings with another system prompt (null = the built-in one), e.g. for an experiment variant. */
+    public AgentConfig withSystemPrompt(String prompt) {
+        return new AgentConfig(chatModel, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations, ragTopK,
+                ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, chatProvider, visionProvider,
+                disabledTools, approvalTools, prompt);
+    }
+
     /** Settings for reading a screenshot: the vision provider and model take the place of the chat ones. */
     public AgentConfig forVision() {
         return withChat(visionProvider == null ? "ollama" : visionProvider, visionModel);

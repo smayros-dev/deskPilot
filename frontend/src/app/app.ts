@@ -45,6 +45,7 @@ export class App {
     { path: '/helpdesk/knowledge', label: 'nav.knowledge' },
     { path: '/helpdesk/memories', label: 'nav.memories' },
     { path: '/evaluation', label: 'nav.evaluation', role: 'admin' },
+    { path: '/experiments', label: 'nav.experiments', role: 'admin' },
     { path: '/audit', label: 'nav.audit', role: 'admin' },
     { path: '/settings', label: 'nav.settings' },
   ];

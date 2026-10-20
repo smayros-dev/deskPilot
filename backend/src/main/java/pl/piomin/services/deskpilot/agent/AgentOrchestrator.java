@@ -39,6 +39,7 @@ import pl.piomin.services.deskpilot.model.AgentStep;
 import pl.piomin.services.deskpilot.model.RunSource;
 import pl.piomin.services.deskpilot.model.RunStatus;
 import pl.piomin.services.deskpilot.model.StepType;
+import pl.piomin.services.deskpilot.service.ExperimentService;
 import pl.piomin.services.deskpilot.service.RunService;
 
 /**
@@ -83,6 +84,7 @@ public class AgentOrchestrator {
     private final VisionReader visionReader;
     private final ConversationSummarizer summarizer;
     private final ModelGateway modelGateway;
+    private final ExperimentService experiments;
     private final String systemPrompt;
 
     public AgentOrchestrator(ChatModel chatModel, ChatMemory chatMemory, ToolRegistry toolRegistry,
@@ -91,7 +93,7 @@ public class AgentOrchestrator {
                              ChatOptionsFactory chatOptionsFactory, GuardrailService guardrails, AgentMetrics metrics,
                              ObservationRegistry observations, SelfCheck selfCheck,
                              VisionReader visionReader, ConversationSummarizer summarizer,
-                             ModelGateway modelGateway,
+                             ModelGateway modelGateway, ExperimentService experiments,
                              @Value("classpath:prompts/system-prompt.txt") Resource systemPrompt) throws IOException {
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
@@ -108,6 +110,7 @@ public class AgentOrchestrator {
         this.visionReader = visionReader;
         this.summarizer = summarizer;
         this.modelGateway = modelGateway;
+        this.experiments = experiments;
         this.systemPrompt = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
     }
 
@@ -165,11 +168,19 @@ public class AgentOrchestrator {
             if (turnStore.isPaused(sessionId)) {
                 throw new ConflictException("A run in session " + sessionId + " is waiting for approval; approve or reject it first");
             }
-            AgentConfig config = override != null ? override : settingsService.current();
-            if (image != null && config.visionModel() == null) {
+            AgentConfig settings = override != null ? override : settingsService.current();
+            if (image != null && settings.visionModel() == null) {
                 throw new IllegalArgumentException("Screenshots are off: an admin can choose a vision model in Settings");
             }
-            AgentRun run = runService.start(sessionId, session.getUserId(), userMessage, config.modelLabel(), source);
+            // A running A/B experiment (12m) decides the chat model and prompt of chat runs, not of evaluations.
+            Optional<ExperimentService.Assignment> assignment = override == null && source == RunSource.CHAT
+                    ? experiments.assign(sessionId, settings)
+                    : Optional.empty();
+            AgentConfig config = assignment.map(ExperimentService.Assignment::config).orElse(settings);
+            AgentRun run = assignment
+                    .map(a -> runService.start(sessionId, session.getUserId(), userMessage, config.modelLabel(), source,
+                            a.experimentId(), a.variant()))
+                    .orElseGet(() -> runService.start(sessionId, session.getUserId(), userMessage, config.modelLabel(), source));
             sessionService.recordMessage(sessionId, userMessage);
             tagCurrentObservation(run);
             listener.runStarted(run);
