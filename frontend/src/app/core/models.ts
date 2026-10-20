@@ -18,6 +18,11 @@ export interface Session {
   id: string;
   userId: string;
   createdAt: string;
+  /** The first question, or the name the user gave the conversation; null before the first message. */
+  title: string | null;
+  lastActivityAt: string | null;
+  /** Number of messages (runs). */
+  runs: number;
 }
 
 export interface RunStep {

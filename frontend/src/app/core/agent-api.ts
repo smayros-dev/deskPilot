@@ -17,6 +17,10 @@ export class AgentApi {
     return this.http.post<Session>(`${this.config.baseUrl}/sessions`, null);
   }
 
+  renameSession(sessionId: string, title: string): Observable<Session> {
+    return this.http.patch<Session>(`${this.config.baseUrl}/sessions/${sessionId}`, { title });
+  }
+
   getSession(sessionId: string, context?: HttpContext): Observable<Session> {
     return this.http.get<Session>(`${this.config.baseUrl}/sessions/${sessionId}`, { context });
   }

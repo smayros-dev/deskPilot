@@ -2,8 +2,11 @@ package pl.piomin.services.deskpilot.agent;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Locale;
 import java.util.function.Supplier;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +35,25 @@ public class SessionService {
     @Transactional
     public AgentSession create(String userId) {
         return repository.save(new AgentSession(userId));
+    }
+
+    /** Names the conversation after its first question and moves it to the top of the history. */
+    @Transactional
+    public void recordMessage(String sessionId, String message) {
+        get(sessionId).recordMessage(message, Instant.now());
+    }
+
+    @Transactional
+    public AgentSession rename(String sessionId, String title) {
+        AgentSession session = get(sessionId);
+        session.rename(title);
+        return session;
+    }
+
+    /** Conversations of the user with at least one message, most recent first. */
+    public List<AgentSession> history(String userId, String search, int limit) {
+        String text = search == null ? "" : search.strip().toLowerCase(Locale.ROOT);
+        return repository.findHistory(userId, text, PageRequest.of(0, limit));
     }
 
     public AgentSession get(String sessionId) {

@@ -227,6 +227,40 @@ class AgentApiIntegrationTest {
     }
 
     @Test
+    void historyListsTheUsersConversationsNewestFirstAndCanBeSearchedAndRenamed() {
+        givenModelReplies(answer("Use the Company Portal."));
+        chat("How do I install Visual Studio Code?").expectStatus().isOk();
+        SessionResponse second = alice.post().uri("/api/sessions").exchange()
+                .expectBody(SessionResponse.class).returnResult().getResponseBody();
+        assertThat(second).isNotNull();
+        alice.post().uri("/api/sessions/{id}/messages", second.id()).body(new ChatRequest("My printer PRN-3-02 is offline"))
+                .exchange().expectStatus().isOk();
+        alice.post().uri("/api/sessions").exchange().expectStatus().isCreated(); // empty: not listed
+
+        List<SessionResponse> history = history(alice, "");
+        assertThat(history).extracting(SessionResponse::title).startsWith("My printer PRN-3-02 is offline",
+                "How do I install Visual Studio Code?");
+        assertThat(history.getFirst().runs()).isEqualTo(1);
+        assertThat(history(alice, "printer")).extracting(SessionResponse::id).containsExactly(second.id());
+        assertThat(history(carol, "")).isEmpty();
+
+        alice.patch().uri("/api/sessions/{id}", second.id()).body(Map.of("title", "Printer on floor 3"))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.title").isEqualTo("Printer on floor 3");
+        carol.patch().uri("/api/sessions/{id}", second.id()).body(Map.of("title", "x")).exchange().expectStatus().isNotFound();
+        alice.patch().uri("/api/sessions/{id}", second.id()).body(Map.of("title", " ")).exchange().expectStatus().isBadRequest();
+        assertThat(history(alice, "floor 3")).extracting(SessionResponse::id).containsExactly(second.id());
+    }
+
+    private static List<SessionResponse> history(RestTestClient user, String q) {
+        return user.get().uri("/api/sessions?q={q}", q).exchange()
+                .expectStatus().isOk()
+                .expectBody(new ParameterizedTypeReference<List<SessionResponse>>() { })
+                .returnResult().getResponseBody();
+    }
+
+    @Test
     void blankMessageIsBadRequest() {
         chat(" ").expectStatus().isBadRequest();
     }

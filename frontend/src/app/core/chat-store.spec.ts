@@ -214,4 +214,15 @@ describe('ChatStore', () => {
       vi.useRealTimers();
     }
   });
+
+  it('reopens a past conversation with its runs', async () => {
+    const opening = store.open('s9');
+    http.expectOne('/api/sessions/s9').flush({ id: 's9', userId: 'alice', createdAt: '', title: 'Printer', lastActivityAt: '', runs: 1 });
+    await Promise.resolve();
+    http.expectOne('/api/sessions/s9/runs').flush([run({ id: 'old-run', sessionId: 's9', answer: 'Use PRN-3-02' })]);
+    await opening;
+
+    expect(store.session()?.id).toBe('s9');
+    expect(store.runs().map((r) => r.id)).toEqual(['old-run']);
+  });
 });

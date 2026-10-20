@@ -1,5 +1,6 @@
 package pl.piomin.services.deskpilot.repository;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +12,15 @@ import pl.piomin.services.deskpilot.model.RunStatus;
 public interface AgentRunRepository extends JpaRepository<AgentRun, String> {
 
     List<AgentRun> findBySessionIdOrderByCreatedAtAsc(String sessionId);
+
+    interface SessionRunCount {
+        String getSessionId();
+
+        long getRuns();
+    }
+
+    @Query("select r.sessionId as sessionId, count(r) as runs from AgentRun r where r.sessionId in :sessionIds group by r.sessionId")
+    List<SessionRunCount> countBySession(Collection<String> sessionIds);
 
     List<AgentRun> findByStatusIn(List<RunStatus> statuses);
 

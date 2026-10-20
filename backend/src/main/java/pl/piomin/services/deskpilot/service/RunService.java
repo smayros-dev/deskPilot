@@ -1,6 +1,9 @@
 package pl.piomin.services.deskpilot.service;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -108,6 +111,16 @@ public class RunService {
     /** The reviewers' queue, oldest first. */
     public List<AgentRun> findAwaitingApproval() {
         return runRepository.findByStatusAndSourceOrderByCreatedAtAsc(RunStatus.AWAITING_APPROVAL, RunSource.CHAT);
+    }
+
+    /** Number of runs per session, for the given sessions (sessions without runs are absent). */
+    public Map<String, Long> countBySession(Collection<String> sessionIds) {
+        if (sessionIds.isEmpty()) {
+            return Map.of();
+        }
+        return runRepository.countBySession(sessionIds).stream()
+                .collect(Collectors.toMap(AgentRunRepository.SessionRunCount::getSessionId,
+                        AgentRunRepository.SessionRunCount::getRuns));
     }
 
     public List<AgentRun> findBySession(String sessionId) {

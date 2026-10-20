@@ -13,6 +13,7 @@ import { FeedbackButtons } from '../shared/feedback-buttons';
 import { StatusBadge } from '../shared/status-badge';
 import { ApprovalCard } from './approval-card';
 import { ChatInput, ChatSubmission } from './chat-input';
+import { ConversationList } from './conversation-list';
 import { ModelSwitcher } from './model-switcher';
 
 const EXAMPLES = [
@@ -25,7 +26,7 @@ const EXAMPLES = [
 
 @Component({
   selector: 'app-chat-page',
-  imports: [FeedbackButtons, RouterLink, ChatInput, ApprovalCard, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe, Answer],
+  imports: [ConversationList, FeedbackButtons, RouterLink, ChatInput, ApprovalCard, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe, Answer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.css',

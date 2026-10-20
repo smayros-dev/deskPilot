@@ -88,6 +88,17 @@ export class ChatStore {
     await this.newConversation();
   }
 
+  /** Reopens a past conversation of the user (from the history). */
+  async open(sessionId: string): Promise<void> {
+    if (this._sending()) {
+      return;
+    }
+    const session = await firstValueFrom(this.api.getSession(sessionId));
+    const runs = await firstValueFrom(this.api.listRuns(sessionId));
+    this._session.set(session);
+    this._runs.set(runs);
+  }
+
   async newConversation(): Promise<void> {
     this._runs.set([]);
     this._session.set(await firstValueFrom(this.api.createSession()));

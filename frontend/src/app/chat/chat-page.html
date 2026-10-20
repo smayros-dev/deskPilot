@@ -121,7 +121,10 @@
     </footer>
   </section>
 
-  <aside class="side" aria-label="Last run">
+  <aside class="side" aria-label="Conversations and last run">
+    <section class="card">
+      <app-conversation-list />
+    </section>
     @let last = store.lastSettledRun();
     @if (last) {
       <section class="card">

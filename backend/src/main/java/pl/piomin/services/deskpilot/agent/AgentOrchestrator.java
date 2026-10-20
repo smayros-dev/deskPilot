@@ -165,6 +165,7 @@ public class AgentOrchestrator {
                 throw new IllegalArgumentException("Screenshots are off: an admin can choose a vision model in Settings");
             }
             AgentRun run = runService.start(sessionId, session.getUserId(), userMessage, config.chatModel(), source);
+            sessionService.recordMessage(sessionId, userMessage);
             tagCurrentObservation(run);
             listener.runStarted(run);
             String agentInput = image == null ? userMessage : withScreenshot(run, config, image, userMessage, listener);
