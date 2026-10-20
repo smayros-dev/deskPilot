@@ -43,6 +43,20 @@ services:
     ports:
       - "8026:8025"
 
+  # Grafana with Prometheus, Tempo and Loki behind one OTLP endpoint (12p). Optional, it needs ~1.5 GB of memory:
+  #   OTEL_METRICS_EXPORT_ENABLED=true docker compose --profile grafana up --build
+  # Dashboard "DeskPilot — Agent" and alert rules at http://localhost:3000 (admin/admin); Jaeger is added as a data source.
+  lgtm:
+    image: grafana/otel-lgtm:0.36.0
+    profiles: ["grafana"]
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend/grafana/dashboards:/deskpilot/dashboards:ro
+      - ./backend/grafana/provisioning/deskpilot-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/deskpilot.yaml:ro
+      - ./backend/grafana/provisioning/deskpilot-datasources.yaml:/otel-lgtm/grafana/conf/provisioning/datasources/deskpilot.yaml:ro
+      - ./backend/grafana/provisioning/deskpilot-alerts.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/deskpilot.yaml:ro
+
   backend:
     build: ./backend
     environment:
@@ -56,6 +70,8 @@ services:
       # Signing keys are fetched inside the network; the issuer claim is still checked against http://localhost:8180.
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/deskpilot/protocol/openid-connect/certs
       OTEL_TRACES_ENDPOINT: http://jaeger:4318/v1/traces
+      OTEL_METRICS_EXPORT_ENABLED: ${OTEL_METRICS_EXPORT_ENABLED:-false}
+      OTEL_METRICS_ENDPOINT: http://lgtm:4318/v1/metrics
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

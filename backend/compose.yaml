@@ -42,5 +42,24 @@ services:
       - "1026:1025"
       - "8026:8025"
 
+  # Grafana with Prometheus, Tempo and Loki behind one OTLP endpoint (12p). Optional, it needs ~1.5 GB of memory:
+  #   docker compose --profile grafana up -d lgtm   and run the backend with OTEL_METRICS_EXPORT_ENABLED=true
+  # Dashboard "DeskPilot — Agent" and alert rules at http://localhost:3000 (admin/admin); Jaeger is added as a data source.
+  lgtm:
+    image: grafana/otel-lgtm:0.36.0
+    profiles: ["grafana"]
+    ports:
+      - "3000:3000"
+      # OTLP over HTTP on 4328: Jaeger already listens on 4318.
+      - "4328:4318"
+    volumes:
+      - ./grafana/dashboards:/deskpilot/dashboards:ro
+      - ./grafana/provisioning/deskpilot-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/deskpilot.yaml:ro
+      - ./grafana/provisioning/deskpilot-datasources.yaml:/otel-lgtm/grafana/conf/provisioning/datasources/deskpilot.yaml:ro
+      - ./grafana/provisioning/deskpilot-alerts.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/deskpilot.yaml:ro
+    labels:
+      # Not a service connection: traces keep going to Jaeger, metrics go to OTEL_METRICS_ENDPOINT.
+      org.springframework.boot.ignore: "true"
+
 volumes:
   deskpilot-pgdata:

@@ -119,8 +119,11 @@ management:
   otlp:
     metrics:
       export:
-        # Metrics stay on /actuator/metrics and /api/metrics; only traces are exported.
-        enabled: false
+        # Grafana (optional grafana/otel-lgtm in compose.yaml, profile "grafana", http://localhost:3000): dashboards and
+        # alerts on these metrics. Off by default; they always stay on /actuator/metrics and /api/metrics.
+        enabled: ${OTEL_METRICS_EXPORT_ENABLED:false}
+        url: ${OTEL_METRICS_ENDPOINT:http://localhost:4328/v1/metrics}
+        step: ${OTEL_METRICS_STEP:15s}
   logging:
     export:
       otlp:

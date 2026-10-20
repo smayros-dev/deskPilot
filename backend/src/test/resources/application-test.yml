@@ -12,3 +12,10 @@ agent:
   self-check: false
   rag:
     index-on-startup: false
+
+management:
+  otlp:
+    metrics:
+      export:
+        # No Grafana in tests; meters are checked in the SimpleMeterRegistry.
+        enabled: false

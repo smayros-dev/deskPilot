@@ -44,6 +44,9 @@ import pl.piomin.services.deskpilot.repository.TicketRepository;
 import pl.piomin.services.deskpilot.service.KnowledgeBaseService;
 import pl.piomin.services.deskpilot.service.RunService;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -106,6 +109,9 @@ class AgentOrchestratorTest {
     @Autowired
     private JdbcClient jdbcClient;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     private String sessionId;
 
     @BeforeEach
@@ -130,6 +136,20 @@ class AgentOrchestratorTest {
                 .extracting(Message::getText).isEqualTo(AgentOrchestrator.GROUNDING_REMINDER);
         // Short-term memory keeps the user's question and the final answer only, not the reminder.
         assertThat(chatMemory.get(sessionId)).hasSize(2);
+    }
+
+    @Test
+    void finishedRunIsCountedPerModelAndProvider() {
+        givenModelReplies(answer("Hello! How can I help?"));
+
+        AgentRun run = orchestrator.chat(sessionId, "Hi");
+
+        assertThat(meterRegistry.get("agent.runs").tag("status", "COMPLETED").tag("model", run.getModel())
+                .tag("provider", "ollama").counter().count()).isGreaterThanOrEqualTo(1);
+        Timer duration = meterRegistry.get("agent.run.duration").tag("model", run.getModel()).tag("provider", "ollama")
+                .tag("status", "COMPLETED").timer();
+        assertThat(duration.count()).isGreaterThanOrEqualTo(1);
+        assertThat(meterRegistry.get("agent.tokens").tag("type", "prompt").counter().count()).isPositive();
     }
 
     @Test

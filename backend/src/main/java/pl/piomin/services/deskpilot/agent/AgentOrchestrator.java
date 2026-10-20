@@ -302,7 +302,7 @@ public class AgentOrchestrator {
             LOG.error("Run {} failed", runId, e);
             record(turn, StepType.ERROR, e.getClass().getSimpleName(), e.getMessage(), true, 0);
             AgentRun failed = runService.finish(runId, RunStatus.FAILED, null, elapsedMillis(startNanos));
-            metrics.runFinished(RunStatus.FAILED, failed.getActiveMillis());
+            metrics.runFinished(failed);
             throw e;
         }
     }
@@ -390,7 +390,7 @@ public class AgentOrchestrator {
             AgentStep error = runService.addStep(run.getId(), StepType.ERROR, "screenshot", e.getMessage(), true, 0);
             listener.step(error);
             AgentRun failed = runService.finish(run.getId(), RunStatus.FAILED, null, elapsedMillis(start));
-            metrics.runFinished(RunStatus.FAILED, failed.getActiveMillis());
+            metrics.runFinished(failed);
             throw e;
         }
         listener.step(runService.addStep(run.getId(), StepType.IMAGE_ANALYSIS, config.visionModel(), read, false,
@@ -513,7 +513,7 @@ public class AgentOrchestrator {
         String answer = sanitized.text();
         record(turn, StepType.ANSWER, status.name(), answer, status == RunStatus.FAILED, 0);
         AgentRun run = runService.finish(turn.runId(), status, answer, elapsedMillis(startNanos));
-        metrics.runFinished(status, run.getActiveMillis());
+        metrics.runFinished(run);
         // Short-term memory keeps only the question and the answer; tool chatter stays in the run trace.
         chatMemory.add(turn.context().sessionId(), List.of(new UserMessage(turn.userInput()), new AssistantMessage(answer)));
         summarizer.summarizeIfLongAsync(turn.context().sessionId(), turn.context().config());
