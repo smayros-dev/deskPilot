@@ -52,3 +52,15 @@ td input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
   border-radius: var(--radius);
   background: var(--surface);
 }
+
+.badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}

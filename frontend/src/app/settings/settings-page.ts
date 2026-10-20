@@ -82,6 +82,7 @@ export class SettingsPage {
     effect(() => {
       if (this.auth.isAdmin()) {
         this.form.enable({ emitEvent: false });
+        this.lockExternalApprovals();
       } else {
         this.form.disable({ emitEvent: false });
       }
@@ -148,12 +149,19 @@ export class SettingsPage {
     }
   }
 
+  private lockExternalApprovals(): void {
+    for (const tool of this.tools.value().filter((t) => t.external)) {
+      this.form.controls.tools.controls[tool.name]?.controls.approval.disable({ emitEvent: false });
+    }
+  }
+
   private patch(settings: AgentSettings, tools: ToolInfo[]): void {
     const record = this.form.controls.tools;
     for (const tool of tools) {
+      // External (MCP) tools always need approval: the checkbox is shown checked and locked.
       const group = this.fb.group({
         enabled: !settings.disabledTools.includes(tool.name),
-        approval: settings.approvalTools.includes(tool.name),
+        approval: { value: tool.external || settings.approvalTools.includes(tool.name), disabled: tool.external },
       });
       if (record.contains(tool.name)) {
         record.setControl(tool.name, group);

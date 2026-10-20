@@ -122,6 +122,10 @@ public class KnowledgeBaseService {
                 .map(article -> new Hit(article.getId(), article.getTitle(), embeddedText(article), 0.0));
     }
 
+    public Optional<KnowledgeArticle> find(long id) {
+        return repository.findById(id);
+    }
+
     public List<KnowledgeArticle> findAll() {
         return repository.findAll();
     }

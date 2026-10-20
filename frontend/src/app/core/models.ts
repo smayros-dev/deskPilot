@@ -197,6 +197,8 @@ export interface ToolInfo {
   name: string;
   description: string;
   approvalByDefault: boolean;
+  /** Provided by an MCP server: always needs approval. */
+  external: boolean;
 }
 
 export interface Health {
