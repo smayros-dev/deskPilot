@@ -38,7 +38,7 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Cloud models (optional)**: admins can enable Mistral and Gemini (free tiers) on the Settings page and pick their models for chat, vision or an evaluation, next to the local Ollama models. Keys come from `MISTRAL_API_KEY` / `GEMINI_API_KEY` or are entered once in the UI, stored encrypted (AES-256-GCM) and never shown again. A warning reminds that questions, articles and tickets are then sent to that provider; the local model stays the default.
 - **Prompt & model experiments**: admins save named versions of the system prompt and run an A/B experiment between two variants (local or cloud model + optional prompt version, configurable split). Each conversation stays on its variant; the Experiments page compares success rate, escalations, latency (avg/p95), tokens and 👍/👎 per variant.
 - **Knowledge gaps**: every week (and on demand) questions that were escalated, rated 👎 or found nothing in the knowledge base are grouped by meaning; questions already covered by an article are skipped. On the Knowledge page reviewers let the model draft an article for a gap, edit it, and publish it to the knowledge base or dismiss it.
-- **Specialist agents (optional)**: with "Specialist agents" on in Settings, each message is routed to a network/VPN, accounts/MFA, hardware or software specialist (keywords first, then embedding similarity, then the conversation's previous specialist; optionally the model) with its own instructions, examples and tool subset. The hand-off is a step in the trace, the answer shows a 🧭 badge, and the dashboard breaks results down per specialist. Off by default until measured with an evaluation.
+- **Specialist agents**: with "Specialist agents" on in Settings (the default), each message is routed to a network/VPN, accounts/MFA, hardware or software specialist (keywords first, then embedding similarity, then the conversation's previous specialist; optionally the model) with its own instructions, examples and tool subset. The hand-off is a step in the trace, the answer shows a 🧭 badge, and the dashboard breaks results down per specialist. Measured: 25/25 scenarios with specialists vs 24/25 without, same latency.
 - **Grafana (optional)**: `docker compose --profile grafana up -d lgtm` in `backend/` starts Grafana at http://localhost:3000 (admin / admin) with a provisioned "DeskPilot — Agent" dashboard (success rate, p95 latency, outcomes, per model/provider, tokens, tools, feedback, approvals, guardrails) and alerts on success rate (< 70 % over 1 h) and p95 latency (> 2 min). Set `OTEL_METRICS_EXPORT_ENABLED=true` to send metrics.
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
@@ -158,7 +158,7 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `OTEL_METRICS_EXPORT_ENABLED` | `false` | Export Micrometer metrics over OTLP to Grafana (lgtm) |
 | `OTEL_METRICS_ENDPOINT` / `OTEL_METRICS_STEP` | `http://localhost:4328/v1/metrics` / `15s` | OTLP metrics endpoint (host port 4328, Jaeger keeps 4318) and export interval |
 | `KNOWLEDGE_GAPS_CRON` | `0 0 6 * * MON` | Weekly knowledge-gap detection (`-` = only on demand); thresholds under `agent.knowledge-gaps.*` |
-| `AGENT_SPECIALISTS` | `false` | Default of the "Specialist agents" setting; thresholds under `agent.specialists.*` |
+| `AGENT_SPECIALISTS` | `true` | Default of the "Specialist agents" setting; thresholds under `agent.specialists.*` |
 | `AGENT_SPECIALISTS_MODEL_FALLBACK` | `false` | Let the chat model pick a specialist when keywords and embeddings don't decide |
 
 ## Frontend pages
@@ -214,8 +214,20 @@ checked at the approval step and never created; evaluation runs do not count in 
 | + refined ticket reminder (ticket scenarios) | — | — | **4/4** | — | — |
 | + hybrid search (knowledge scenarios) | — | **11/13** | — | — | 62 s / — |
 | + self-check (knowledge + ticket scenarios) | — | **12/13** | **4/4** | — | ~110 s* / — |
+| 1.0.22, all features, specialists off | 24/25 (96%) | 12/13 | 4/4 | 2/2 | 84 s / 126 s |
+| 1.0.22, specialists on | **25/25 (100%)** | **13/13** | 4/4 | 2/2 | 81 s / 147 s |
 
 What the evaluation found and what fixed it:
+- **Specialist agents (2026-10-20)**: with routing on, all 25 scenarios pass; the one difference is "account locked", which the
+  Accounts & MFA specialist answers with the 30-minute wait (the general agent suggested a password reset). Routing was
+  right for all 24 routed questions: 21 by keywords, 3 by embedding similarity (correct specialist 0.73–0.95, runner-up
+  0.63–0.67, so the similarity threshold was raised from 0.6 to 0.7); the two off-topic or "talk to a person" messages
+  stayed with the general agent. One run each, so one scenario is within noise: specialists are on by default because
+  they did not lose anything, not because they are proven better.
+- **Knowledge-gap thresholds** checked with `nomic-embed-text`: paraphrases of the same question score 0.52–0.86 and
+  different questions at most 0.49, so questions are grouped from 0.55 (was 0.8, which grouped 2 of 13 paraphrase pairs).
+  Questions the knowledge base answers score 0.54–0.83 against their article and uncovered ones 0.45–0.60, so a question
+  counts as covered from 0.65 (was 0.75, which treated 8 of 13 answered questions as gaps).
 - **The model answered from general knowledge** in 7 of 13 knowledge questions: no search, invented procedures
   ("12 characters" instead of 14, a guest Wi-Fi without password) and copied the prompt's example citation `[4]`.
   Prompt v2 (no literal example, "search even if you think you know") helped a little; the **grounding check** — when a
@@ -306,6 +318,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.23** — Measured with the evaluation: specialist agents on by default (25/25 vs 24/25), routing similarity threshold 0.7; knowledge-gap thresholds tuned on real embeddings (grouping 0.55, covered 0.65).
 - **1.0.22** — Prompt versions and A/B experiments (12m, V18); knowledge-gap detection with model-drafted articles (12d, V19); Grafana dashboard and alerts with OTLP metrics (12p); optional supervisor + specialist agents with hand-off in the trace (12f, V20).
 - **1.0.21** — Optional cloud models: Mistral and Gemini through their OpenAI-compatible APIs, enabled and keyed from the Settings page (keys encrypted, V17), usable for chat, vision and evaluations (12s).
 - **1.0.20** — Conversation summaries (12h, V16); guardrails v2: rate limits, circuit breaker around the model, optional moderation, IBAN/phone redaction (12n); English/French/Arabic UI with right-to-left layout (12q); fix: the page no longer gets wider than the screen when the header is long.

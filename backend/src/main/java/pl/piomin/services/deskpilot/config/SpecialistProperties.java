@@ -18,8 +18,8 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties("agent.specialists")
 public record SpecialistProperties(
-        @DefaultValue("false") boolean enabled,
-        @DefaultValue("0.6") @DecimalMin("0.0") @DecimalMax("1.0") double minSimilarity,
+        @DefaultValue("true") boolean enabled,
+        @DefaultValue("0.7") @DecimalMin("0.0") @DecimalMax("1.0") double minSimilarity,
         @DefaultValue("0.03") @DecimalMin("0.0") @DecimalMax("1.0") double minMargin,
         @DefaultValue("false") boolean modelFallback) {
 }

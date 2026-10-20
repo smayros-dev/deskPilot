@@ -170,14 +170,17 @@ agent:
     # Unanswered questions grouped into gaps for reviewers (12d); "-" turns the weekly run off (manual detection stays).
     cron: ${KNOWLEDGE_GAPS_CRON:0 0 6 * * MON}
     lookback-days: 30
-    similarity: 0.8
+    # Measured with nomic-embed-text: same-topic questions 0.52-0.86, different topics at most 0.49.
+    similarity: 0.55
     min-questions: 2
-    covered-similarity: 0.75
+    # Questions the knowledge base answers score 0.54-0.83 against their article, uncovered ones 0.45-0.60.
+    covered-similarity: 0.65
   specialists:
-    # Supervisor + specialist agents (12f): default of the Settings toggle; off until measured with the evaluation.
-    enabled: ${AGENT_SPECIALISTS:false}
+    # Supervisor + specialist agents (12f): default of the Settings toggle (evaluation: 25/25 on vs 24/25 off).
+    enabled: ${AGENT_SPECIALISTS:true}
     # Route by meaning when a message is this similar to a specialist's examples and this far ahead of the next one.
-    min-similarity: 0.6
+    # Measured: the right specialist scored 0.73-0.95, the runner-up 0.63-0.67.
+    min-similarity: 0.7
     min-margin: 0.03
     # When keywords and meaning are inconclusive, ask the chat model to choose (one extra, slow call on CPU).
     model-fallback: ${AGENT_SPECIALISTS_MODEL_FALLBACK:false}

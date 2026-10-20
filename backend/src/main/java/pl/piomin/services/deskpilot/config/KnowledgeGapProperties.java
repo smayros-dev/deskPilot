@@ -23,8 +23,8 @@ import org.springframework.validation.annotation.Validated;
 public record KnowledgeGapProperties(
         @DefaultValue("0 0 6 * * MON") String cron,
         @DefaultValue("30") @Min(1) int lookbackDays,
-        @DefaultValue("0.8") @DecimalMin("0.0") @DecimalMax("1.0") double similarity,
+        @DefaultValue("0.55") @DecimalMin("0.0") @DecimalMax("1.0") double similarity,
         @DefaultValue("2") @Min(1) int minQuestions,
-        @DefaultValue("0.75") @DecimalMin("0.0") @DecimalMax("1.0") double coveredSimilarity,
+        @DefaultValue("0.65") @DecimalMin("0.0") @DecimalMax("1.0") double coveredSimilarity,
         @DefaultValue("500") @Min(1) int maxQuestions) {
 }
