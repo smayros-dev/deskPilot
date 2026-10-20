@@ -1,4 +1,8 @@
 agent:
+  # Rate limits have their own test; off for the others.
+  rate-limit:
+    per-minute: 0
+    per-day: 0
   notifications:
     enabled: false
   # Tests script the model; the grounding check has its own tests that switch it on.

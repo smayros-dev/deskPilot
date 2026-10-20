@@ -3,6 +3,8 @@ package pl.piomin.services.deskpilot.exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -45,6 +47,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "Bad request", e.getMessage());
     }
 
+    /** The circuit breaker refuses model calls for a while after several failures in a row. */
+    @ExceptionHandler(ModelUnavailableException.class)
+    ResponseEntity<ProblemDetail> handleCircuitOpen(ModelUnavailableException e) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(e.getRetryAfterSeconds()))
+                .body(circuitOpenProblem(e));
+    }
+
+    private static ProblemDetail circuitOpenProblem(ModelUnavailableException e) {
+        ProblemDetail problem = problem(HttpStatus.SERVICE_UNAVAILABLE, "Model unavailable", e.getMessage());
+        problem.setProperty("retryAfterSeconds", e.getRetryAfterSeconds());
+        return problem;
+    }
+
     /** The model server (Ollama) could not be reached or timed out. */
     @ExceptionHandler(ResourceAccessException.class)
     ProblemDetail handleModelUnavailable(ResourceAccessException e) {
@@ -62,6 +78,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case UnsupportedDocumentException u -> handleUnsupportedDocument(u);
             case IllegalArgumentException i -> handleIllegalArgument(i);
             case ResourceAccessException r -> handleModelUnavailable(r);
+            case ModelUnavailableException m -> circuitOpenProblem(m);
             default -> {
                 LOG.error("Request failed", e);
                 yield problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal error", "The request failed unexpectedly.");

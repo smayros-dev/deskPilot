@@ -59,12 +59,36 @@ class GuardrailServiceTest {
     }
 
     @Test
-    void redactsValidCardNumberButNotOtherNumbers() {
+    void redactsValidCardNumberAndPhoneButNotTicketNumbers() {
         GuardrailService.Sanitized result = guardrails.sanitizeOutput(
                 "Card 4111 1111 1111 1111, ticket 1234567890123, phone 0612345678.");
 
-        assertThat(result.redactions()).isEqualTo(1);
-        assertThat(result.text()).doesNotContain("4111 1111").contains("1234567890123", "0612345678");
+        assertThat(result.redactions()).isEqualTo(2);
+        assertThat(result.text()).doesNotContain("4111 1111", "0612345678").contains("1234567890123");
+    }
+
+    @Test
+    void redactsValidIbansOnly() {
+        GuardrailService.Sanitized result = guardrails.sanitizeOutput(
+                "Pay to FR76 3000 6000 0112 3456 7890 189 or DE89370400440532013000; not to FR00 1234 5678 9012 3456 7890 123.");
+
+        assertThat(result.redactions()).isEqualTo(2);
+        assertThat(result.text()).doesNotContain("FR76 3000", "DE8937").contains("FR00 1234 5678");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"+33 6 12 34 56 78", "+1 555 123 4567", "0049 30 1234 5678", "06.12.34.56.78", "+44 (0) 20 7946 0958"})
+    void redactsPhoneNumbers(String phone) {
+        GuardrailService.Sanitized result = guardrails.sanitizeOutput("Call me at " + phone + " please.");
+
+        assertThat(result.text()).isEqualTo("Call me at " + GuardrailService.REDACTED + " please.");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Error 0x80070005", "client version 5.2.8", "printer PRN-3-02", "ticket #1234", "wait 30 minutes",
+            "on 2026-10-20 at 08:30", "IP 10.0.12.34"})
+    void keepsOrdinaryNumbers(String text) {
+        assertThat(guardrails.sanitizeOutput(text).text()).isEqualTo(text);
     }
 
     @Test
