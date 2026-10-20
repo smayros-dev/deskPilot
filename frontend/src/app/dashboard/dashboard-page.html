@@ -137,6 +137,34 @@
       }
     </section>
 
+    @if (m.specialists?.length) {
+      <section class="card" aria-labelledby="specialists-title">
+        <h2 id="specialists-title">{{ i18n.t('dashboard.specialists') }}</h2>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{{ i18n.t('dashboard.colSpecialist') }}</th>
+              <th scope="col">{{ i18n.t('dashboard.colRuns') }}</th>
+              <th scope="col">{{ i18n.t('dashboard.colSuccess') }}</th>
+              <th scope="col">{{ i18n.t('dashboard.colEscalated') }}</th>
+              <th scope="col">{{ i18n.t('dashboard.colLatency') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of m.specialists; track row.specialist) {
+              <tr>
+                <th scope="row"><app-specialist-badge [specialist]="row.specialist" /></th>
+                <td>{{ row.runs }}</td>
+                <td [class.warn]="row.successRate < 0.8">{{ row.successRate | percent: '1.0-0' : i18n.locale() }}</td>
+                <td>{{ row.escalationRate | percent: '1.0-0' : i18n.locale() }}</td>
+                <td>{{ row.avgLatencyMillis | duration: i18n.lang() }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+    }
+
     <!-- Below the fold on small screens: only rendered once scrolled into view. -->
     @defer (on viewport) {
       <section class="card" aria-labelledby="tools-title">

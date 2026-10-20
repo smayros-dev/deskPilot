@@ -34,7 +34,7 @@ class RunResponseMapper {
                 : List.of();
         RunResponse.Stats stats = new RunResponse.Stats(run.getIterations(), run.getToolCalls(), run.getToolErrors(),
                 run.getPromptTokens(), run.getCompletionTokens(), run.getActiveMillis());
-        return new RunResponse(run.getId(), run.getSessionId(), run.getUserId(), run.getModel(), run.getStatus(), run.getUserInput(),
+        return new RunResponse(run.getId(), run.getSessionId(), run.getUserId(), run.getModel(), run.getSpecialist(), run.getStatus(), run.getUserInput(),
                 run.getFinalAnswer(), steps, pending, stats, run.getCreatedAt(), run.getCompletedAt(),
                 run.isFinished() ? feedbackService.find(run.getId()).map(RunResponseMapper::toFeedback).orElse(null) : null);
     }

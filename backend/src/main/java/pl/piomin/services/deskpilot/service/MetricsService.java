@@ -81,7 +81,12 @@ public class MetricsService {
                 (long) agentMetrics.guardrailBlockedTotal(),
                 tools,
                 models,
-                feedback());
+                feedback(),
+                runRepository.finishedTotalsBySpecialist().stream()
+                        .map(s -> new AgentMetricsResponse.SpecialistStats(s.getSpecialist(), s.getRuns(),
+                                ratio(s.getCompleted(), s.getRuns()), ratio(s.getEscalated(), s.getRuns()),
+                                average(s.getActiveMillis(), s.getRuns())))
+                        .toList());
     }
 
     private AgentMetricsResponse.FeedbackStats feedback() {

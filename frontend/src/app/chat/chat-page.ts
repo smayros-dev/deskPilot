@@ -11,6 +11,7 @@ import { Answer } from '../shared/answer';
 import { AutoScroll } from '../shared/auto-scroll';
 import { DurationPipe } from '../shared/duration-pipe';
 import { FeedbackButtons } from '../shared/feedback-buttons';
+import { SpecialistBadge, specialistLabel } from '../shared/specialist-badge';
 import { StatusBadge } from '../shared/status-badge';
 import { ApprovalCard } from './approval-card';
 import { ChatInput, ChatSubmission } from './chat-input';
@@ -21,7 +22,7 @@ const EXAMPLES: TranslationKey[] = ['chat.example1', 'chat.example2', 'chat.exam
 
 @Component({
   selector: 'app-chat-page',
-  imports: [ConversationList, FeedbackButtons, RouterLink, ChatInput, ApprovalCard, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe, Answer],
+  imports: [ConversationList, FeedbackButtons, RouterLink, ChatInput, ApprovalCard, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe, Answer, SpecialistBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.css',
@@ -59,6 +60,10 @@ export class ChatPage implements OnInit {
       void this.settings.load();
     }
     void this.store.init();
+  }
+
+  protected specialistName(id: string): string {
+    return specialistLabel(this.i18n, id);
   }
 
   protected hasScreenshot(run: Run): boolean {

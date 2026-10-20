@@ -12,6 +12,7 @@ public record RunResponse(
         String sessionId,
         String userId,
         String model,
+        String specialist,
         RunStatus status,
         String userInput,
         String answer,

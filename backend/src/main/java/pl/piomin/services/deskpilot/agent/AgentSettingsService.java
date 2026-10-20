@@ -10,6 +10,7 @@ import pl.piomin.services.deskpilot.agent.tool.ExternalTools;
 import pl.piomin.services.deskpilot.agent.tool.ToolRegistry;
 import pl.piomin.services.deskpilot.cloud.CloudProviderService;
 import pl.piomin.services.deskpilot.config.AgentProperties;
+import pl.piomin.services.deskpilot.config.SpecialistProperties;
 import pl.piomin.services.deskpilot.model.AgentSettings;
 import pl.piomin.services.deskpilot.repository.AgentSettingsRepository;
 
@@ -32,7 +33,7 @@ public class AgentSettingsService {
 
     public AgentSettingsService(AgentSettingsRepository repository, ModelCatalog modelCatalog, ToolRegistry toolRegistry,
                                 CloudProviderService cloudProviders,
-                                AgentProperties properties,
+                                AgentProperties properties, SpecialistProperties specialists,
                                 @Value("${spring.ai.ollama.chat.model}") String chatModel,
                                 @Value("${spring.ai.ollama.chat.temperature:0.2}") double temperature,
                                 @Value("${spring.ai.ollama.chat.think:false}") String think,
@@ -47,7 +48,7 @@ public class AgentSettingsService {
                 DEFAULT_MAX_OUTPUT_TOKENS, Boolean.parseBoolean(think), properties.maxIterations(),
                 properties.rag().topK(), properties.rag().similarityThreshold(), groundingCheck, properties.rag().hybridSearch(), selfCheck,
                 visionModel.isBlank() ? null : visionModel, "ollama", visionModel.isBlank() ? null : "ollama", Set.of(),
-                toolRegistry.defaultApprovalTools(), null);
+                toolRegistry.defaultApprovalTools(), null, specialists.enabled());
     }
 
     /** Current settings as an immutable snapshot for one run. */
@@ -139,6 +140,6 @@ public class AgentSettingsService {
         return new AgentConfig(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(), v.maxOutputTokens(),
                 v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
                 v.hybridSearch(), v.selfCheck(), v.visionModel(),
-                v.chatProvider(), v.visionProvider(), v.disabledTools(), v.approvalTools(), v.systemPrompt());
+                v.chatProvider(), v.visionProvider(), v.disabledTools(), v.approvalTools(), v.systemPrompt(), v.specialists());
     }
 }

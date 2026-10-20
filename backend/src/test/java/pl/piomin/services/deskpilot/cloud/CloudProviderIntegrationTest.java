@@ -218,7 +218,7 @@ class CloudProviderIntegrationTest {
     private static AgentSettingsDto withCloudModel(AgentSettingsDto s, String provider, String model) {
         return new AgentSettingsDto(model, s.temperature(), s.topP(), s.contextWindow(), s.maxOutputTokens(), false,
                 s.maxIterations(), s.ragTopK(), s.ragSimilarityThreshold(), s.groundingCheck(), s.hybridSearch(),
-                s.selfCheck(), null, provider, null, s.disabledTools(), s.approvalTools(), s.systemPrompt(), null);
+                s.selfCheck(), null, provider, null, s.disabledTools(), s.approvalTools(), s.systemPrompt(), s.specialists(), null);
     }
 
     private RestTestClient as(String username, String... roles) {

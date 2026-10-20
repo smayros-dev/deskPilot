@@ -3,6 +3,7 @@ package pl.piomin.services.deskpilot.service;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -58,6 +59,18 @@ public class RunService {
         run = runRepository.save(run);
         stepRepository.save(new AgentStep(run.getId(), StepType.USER_INPUT, null, userInput, false, 0));
         return run;
+    }
+
+    /** Records which specialist handles the run (12f). */
+    @Transactional
+    public void handOff(String runId, String specialist) {
+        get(runId).handOffTo(specialist);
+    }
+
+    /** Specialist of the latest other run of the conversation that was routed, if any. */
+    public Optional<String> previousSpecialist(String sessionId, String exceptRunId) {
+        return runRepository.findFirstBySessionIdAndSpecialistIsNotNullAndIdNotOrderByCreatedAtDesc(sessionId, exceptRunId)
+                .map(AgentRun::getSpecialist);
     }
 
     @Transactional

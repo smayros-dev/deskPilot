@@ -42,6 +42,7 @@ import pl.piomin.services.deskpilot.repository.AgentSessionRepository;
 import pl.piomin.services.deskpilot.repository.PendingTurnRepository;
 import pl.piomin.services.deskpilot.repository.TicketRepository;
 import pl.piomin.services.deskpilot.service.KnowledgeBaseService;
+import pl.piomin.services.deskpilot.service.MetricsService;
 import pl.piomin.services.deskpilot.service.RunService;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -105,6 +106,9 @@ class AgentOrchestratorTest {
 
     @Autowired
     private JdbcClient jdbcClient;
+
+    @Autowired
+    private MetricsService metricsService;
 
     private String sessionId;
 
@@ -458,7 +462,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("llama3.2:3b")).thenReturn(Optional.of(toolModel("llama3.2:3b")));
         AgentSettings.Values values = settingsService.get().values();
         settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true, true, false, null, "ollama", null,
-                Set.of("save_memory"), values.approvalTools(), "You are a terse helpdesk bot."));
+                Set.of("save_memory"), values.approvalTools(), "You are a terse helpdesk bot.", false));
         givenModelReplies(answer("Done."));
 
         AgentRun run = orchestrator.chat(sessionId, "Hi");
@@ -475,13 +479,56 @@ class AgentOrchestratorTest {
     }
 
     @Test
+    void supervisorHandsTheMessageToASpecialistWithItsPromptAndTools() {
+        setGroundingCheck(false);
+        setSpecialists(true);
+        givenModelReplies(
+                toolCall("", "save_memory", "{\"fact\":\"uses the reset page\"}"),
+                answer("Use the self-service reset page."));
+
+        AgentRun run = orchestrator.chat(sessionId, "I forgot my password, how do I reset it?");
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(runService.get(run.getId()).getSpecialist()).isEqualTo("accounts");
+        assertThat(stepTypes(run)).containsExactly(StepType.USER_INPUT, StepType.HANDOFF, StepType.TOOL_CALL,
+                StepType.TOOL_RESULT, StepType.ANSWER);
+        AgentStep handOff = steps(run).get(1);
+        assertThat(handOff.getName()).isEqualTo("accounts");
+        assertThat(handOff.getContent()).contains("Accounts & MFA", "keywords", "password");
+        // The accounts specialist may not store memories: the call is refused like a disabled tool.
+        AgentStep refused = steps(run).get(3);
+        assertThat(refused.isError()).isTrue();
+        assertThat(refused.getContent()).contains("Unknown or disabled tool 'save_memory'");
+
+        Prompt prompt = lastPrompt();
+        assertThat(prompt.getSystemMessage().getText()).startsWith("You are DeskPilot")
+                .contains("Accounts & MFA specialist", "I lost my phone with the authenticator app on it.");
+        assertThat(((ToolCallingChatOptions) prompt.getOptions()).getToolCallbacks()).extracting(t -> t.getToolDefinition().name())
+                .contains("search_knowledge_base", "create_ticket").doesNotContain("save_memory");
+        assertThat(metricsService.metrics().specialists())
+                .anySatisfy(s -> assertThat(s.specialist()).isEqualTo("accounts"));
+    }
+
+    @Test
+    void withoutSpecialistsTheRunHasNoHandOff() {
+        setGroundingCheck(false);
+        givenModelReplies(answer("Use the self-service reset page."));
+
+        AgentRun run = orchestrator.chat(sessionId, "I forgot my password");
+
+        assertThat(runService.get(run.getId()).getSpecialist()).isNull();
+        assertThat(stepTypes(run)).doesNotContain(StepType.HANDOFF);
+        assertThat(lastPrompt().getSystemMessage().getText()).doesNotContain("specialist");
+    }
+
+    @Test
     void approvalGateCanBeTurnedOffInSettings() {
         long ticketsBefore = ticketRepository.count();
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
                 v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.chatProvider(), v.visionProvider(),
-                v.disabledTools(), Set.of(), v.systemPrompt()));
+                v.disabledTools(), Set.of(), v.systemPrompt(), v.specialists()));
         givenModelReplies(
                 toolCall("", "create_ticket", "{\"title\":\"Mouse\",\"description\":\"Broken\",\"priority\":\"LOW\"}"),
                 answer("Ticket created."));
@@ -498,7 +545,7 @@ class AgentOrchestratorTest {
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
                 v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.chatProvider(), v.visionProvider(),
-                Set.of("escalate_to_human"), v.approvalTools(), v.systemPrompt()));
+                Set.of("escalate_to_human"), v.approvalTools(), v.systemPrompt(), v.specialists()));
         givenModelReplies(toolCall("", "escalate_to_human", "{\"reason\":\"x\"}"), answer("OK"));
 
         AgentRun run = orchestrator.chat(sessionId, "I want a human");
@@ -515,7 +562,7 @@ class AgentOrchestratorTest {
 
         assertThatThrownBy(() -> settingsService.update(new AgentSettings.Values("gemma:2b", v.temperature(), v.topP(),
                 v.contextWindow(), v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(),
-                v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.chatProvider(), v.visionProvider(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
+                v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.chatProvider(), v.visionProvider(), v.disabledTools(), v.approvalTools(), v.systemPrompt(), v.specialists())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not support tool calling");
     }
@@ -651,7 +698,16 @@ class AgentOrchestratorTest {
         when(modelCatalog.find(v.chatModel())).thenReturn(Optional.of(toolModel(v.chatModel())));
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
                 v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), grounding,
-                v.hybridSearch(), selfCheck, v.visionModel(), v.chatProvider(), v.visionProvider(), v.disabledTools(), v.approvalTools(), v.systemPrompt()));
+                v.hybridSearch(), selfCheck, v.visionModel(), v.chatProvider(), v.visionProvider(), v.disabledTools(), v.approvalTools(), v.systemPrompt(), v.specialists()));
+    }
+
+    private void setSpecialists(boolean on) {
+        AgentSettings.Values v = settingsService.get().values();
+        when(modelCatalog.find(v.chatModel())).thenReturn(Optional.of(toolModel(v.chatModel())));
+        settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(),
+                v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.visionModel(), v.chatProvider(), v.visionProvider(),
+                v.disabledTools(), v.approvalTools(), v.systemPrompt(), on));
     }
 
     private void setVisionModel(String model) {
@@ -664,7 +720,7 @@ class AgentOrchestratorTest {
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
                 v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(),
                 v.groundingCheck(), v.hybridSearch(), v.selfCheck(), model, v.chatProvider(), "ollama", v.disabledTools(), v.approvalTools(),
-                v.systemPrompt()));
+                v.systemPrompt(), v.specialists()));
     }
 
     private static ModelCatalog.ModelInfo toolModel(String name) {

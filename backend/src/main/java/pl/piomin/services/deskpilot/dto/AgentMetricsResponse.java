@@ -27,7 +27,8 @@ public record AgentMetricsResponse(
         long inputsBlockedSinceStart,
         List<ToolStats> tools,
         List<ModelStats> models,
-        FeedbackStats feedback) {
+        FeedbackStats feedback,
+        List<SpecialistStats> specialists) {
 
     /**
      * Users' ratings of answers.
@@ -43,6 +44,11 @@ public record AgentMetricsResponse(
     /** Per-model comparison over finished runs: the data to choose a model on. */
     public record ModelStats(String model, long runs, double successRate, double avgLatencyMillis,
                              double avgIterations, double avgTokens) {
+    }
+
+    /** Per-specialist comparison over finished chat runs that were routed (12f). */
+    public record SpecialistStats(String specialist, long runs, double successRate, double escalationRate,
+                                  double avgLatencyMillis) {
     }
 
     public record ToolStats(String tool, long calls, long errors, double accuracy, double avgMillis) {

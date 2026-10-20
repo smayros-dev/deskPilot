@@ -1,5 +1,6 @@
 package pl.piomin.services.deskpilot.agent;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -24,27 +25,40 @@ public record AgentConfig(
         String visionProvider,
         Set<String> disabledTools,
         Set<String> approvalTools,
-        String systemPrompt) {
+        String systemPrompt,
+        boolean specialists) {
 
     /** The same settings with another chat model, e.g. to evaluate a model without switching the live agent. */
     public AgentConfig withChatModel(String model) {
         return new AgentConfig(model, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations, ragTopK,
                 ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, chatProvider, visionProvider, disabledTools, approvalTools,
-                systemPrompt);
+                systemPrompt, specialists);
     }
 
     /** The same settings with another provider and model, e.g. to evaluate a cloud model. */
     public AgentConfig withChat(String provider, String model) {
         return new AgentConfig(model, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations, ragTopK,
                 ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, provider, visionProvider,
-                disabledTools, approvalTools, systemPrompt);
+                disabledTools, approvalTools, systemPrompt, specialists);
     }
 
     /** The same settings with another system prompt (null = the built-in one), e.g. for an experiment variant. */
     public AgentConfig withSystemPrompt(String prompt) {
         return new AgentConfig(chatModel, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations, ragTopK,
                 ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, chatProvider, visionProvider,
-                disabledTools, approvalTools, prompt);
+                disabledTools, approvalTools, prompt, specialists);
+    }
+
+    /**
+     * The settings a specialist works with (12f): its system prompt (the base prompt plus the specialist's part) and
+     * the tools it may not use on top of those disabled in the settings.
+     */
+    public AgentConfig forSpecialist(String prompt, Set<String> moreDisabledTools) {
+        Set<String> disabled = new HashSet<>(disabledTools);
+        disabled.addAll(moreDisabledTools);
+        return new AgentConfig(chatModel, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations, ragTopK,
+                ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, visionModel, chatProvider, visionProvider,
+                Set.copyOf(disabled), approvalTools, prompt, specialists);
     }
 
     /** Settings for reading a screenshot: the vision provider and model take the place of the chat ones. */

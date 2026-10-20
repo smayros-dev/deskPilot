@@ -25,6 +25,7 @@ const SETTINGS: AgentSettings = {
   groundingCheck: true,
   hybridSearch: true,
   selfCheck: true,
+  specialists: false,
   visionModel: null,
   visionProvider: null,
   disabledTools: [],
@@ -172,6 +173,7 @@ const MISTRAL: ProviderStatus = {
     approval.click();
     const enabled = element.querySelector<HTMLInputElement>('input[aria-label="Enable search_knowledge_base"]')!;
     enabled.click();
+    element.querySelector<HTMLInputElement>('input[formControlName=specialists]')!.click();
     await fixture.whenStable();
     expect(fixture.componentInstance.hasUnsavedChanges()).toBe(true);
 
@@ -182,6 +184,7 @@ const MISTRAL: ProviderStatus = {
       ...SETTINGS,
       updatedAt: undefined,
       chatModel: 'qwen3:4b',
+      specialists: true,
       disabledTools: ['search_knowledge_base'],
       approvalTools: ['mcp_github_create_issue'], // external tools always need approval
     });

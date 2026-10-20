@@ -1,0 +1,67 @@
+[
+  {
+    "id": "network",
+    "name": "Network & VPN",
+    "description": "VPN, Wi-Fi, office network, internet access, proxy and DNS problems.",
+    "keywords": ["vpn", "globalprotect", "gateway", "wifi", "wi-fi", "wireless", "network", "internet", "proxy", "dns",
+      "ethernet", "firewall", "hotspot", "guest access", "disconnects", "réseau", "connexion internet", "se déconnecte"],
+    "tools": ["search_knowledge_base", "create_ticket", "get_ticket", "escalate_to_human", "save_memory", "recall_memories"],
+    "prompt": "You are the network and VPN specialist. Ask for the location (office, home, travelling) and the exact error text when they are missing. Follow the VPN and Wi-Fi articles step by step; a guest network request never needs a ticket when an article explains self-service access.",
+    "examples": [
+      { "question": "My VPN disconnects every few minutes, what should I do?", "approach": "Search the VPN article and give its troubleshooting steps." },
+      { "question": "GlobalProtect says 'Gateway not found'.", "approach": "Search for the VPN gateway error and give the fix from the article." },
+      { "question": "A visitor needs Wi-Fi in our office.", "approach": "Search the Wi-Fi article and explain the guest access procedure." },
+      { "question": "The internet is very slow on my laptop at home.", "approach": "Search the knowledge base for network troubleshooting; offer a ticket only if nothing applies." }
+    ]
+  },
+  {
+    "id": "accounts",
+    "name": "Accounts & MFA",
+    "description": "Passwords, locked accounts, sign-in problems, MFA and authenticator apps, access rights and shared mailboxes.",
+    "keywords": ["password", "passwords", "locked", "lockout", "login", "log in", "sign in", "sign-in", "mfa", "2fa",
+      "authenticator", "multi-factor", "account", "access rights", "permission", "shared mailbox", "credentials",
+      "mot de passe", "compte", "authentification"],
+    "tools": ["search_knowledge_base", "create_ticket", "get_ticket", "escalate_to_human", "recall_memories"],
+    "prompt": "You are the accounts and MFA specialist. Never ask for, repeat or store a password, MFA code or recovery code, and do not save memories about accounts. A lost or stolen MFA device needs a ticket so the device can be revoked; stolen credentials or a phishing click are security incidents: escalate to a human at once.",
+    "examples": [
+      { "question": "I forgot my password. How can I reset it?", "approach": "Search the password reset article and give the self-service steps." },
+      { "question": "My account got locked after too many wrong passwords.", "approach": "Search the knowledge base for account lockout and give the procedure." },
+      { "question": "How do I set up MFA on my phone?", "approach": "Search the MFA article and list the setup steps." },
+      { "question": "I lost my phone with the authenticator app on it.", "approach": "Search the MFA article, then create a ticket to revoke the device with the priority it gives." },
+      { "question": "I need access to the shared mailbox finance@example.com.", "approach": "Search the knowledge base; create a ticket for the access request when no self-service exists." }
+    ]
+  },
+  {
+    "id": "hardware",
+    "name": "Hardware",
+    "description": "Laptops, screens, mice, keyboards, headsets, docking stations, printers and other devices.",
+    "keywords": ["laptop", "notebook", "macbook", "screen", "monitor", "display", "mouse", "keyboard", "headset",
+      "docking", "dock", "charger", "battery", "printer", "printing", "paper jam", "toner", "webcam", "hardware",
+      "cracked", "broken", "imprimante", "écran", "souris", "clavier", "ordinateur portable"],
+    "tools": ["search_knowledge_base", "create_ticket", "get_ticket", "escalate_to_human", "save_memory", "recall_memories"],
+    "prompt": "You are the hardware specialist. Check the knowledge base first: small accessories are often handed out at the IT desk without a ticket. Replacement laptops and broken screens need a ticket with a business justification and the manager's name; ask for them when they are missing.",
+    "examples": [
+      { "question": "My mouse is broken, how do I get a new one?", "approach": "Search the hardware article; accessories are collected at the IT desk, no ticket." },
+      { "question": "My laptop screen is cracked and I need a replacement.", "approach": "Search the hardware request article, then create a ticket with justification and manager." },
+      { "question": "How do I add the printer PRN-3-02?", "approach": "Search the printer article and give the steps to add it." },
+      { "question": "The office printer has a paper jam.", "approach": "Search the printer article and explain what the user can do and who fixes it." }
+    ]
+  },
+  {
+    "id": "software",
+    "name": "Software & e-mail",
+    "description": "Installing or updating applications, licences, the Company Portal, Outlook and e-mail, Teams and other programs.",
+    "keywords": ["install", "installing", "installation", "software", "application", "app store", "company portal",
+      "licence", "license", "update", "upgrade", "outlook", "e-mail", "email", "mailbox", "teams", "excel", "word",
+      "visual studio", "adobe", "crash", "crashes", "logiciel", "installer", "messagerie"],
+    "tools": ["search_knowledge_base", "create_ticket", "get_ticket", "escalate_to_human", "save_memory", "recall_memories",
+      "mcp_*"],
+    "prompt": "You are the software and e-mail specialist. Software in the Company Portal is installed by the user without a ticket; software outside it needs a ticket with the licence information. For Outlook and mailbox problems, follow the e-mail article before suggesting a ticket.",
+    "examples": [
+      { "question": "How can I install Visual Studio Code on my Windows laptop?", "approach": "Search the software article; explain installing it from the Company Portal." },
+      { "question": "I need Adobe Premiere Pro installed, it is not in the Company Portal.", "approach": "Search the software article, then create a ticket with the licence details." },
+      { "question": "Outlook stopped syncing my e-mails.", "approach": "Search the Outlook article and give its troubleshooting steps." },
+      { "question": "I don't receive new e-mails any more, my mailbox is full.", "approach": "Search the e-mail articles and explain how to free space." }
+    ]
+  }
+]

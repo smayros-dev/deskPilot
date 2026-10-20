@@ -2,6 +2,7 @@ package pl.piomin.services.deskpilot.repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -13,6 +14,8 @@ import pl.piomin.services.deskpilot.model.RunStatus;
 public interface AgentRunRepository extends JpaRepository<AgentRun, String> {
 
     List<AgentRun> findBySessionIdOrderByCreatedAtAsc(String sessionId);
+
+    Optional<AgentRun> findFirstBySessionIdAndSpecialistIsNotNullAndIdNotOrderByCreatedAtDesc(String sessionId, String id);
 
     interface SessionRunCount {
         String getSessionId();
@@ -79,6 +82,29 @@ public interface AgentRunRepository extends JpaRepository<AgentRun, String> {
             from AgentRun r where r.completedAt is not null and r.source = pl.piomin.services.deskpilot.model.RunSource.CHAT
             group by coalesce(r.model, 'unknown') order by count(r) desc""")
     List<ModelTotals> finishedTotalsByModel();
+
+    interface SpecialistTotals {
+        String getSpecialist();
+
+        long getRuns();
+
+        long getCompleted();
+
+        long getEscalated();
+
+        long getActiveMillis();
+    }
+
+    /** Finished chat runs per specialist (12f); runs made without routing are left out. */
+    @Query("""
+            select r.specialist as specialist, count(r) as runs,
+                   sum(case when r.status = pl.piomin.services.deskpilot.model.RunStatus.COMPLETED then 1 else 0 end) as completed,
+                   sum(case when r.status = pl.piomin.services.deskpilot.model.RunStatus.ESCALATED then 1 else 0 end) as escalated,
+                   sum(r.activeMillis) as activeMillis
+            from AgentRun r where r.completedAt is not null and r.specialist is not null
+              and r.source = pl.piomin.services.deskpilot.model.RunSource.CHAT
+            group by r.specialist order by count(r) desc""")
+    List<SpecialistTotals> finishedTotalsBySpecialist();
 
     interface VariantTotals {
         String getVariant();

@@ -170,6 +170,14 @@ agent:
     similarity: 0.8
     min-questions: 2
     covered-similarity: 0.75
+  specialists:
+    # Supervisor + specialist agents (12f): default of the Settings toggle; off until measured with the evaluation.
+    enabled: ${AGENT_SPECIALISTS:false}
+    # Route by meaning when a message is this similar to a specialist's examples and this far ahead of the next one.
+    min-similarity: 0.6
+    min-margin: 0.03
+    # When keywords and meaning are inconclusive, ask the chat model to choose (one extra, slow call on CPU).
+    model-fallback: ${AGENT_SPECIALISTS_MODEL_FALLBACK:false}
   # Default of the Settings toggle: remind the model to search the knowledge base before answering or opening a ticket.
   grounding-check: true
   # Default of the Settings toggle: check answers and ticket requests against the retrieved articles.
