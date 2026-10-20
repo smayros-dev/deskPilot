@@ -28,6 +28,9 @@ describe('KnowledgePage', () => {
     if (roles.includes('admin')) {
       http.expectOne('/api/knowledge-base/documents').flush([]);
     }
+    if (roles.includes('admin') || roles.includes('reviewer')) {
+      http.expectOne('/api/knowledge-gaps').flush([]);
+    }
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
   }
@@ -50,5 +53,15 @@ describe('KnowledgePage', () => {
     TestBed.resetTestingModule();
     const adminView = await render(['user', 'admin']);
     expect(adminView.querySelector('app-documents-panel')).not.toBeNull();
+  });
+
+  it('shows knowledge gaps to reviewers, without the documents panel', async () => {
+    const userView = await render(['user']);
+    expect(userView.querySelector('app-knowledge-gaps-panel')).toBeNull();
+
+    TestBed.resetTestingModule();
+    const reviewerView = await render(['user', 'reviewer']);
+    expect(reviewerView.querySelector('app-knowledge-gaps-panel')).not.toBeNull();
+    expect(reviewerView.querySelector('app-documents-panel')).toBeNull();
   });
 });
