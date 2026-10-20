@@ -37,6 +37,8 @@ export const SEARCH_DEBOUNCE_MS = 300;
             </button>
             <button type="button" class="link-button edit" [attr.aria-label]="'Rename ' + (conversation.title ?? 'conversation')"
                     (click)="editing.set(conversation.id)">✏️</button>
+            <button type="button" class="link-button edit" [attr.aria-label]="'Delete ' + (conversation.title ?? 'conversation')"
+                    [disabled]="store.sending()" (click)="remove(conversation)">🗑️</button>
           }
         </li>
       } @empty {
@@ -89,6 +91,22 @@ export class ConversationList {
   protected open(conversation: Session): void {
     if (conversation.id !== this.store.session()?.id) {
       void this.store.open(conversation.id);
+    }
+  }
+
+  /** Deletes the conversation and its messages for good (privacy); the current one is replaced by a new one. */
+  protected async remove(conversation: Session): Promise<void> {
+    if (!confirm(`Delete "${conversation.title ?? 'this conversation'}" and all its messages? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      await firstValueFrom(this.api.deleteSession(conversation.id));
+      if (conversation.id === this.store.session()?.id) {
+        await this.store.newConversation();
+      }
+      this.conversations.reload();
+    } catch {
+      // Toast shown by the error interceptor (e.g. 409 while the agent is working on it).
     }
   }
 

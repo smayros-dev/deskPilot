@@ -29,6 +29,9 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **MCP**: DeskPilot's read-only knowledge-base tools are available to other agents and IDEs over the Model Context Protocol, and tools of external MCP servers can be given to the agent (always behind the approval gate).
 - **Document upload**: admins add PDF, Markdown, text or HTML files (up to 10 MB) on the Knowledge base page; they are split into articles (by page or heading, with overlapping chunks), embedded, and searched like the built-in articles.
 - **Screenshots**: users attach or paste a screenshot of an error; the vision model chosen in Settings (e.g. `gemma4:26b`) transcribes it, and the agent works with that text (marked as data). The image is not stored; the trace keeps what was read.
+- **Conversation history**: past conversations in the chat sidebar, titled after their first question; search, reopen, rename, delete.
+- **Notifications**: reviewers get an e-mail when an action waits for approval, requesters when their ticket is created, and admins when an approval waits longer than the SLA (default 30 min). Optional Slack/Teams webhook. In development the e-mails land in Mailpit: http://localhost:8026.
+- **Audit & privacy**: an audit trail of approvals, settings changes, documents, evaluations and data deletions (admin Audit page with CSV export); users can download everything stored about them and delete their conversations and memories (tickets stay with the helpdesk); optional retention (`agent.retention.conversations-days`).
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -111,7 +114,7 @@ The Keycloak realm (`backend/keycloak/deskpilot-realm.json`) is imported on firs
 | `bob` / `bob` | user, reviewer | Also approve or reject agent actions on the **Approvals** page, see all tickets |
 | `admin` / `admin` | user, reviewer, admin | Also change the agent settings and switch the model |
 
-Keycloak's own console is at http://localhost:8180 (admin / admin). Traces are in Jaeger at http://localhost:16686 (service `deskpilot`, one trace per agent run, with the model and tool calls as spans).
+Keycloak's own console is at http://localhost:8180 (admin / admin). E-mails sent in development are in Mailpit at http://localhost:8026 (if the development containers were already running, start Mailpit once with `docker compose up -d` in `backend/`). Traces are in Jaeger at http://localhost:16686 (service `deskpilot`, one trace per agent run, with the model and tool calls as spans).
 
 > Spring Boot only runs `docker compose up` when none of the project's containers are running. If Postgres was
 > already up from an earlier version, start Keycloak once with `docker compose up -d` in `backend/`.
@@ -130,6 +133,12 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `AGENT_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model for RAG |
 | `AGENT_THINK` | `false` | qwen3 reasoning mode. About 15x slower on CPU; enable on a GPU |
 | `AGENT_VISION_MODEL` | (empty) | Default vision model for screenshots, e.g. `gemma4:26b`; empty = off (can be set on the Settings page) |
+| `NOTIFICATIONS_ENABLED` | `true` | E-mail/webhook notifications |
+| `NOTIFICATIONS_REVIEWERS` / `NOTIFICATIONS_ADMINS` | `bob@example.com,admin@example.com` / `admin@example.com` | Who gets approval requests / SLA escalations |
+| `NOTIFICATIONS_APPROVAL_SLA` | `PT30M` | Escalate approvals waiting longer than this |
+| `NOTIFICATIONS_WEBHOOK_URL` | (empty) | Slack/Teams incoming webhook |
+| `NOTIFICATIONS_BASE_URL` | `http://localhost:4200` | Base of the links in e-mails |
+| `MAIL_HOST` / `MAIL_PORT` | `localhost` / `1026` | SMTP server (Mailpit in development) |
 | `DESKPILOT_ISSUER_URI` | `http://localhost:8180/realms/deskpilot` | OIDC issuer whose tokens the API accepts |
 | `OTEL_TRACES_ENDPOINT` | `http://localhost:4318/v1/traces` | OTLP endpoint for traces (Jaeger) |
 | `TRACING_EXPORT_ENABLED` | `true` | Set to `false` to stop exporting traces |
@@ -248,7 +257,11 @@ OLLAMA_IT=true ./mvnw test -Dtest="*SmokeTest"   # real local model: chat, RAG, 
 | `POST` | `/api/sessions` | Start a conversation for the signed-in user |
 | `POST` | `/api/sessions/{id}/messages` | Ask the agent (`{"message": "...", "image": {"mimeType": "image/png", "data": "<base64>"}}`, image optional) → run with trace |
 | `POST` | `/api/sessions/{id}/messages/stream` | Same, as `text/event-stream`: `run`, `thinking`, `step`… then `done` (final run) or `error` (Problem Detail) |
-| `GET` | `/api/sessions/{id}/runs` | Conversation history |
+| `GET` | `/api/sessions/{id}/runs` | Messages of a conversation |
+| `GET` | `/api/sessions?q=` | Your conversations, newest first (search in titles and questions) |
+| `PATCH` `DELETE` | `/api/sessions/{id}` | Rename (`{"title": "..."}`) or delete a conversation (409 while it is working or waiting for approval) |
+| `GET` `DELETE` | `/api/me/export`, `/api/me/data`, `/api/me/memories[/{id}]` | Download your data; delete your conversations and memories |
+| `GET` | `/api/audit`, `/api/audit/export` | Admins: audit trail (filters action, actor, from, to; paging) and CSV export |
 | `GET` | `/api/runs/{id}` | One run with its steps |
 | `GET` `POST` `DELETE` | `/api/knowledge-base/documents`, `/{id}`, `POST /{id}/reindex` | Admins: upload (multipart `file`, optional `title`), list, re-index and delete documents |
 | `GET` | `/api/events` | Live updates as Server-Sent Events: `run` (your runs), `ticket` (your tickets; all for reviewers), `approvals` (`{"pending": n}`, reviewers) |
@@ -269,6 +282,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.19** — Conversation history (12r, V13), audit trail and privacy controls (12o, V14), e-mail/webhook notifications with Mailpit and an approval SLA (12j, V15).
 - **1.0.18** — Document ingestion (12b): PDF/Markdown/text/HTML uploads split into searchable articles (Flyway V12).
 - **1.0.17** — Screenshots (12e): attach or paste an error screenshot; a vision model from the Settings (Flyway V11) reads it before the agent starts.
 - **1.0.16** — Self-check of answers and tickets (12g, Flyway V10); real-time updates over a per-user SSE channel with a live approval badge (12k); MCP server for the knowledge base and MCP client for external tools behind the approval gate (12i).

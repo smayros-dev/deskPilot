@@ -7,10 +7,12 @@ import java.util.Map;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import pl.piomin.services.deskpilot.agent.AgentOrchestrator;
@@ -31,6 +34,7 @@ import pl.piomin.services.deskpilot.exception.GlobalExceptionHandler;
 import pl.piomin.services.deskpilot.exception.NotFoundException;
 import pl.piomin.services.deskpilot.model.AgentSession;
 import pl.piomin.services.deskpilot.notifications.ContactService;
+import pl.piomin.services.deskpilot.service.PrivacyService;
 import pl.piomin.services.deskpilot.service.RunService;
 
 /** Conversations of the authenticated user; other users' sessions answer 404. */
@@ -45,16 +49,18 @@ public class SessionController {
     private final RunResponseMapper mapper;
     private final ContactService contacts;
     private final GlobalExceptionHandler errors;
+    private final PrivacyService privacyService;
 
     public SessionController(SessionService sessionService, AgentOrchestrator orchestrator, RunService runService,
                              RunResponseMapper mapper, GlobalExceptionHandler errors,
-                             ContactService contacts) {
+                             ContactService contacts, PrivacyService privacyService) {
         this.contacts = contacts;
         this.sessionService = sessionService;
         this.orchestrator = orchestrator;
         this.runService = runService;
         this.mapper = mapper;
         this.errors = errors;
+        this.privacyService = privacyService;
     }
 
     /** Starts a conversation for the caller; the user id comes from the token, never from the request. */
@@ -107,6 +113,13 @@ public class SessionController {
     public List<RunResponse> runs(@PathVariable String sessionId, Authentication authentication) {
         ownSession(sessionId, authentication);
         return runService.findBySession(sessionId).stream().map(mapper::toResponse).toList();
+    }
+
+    /** Deletes the caller's conversation with its runs, trace, feedback and short-term memory (409 while busy). */
+    @DeleteMapping("/{sessionId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable String sessionId, Authentication authentication) {
+        privacyService.deleteConversation(sessionId, authentication.getName());
     }
 
     private AgentSession ownSession(String sessionId, Authentication authentication) {

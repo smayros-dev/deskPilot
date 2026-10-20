@@ -43,6 +43,7 @@ export class App {
     { path: '/helpdesk/knowledge', label: 'Knowledge base' },
     { path: '/helpdesk/memories', label: 'My memories' },
     { path: '/evaluation', label: 'Evaluation', role: 'admin' },
+    { path: '/audit', label: 'Audit', role: 'admin' },
     { path: '/settings', label: 'Settings' },
   ];
 

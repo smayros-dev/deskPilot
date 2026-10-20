@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import pl.piomin.services.deskpilot.model.AgentRun;
 import pl.piomin.services.deskpilot.model.RunSource;
@@ -21,6 +22,10 @@ public interface AgentRunRepository extends JpaRepository<AgentRun, String> {
 
     @Query("select r.sessionId as sessionId, count(r) as runs from AgentRun r where r.sessionId in :sessionIds group by r.sessionId")
     List<SessionRunCount> countBySession(Collection<String> sessionIds);
+
+    @Modifying
+    @Query("delete from AgentRun r where r.sessionId = :sessionId")
+    int deleteBySessionId(String sessionId);
 
     List<AgentRun> findByStatusIn(List<RunStatus> statuses);
 

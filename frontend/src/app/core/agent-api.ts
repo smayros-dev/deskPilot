@@ -17,6 +17,11 @@ export class AgentApi {
     return this.http.post<Session>(`${this.config.baseUrl}/sessions`, null);
   }
 
+  /** Deletes the conversation with its messages (refused with 409 while the agent works on it or waits for approval). */
+  deleteSession(sessionId: string): Observable<void> {
+    return this.http.delete<void>(`${this.config.baseUrl}/sessions/${sessionId}`);
+  }
+
   renameSession(sessionId: string, title: string): Observable<Session> {
     return this.http.patch<Session>(`${this.config.baseUrl}/sessions/${sessionId}`, { title });
   }

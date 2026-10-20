@@ -3,6 +3,7 @@ package pl.piomin.services.deskpilot.controller;
 import java.util.List;
 
 import jakarta.validation.Valid;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -14,6 +15,8 @@ import pl.piomin.services.deskpilot.agent.ModelCatalog;
 import pl.piomin.services.deskpilot.agent.tool.ToolRegistry;
 import pl.piomin.services.deskpilot.dto.AgentSettingsDto;
 import pl.piomin.services.deskpilot.dto.ToolInfo;
+import pl.piomin.services.deskpilot.model.AuditAction;
+import pl.piomin.services.deskpilot.service.AuditService;
 
 /** Runtime configuration of the agent: model, sampling, RAG, tools. Changes apply to the next run. */
 @RestController
@@ -23,11 +26,14 @@ public class SettingsController {
     private final AgentSettingsService settingsService;
     private final ModelCatalog modelCatalog;
     private final ToolRegistry toolRegistry;
+    private final AuditService auditService;
 
-    public SettingsController(AgentSettingsService settingsService, ModelCatalog modelCatalog, ToolRegistry toolRegistry) {
+    public SettingsController(AgentSettingsService settingsService, ModelCatalog modelCatalog, ToolRegistry toolRegistry,
+                              AuditService auditService) {
         this.settingsService = settingsService;
         this.modelCatalog = modelCatalog;
         this.toolRegistry = toolRegistry;
+        this.auditService = auditService;
     }
 
     @GetMapping("/settings")
@@ -36,14 +42,24 @@ public class SettingsController {
     }
 
     @PutMapping("/settings")
-    public AgentSettingsDto update(@Valid @RequestBody AgentSettingsDto request) {
-        return AgentSettingsDto.of(settingsService.update(request.toValues()));
+    public AgentSettingsDto update(@Valid @RequestBody AgentSettingsDto request, Authentication authentication) {
+        AgentSettingsDto before = AgentSettingsDto.of(settingsService.get());
+        AgentSettingsDto after = AgentSettingsDto.of(settingsService.update(request.toValues()));
+        String changes = AuditService.diff(before, after, "updatedAt");
+        if (!changes.isEmpty()) {
+            auditService.record(authentication.getName(), AuditAction.SETTINGS_CHANGED, "settings", null, changes);
+        }
+        return after;
     }
 
     /** Restores the defaults from application.yml. */
     @DeleteMapping("/settings")
-    public AgentSettingsDto reset() {
-        return AgentSettingsDto.of(settingsService.reset());
+    public AgentSettingsDto reset(Authentication authentication) {
+        AgentSettingsDto before = AgentSettingsDto.of(settingsService.get());
+        AgentSettingsDto after = AgentSettingsDto.of(settingsService.reset());
+        auditService.record(authentication.getName(), AuditAction.SETTINGS_RESET, "settings", null,
+                AuditService.diff(before, after, "updatedAt"));
+        return after;
     }
 
     /** Models installed in Ollama, with their capabilities. */

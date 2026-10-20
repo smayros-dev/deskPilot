@@ -1,6 +1,7 @@
 package pl.piomin.services.deskpilot.controller;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -23,7 +24,9 @@ import pl.piomin.services.deskpilot.dto.RunResponse;
 import pl.piomin.services.deskpilot.exception.GlobalExceptionHandler;
 import pl.piomin.services.deskpilot.exception.NotFoundException;
 import pl.piomin.services.deskpilot.model.AgentRun;
+import pl.piomin.services.deskpilot.model.AuditAction;
 import pl.piomin.services.deskpilot.security.CurrentUser;
+import pl.piomin.services.deskpilot.service.AuditService;
 import pl.piomin.services.deskpilot.service.FeedbackService;
 import pl.piomin.services.deskpilot.service.RunService;
 
@@ -35,14 +38,17 @@ public class RunController {
     private final AgentOrchestrator orchestrator;
     private final RunResponseMapper mapper;
     private final GlobalExceptionHandler errors;
+    private final AuditService auditService;
     private final FeedbackService feedbackService;
 
     public RunController(RunService runService, AgentOrchestrator orchestrator, RunResponseMapper mapper,
-                         GlobalExceptionHandler errors, FeedbackService feedbackService) {
+                         GlobalExceptionHandler errors, FeedbackService feedbackService,
+                         AuditService auditService) {
         this.runService = runService;
         this.orchestrator = orchestrator;
         this.mapper = mapper;
         this.errors = errors;
+        this.auditService = auditService;
         this.feedbackService = feedbackService;
     }
 
@@ -80,8 +86,11 @@ public class RunController {
     @PostMapping("/{runId}/approval")
     public RunResponse decide(@PathVariable String runId, @Valid @RequestBody ApprovalRequest request,
                               Authentication authentication) {
-        return mapper.toResponse(orchestrator.decide(runId,
-                new AgentOrchestrator.ApprovalDecision(request.approved(), request.comment(), authentication.getName())));
+        String tools = pendingTools(runId);
+        AgentRun run = orchestrator.decide(runId,
+                new AgentOrchestrator.ApprovalDecision(request.approved(), request.comment(), authentication.getName()));
+        auditDecision(authentication.getName(), runId, request, tools);
+        return mapper.toResponse(run);
     }
 
     /** Same as {@link #decide}, streamed as Server-Sent Events while the run continues (see {@link RunStream}). */
@@ -90,6 +99,23 @@ public class RunController {
                                    Authentication authentication) {
         AgentOrchestrator.ApprovalDecision decision =
                 new AgentOrchestrator.ApprovalDecision(request.approved(), request.comment(), authentication.getName());
-        return RunStream.start(mapper, errors, listener -> orchestrator.decide(runId, decision, listener));
+        String tools = pendingTools(runId);
+        return RunStream.start(mapper, errors, listener -> {
+            AgentRun run = orchestrator.decide(runId, decision, listener);
+            auditDecision(authentication.getName(), runId, request, tools);
+            return run;
+        });
+    }
+
+    private String pendingTools(String runId) {
+        return orchestrator.pendingApprovals(runId).stream()
+                .map(call -> call.name() + " " + call.arguments())
+                .collect(Collectors.joining("; "));
+    }
+
+    private void auditDecision(String reviewer, String runId, ApprovalRequest request, String tools) {
+        String comment = request.comment() == null || request.comment().isBlank() ? "" : " — comment: " + request.comment();
+        auditService.record(reviewer, request.approved() ? AuditAction.APPROVAL_APPROVED : AuditAction.APPROVAL_REJECTED,
+                "run", runId, tools + comment);
     }
 }

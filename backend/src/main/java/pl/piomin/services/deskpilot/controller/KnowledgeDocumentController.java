@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import pl.piomin.services.deskpilot.dto.KnowledgeDocumentResponse;
+import pl.piomin.services.deskpilot.model.AuditAction;
+import pl.piomin.services.deskpilot.model.KnowledgeDocument;
+import pl.piomin.services.deskpilot.service.AuditService;
 import pl.piomin.services.deskpilot.service.DocumentIngestionService;
 
 /** Documents uploaded to the knowledge base (admins only, see SecurityConfig). */
@@ -24,9 +27,11 @@ import pl.piomin.services.deskpilot.service.DocumentIngestionService;
 public class KnowledgeDocumentController {
 
     private final DocumentIngestionService ingestionService;
+    private final AuditService auditService;
 
-    public KnowledgeDocumentController(DocumentIngestionService ingestionService) {
+    public KnowledgeDocumentController(DocumentIngestionService ingestionService, AuditService auditService) {
         this.ingestionService = ingestionService;
+        this.auditService = auditService;
     }
 
     /** Stores the file and indexes it in the background; poll the document for its status. */
@@ -35,8 +40,11 @@ public class KnowledgeDocumentController {
     public KnowledgeDocumentResponse upload(@RequestParam("file") MultipartFile file,
                                             @RequestParam(value = "title", required = false) String title,
                                             Authentication authentication) throws IOException {
-        return KnowledgeDocumentResponse.of(ingestionService.upload(file.getBytes(), file.getOriginalFilename(), title,
-                authentication.getName()));
+        KnowledgeDocument document = ingestionService.upload(file.getBytes(), file.getOriginalFilename(), title,
+                authentication.getName());
+        auditService.record(authentication.getName(), AuditAction.DOCUMENT_UPLOADED, "document", String.valueOf(document.getId()),
+                document.getTitle() + " (" + document.getFileName() + ", " + document.getSizeBytes() + " bytes)");
+        return KnowledgeDocumentResponse.of(document);
     }
 
     @GetMapping
@@ -51,13 +59,18 @@ public class KnowledgeDocumentController {
 
     @PostMapping("/{id}/reindex")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public KnowledgeDocumentResponse reindex(@PathVariable long id) {
-        return KnowledgeDocumentResponse.of(ingestionService.reindex(id));
+    public KnowledgeDocumentResponse reindex(@PathVariable long id, Authentication authentication) {
+        KnowledgeDocument document = ingestionService.reindex(id);
+        auditService.record(authentication.getName(), AuditAction.DOCUMENT_REINDEXED, "document", String.valueOf(id),
+                document.getTitle());
+        return KnowledgeDocumentResponse.of(document);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable long id) {
+    public void delete(@PathVariable long id, Authentication authentication) {
+        String title = ingestionService.get(id).getTitle();
         ingestionService.delete(id);
+        auditService.record(authentication.getName(), AuditAction.DOCUMENT_DELETED, "document", String.valueOf(id), title);
     }
 }

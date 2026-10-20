@@ -25,6 +25,9 @@ describe('ConversationList', () => {
       open: async (id: string) => {
         opened.push(id);
       },
+      newConversation: async () => {
+        opened.push('new');
+      },
     };
     TestBed.configureTestingModule({
       imports: [ConversationList],
@@ -87,5 +90,21 @@ describe('ConversationList', () => {
     http.expectOne('/api/sessions?q=').flush([session('s2', 'Printer on floor 3')]);
     await fixture.whenStable();
     expect(element.querySelector('.title')?.textContent).toBe('Printer on floor 3');
+  });
+
+  it('deletes the current conversation after confirmation and starts a new one', async () => {
+    current.set(session('s1', 'VPN keeps dropping'));
+    const { fixture, element } = await render([session('s1', 'VPN keeps dropping')]);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    element.querySelector<HTMLButtonElement>('[aria-label="Delete VPN keeps dropping"]')!.click();
+    http.expectOne({ method: 'DELETE', url: '/api/sessions/s1' }).flush(null, { status: 204, statusText: 'No Content' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    TestBed.tick();
+
+    expect(opened).toEqual(['new']);
+    http.expectOne('/api/sessions?q=').flush([]);
+    await fixture.whenStable();
+    expect(element.querySelector('.title')).toBeNull();
   });
 });

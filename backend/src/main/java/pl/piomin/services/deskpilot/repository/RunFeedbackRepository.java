@@ -1,9 +1,11 @@
 package pl.piomin.services.deskpilot.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import pl.piomin.services.deskpilot.model.FeedbackRating;
 import pl.piomin.services.deskpilot.model.RunFeedback;
@@ -11,6 +13,12 @@ import pl.piomin.services.deskpilot.model.RunFeedback;
 public interface RunFeedbackRepository extends JpaRepository<RunFeedback, Long> {
 
     Optional<RunFeedback> findByRunId(String runId);
+
+    List<RunFeedback> findByRunIdIn(Collection<String> runIds);
+
+    @Modifying
+    @Query("delete from RunFeedback f where f.runId in :runIds")
+    int deleteByRunIdIn(Collection<String> runIds);
 
     List<RunFeedback> findTop10ByRatingOrderByUpdatedAtDesc(FeedbackRating rating);
 
