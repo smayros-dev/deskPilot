@@ -8,3 +8,7 @@ Thumbs.db
 
 # Git worktrees of parallel agents
 .claude/worktrees/
+
+# JVM crash files
+hs_err_pid*.log
+replay_pid*.log

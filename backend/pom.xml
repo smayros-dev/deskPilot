@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>pl.piomin.services</groupId>
 	<artifactId>deskpilot</artifactId>
-	<version>1.0.17</version>
+	<version>1.0.18</version>
 	<name>deskpilot</name>
 	<description>Agentic AI backend (Spring AI + Ollama + Spring Boot)</description>
 	<url/>
@@ -87,6 +87,18 @@
 		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-model-chat-memory-repository-jdbc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-pdf-document-reader</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-markdown-document-reader</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-jsoup-document-reader</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.ai</groupId>

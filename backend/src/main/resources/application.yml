@@ -7,6 +7,11 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      # Knowledge-base documents (12b); larger uploads get 413 Payload Too Large.
+      max-file-size: 10MB
+      max-request-size: 11MB
   lifecycle:
     timeout-per-shutdown-phase: 30s
   http:

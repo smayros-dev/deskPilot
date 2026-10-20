@@ -1,6 +1,7 @@
 package pl.piomin.services.deskpilot.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +14,7 @@ import pl.piomin.services.deskpilot.dto.TicketResponse;
 import pl.piomin.services.deskpilot.exception.NotFoundException;
 import pl.piomin.services.deskpilot.model.Ticket;
 import pl.piomin.services.deskpilot.security.CurrentUser;
+import pl.piomin.services.deskpilot.service.DocumentIngestionService;
 import pl.piomin.services.deskpilot.service.KnowledgeBaseService;
 import pl.piomin.services.deskpilot.service.MemoryService;
 import pl.piomin.services.deskpilot.service.TicketService;
@@ -25,12 +27,14 @@ public class HelpdeskDataController {
     private final TicketService ticketService;
     private final MemoryService memoryService;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final DocumentIngestionService documentService;
 
     public HelpdeskDataController(TicketService ticketService, MemoryService memoryService,
-                                  KnowledgeBaseService knowledgeBaseService) {
+                                  KnowledgeBaseService knowledgeBaseService, DocumentIngestionService documentService) {
         this.ticketService = ticketService;
         this.memoryService = memoryService;
         this.knowledgeBaseService = knowledgeBaseService;
+        this.documentService = documentService;
     }
 
     /** The caller's tickets; reviewers and admins see all of them. */
@@ -58,6 +62,9 @@ public class HelpdeskDataController {
 
     @GetMapping("/knowledge-base/articles")
     public List<ArticleResponse> articles() {
-        return knowledgeBaseService.findAll().stream().map(ArticleResponse::of).toList();
+        Map<Long, String> documentTitles = documentService.titles();
+        return knowledgeBaseService.findAll().stream()
+                .map(a -> ArticleResponse.of(a, a.getDocumentId() == null ? null : documentTitles.get(a.getDocumentId())))
+                .toList();
     }
 }

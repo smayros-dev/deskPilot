@@ -3,10 +3,17 @@ package pl.piomin.services.deskpilot.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import pl.piomin.services.deskpilot.model.KnowledgeArticle;
 
 public interface KnowledgeArticleRepository extends JpaRepository<KnowledgeArticle, Long> {
+
+    List<KnowledgeArticle> findByDocumentIdOrderByIdAsc(Long documentId);
+
+    @Modifying
+    @Query("delete from KnowledgeArticle a where a.documentId = :documentId")
+    int deleteByDocumentId(Long documentId);
 
     interface KeywordHit {
         Long getId();

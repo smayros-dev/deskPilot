@@ -42,6 +42,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/settings").hasRole(ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/settings").hasRole(ADMIN)
                         .requestMatchers("/api/evaluations", "/api/evaluations/**").hasRole(ADMIN)
+                        .requestMatchers("/api/knowledge-base/documents", "/api/knowledge-base/documents/**").hasRole(ADMIN)
                         .requestMatchers("/actuator/**").hasRole(ADMIN)
                         .requestMatchers("/api/**").hasRole(USER)
                         // MCP server (Streamable HTTP): read-only knowledge-base tools for other agents and IDEs.

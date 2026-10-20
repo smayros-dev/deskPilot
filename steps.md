@@ -133,7 +133,7 @@ order of the recommended path below. Value / effort are rough estimates for this
 
 ### A. Better answers (knowledge & retrieval)
 - [x] **12a — Answers with citations ✅:** the knowledge-base tool returns article ids; the agent cites them as `[1]`, the chat renders Markdown safely and shows the cited articles as links/cards. *Value: high · Effort: S*
-- [ ] **12b — Document ingestion:** admins upload PDF / Markdown / HTML (Spring AI document readers + token-based chunking with overlap), re-index on change, delete; a Knowledge admin page with ingestion status. *Value: high · Effort: M*
+- [x] **12b — Document ingestion ✅ (verified live: a Markdown guide became 3 searchable articles in 0.5 s; no OCR for scanned PDFs):** admins upload PDF / Markdown / HTML (Spring AI document readers + token-based chunking with overlap), re-index on change, delete; a Knowledge admin page with ingestion status. *Value: high · Effort: M*
 - [x] **12c — Hybrid search ✅ (re-ranking by the model not done: too slow on CPU):** Postgres full-text (BM25-like `ts_rank`) combined with pgvector by reciprocal rank fusion, optional re-ranking of the top hits by the model; measured against Step 10's scenarios. *Value: medium–high · Effort: M*
 - [ ] **12d — Knowledge-gap detection:** questions answered "not found" or escalated are clustered weekly; reviewers get suggested new articles drafted by the model. *Value: medium · Effort: M*
 

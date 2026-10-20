@@ -118,6 +118,27 @@ export interface Article {
   title: string;
   tags: string;
   content: string;
+  /** Set when the article is a chunk of an uploaded document. */
+  documentId: number | null;
+  documentTitle: string | null;
+}
+
+export type DocumentFormat = 'PDF' | 'MARKDOWN' | 'TEXT' | 'HTML';
+export type DocumentStatus = 'PROCESSING' | 'READY' | 'FAILED';
+
+/** A document uploaded to the knowledge base and split into articles. */
+export interface KnowledgeDocument {
+  id: number;
+  title: string;
+  fileName: string;
+  format: DocumentFormat;
+  sizeBytes: number;
+  status: DocumentStatus;
+  chunks: number;
+  error: string | null;
+  uploadedBy: string;
+  uploadedAt: string;
+  indexedAt: string | null;
 }
 
 export interface ToolStats {

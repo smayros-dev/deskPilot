@@ -35,6 +35,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(UnsupportedDocumentException.class)
+    ProblemDetail handleUnsupportedDocument(UnsupportedDocumentException e) {
+        return problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported file type", e.getMessage());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail handleIllegalArgument(IllegalArgumentException e) {
         return problem(HttpStatus.BAD_REQUEST, "Bad request", e.getMessage());
@@ -54,6 +59,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case NotFoundException n -> handleNotFound(n);
             case ConflictException c -> handleConflict(c);
             case GuardrailViolationException g -> handleGuardrail(g);
+            case UnsupportedDocumentException u -> handleUnsupportedDocument(u);
             case IllegalArgumentException i -> handleIllegalArgument(i);
             case ResourceAccessException r -> handleModelUnavailable(r);
             default -> {
