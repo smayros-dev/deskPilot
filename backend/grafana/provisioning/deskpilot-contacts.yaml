@@ -1,0 +1,14 @@
+# DeskPilot alert contact point (B1): e-mail through the SMTP server configured by the GF_SMTP_* variables
+# (Mailpit in development, http://localhost:8026). Recipients: GRAFANA_ALERT_EMAILS (comma-separated).
+# Resolved notifications are sent too, so the inbox shows when a problem is over.
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: deskpilot
+    receivers:
+      - uid: deskpilot-email
+        type: email
+        disableResolveMessage: false
+        settings:
+          addresses: $GRAFANA_ALERT_EMAILS
+          singleEmail: true

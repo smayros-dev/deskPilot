@@ -1,0 +1,19 @@
+# Same contact point as deskpilot-contacts.yaml plus a chat webhook (B1). Mounted instead of it when
+# GRAFANA_ALERT_WEBHOOK_URL is set, so an empty URL never reaches Grafana (it would reject the whole file).
+# GRAFANA_ALERT_WEBHOOK_TYPE: slack (default, also Mattermost/Rocket.Chat incoming webhooks), teams or webhook (raw JSON).
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: deskpilot
+    receivers:
+      - uid: deskpilot-email
+        type: email
+        disableResolveMessage: false
+        settings:
+          addresses: $GRAFANA_ALERT_EMAILS
+          singleEmail: true
+      - uid: deskpilot-webhook
+        type: $GRAFANA_ALERT_WEBHOOK_TYPE
+        disableResolveMessage: false
+        settings:
+          url: $GRAFANA_ALERT_WEBHOOK_URL
