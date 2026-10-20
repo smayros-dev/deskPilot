@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "DeskPilot Architecture",
+    "output": "docs/diagrams/architecture-deskpilot-20261020-233020/deskpilot-architecture.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "https://github.com/smayros-dev/deskPilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "957ea304fea2a6f556db935707e3a4ae4ec260af"
+    }
+  },
+  "components": [
+    {
+      "id": "users", "type": "external", "label": "Helpdesk users", "sublabel": "user · reviewer · admin",
+      "pos": [40, 300], "size": [150, 64],
+      "sources": [{ "path": "backend/keycloak/deskpilot-realm.json", "label": "demo users and roles" }]
+    },
+    {
+      "id": "spa", "type": "frontend", "label": "Angular 22 SPA", "sublabel": "chat · approvals · settings",
+      "pos": [270, 300], "size": [170, 64], "tag": "zoneless + signals",
+      "sources": [
+        { "path": "frontend/src/app/app.routes.ts", "line": 7, "end_line": 60, "label": "pages" },
+        { "path": "frontend/src/app/core/agent-api.ts", "line": 81, "label": "streamed POST" }
+      ]
+    },
+    {
+      "id": "keycloak", "type": "security", "label": "Keycloak", "sublabel": "OIDC realm deskpilot",
+      "pos": [270, 110], "size": [170, 64], "tag": ":8180",
+      "sources": [
+        { "path": "frontend/src/app/core/auth.ts", "line": 12, "end_line": 18, "label": "code flow + PKCE" },
+        { "path": "backend/compose.yaml", "line": 21, "label": "keycloak image" }
+      ]
+    },
+    {
+      "id": "api", "type": "backend", "label": "REST + SSE API", "sublabel": "JWT roles · rate limits",
+      "pos": [580, 300], "size": [170, 64],
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/controller/SessionController.java", "line": 97, "end_line": 109, "label": "chat endpoints" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/security/SecurityConfig.java", "line": 55, "label": "resource server" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/security/RateLimitFilter.java", "line": 39, "label": "Bucket4j filter" }
+      ]
+    },
+    {
+      "id": "orch", "type": "backend", "label": "AgentOrchestrator", "sublabel": "ReAct loop · approval gate",
+      "pos": [880, 300], "size": [180, 64],
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 142, "end_line": 214, "label": "chat + decide" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 496, "label": "approval rule" }
+      ]
+    },
+    {
+      "id": "agentsvc", "type": "backend", "label": "Guardrails + routing", "sublabel": "specialists · self-check",
+      "pos": [880, 110], "size": [180, 64],
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 168, "label": "input guardrail" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/specialist/SpecialistRouter.java", "line": 87, "label": "route()" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 454, "end_line": 472, "label": "self-check" }
+      ]
+    },
+    {
+      "id": "gateway", "type": "backend", "label": "ModelGateway", "sublabel": "circuit breaker",
+      "pos": [1180, 300], "size": [170, 64],
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/ModelGateway.java", "line": 33, "end_line": 37, "label": "local or cloud" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/ResilientChatModel.java", "line": 30, "label": "Resilience4j" }
+      ]
+    },
+    {
+      "id": "cloud", "type": "cloud", "label": "Mistral / Gemini", "sublabel": "optional, key encrypted",
+      "pos": [1180, 110], "size": [170, 64],
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/cloud/CloudProviderService.java", "line": 45, "end_line": 47, "label": "endpoints" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/cloud/SecretCipher.java", "label": "AES-256-GCM" }
+      ]
+    },
+    {
+      "id": "ollama", "type": "external", "label": "Ollama (local)", "sublabel": "qwen3 · nomic · gemma4",
+      "pos": [1460, 300], "size": [170, 64], "tag": ":11434",
+      "sources": [{ "path": "backend/src/main/resources/application.yml", "line": 78, "end_line": 89, "label": "chat + embedding" }]
+    },
+    {
+      "id": "postgres", "type": "database", "label": "PostgreSQL + pgvector", "sublabel": "runs · tickets · articles",
+      "pos": [580, 490], "size": [170, 64],
+      "sources": [
+        { "path": "backend/compose.yaml", "line": 5, "label": "pgvector image" },
+        { "path": "backend/src/main/resources/application.yml", "line": 91, "end_line": 97, "label": "vector store" }
+      ]
+    },
+    {
+      "id": "tools", "type": "backend", "label": "Tools + RAG", "sublabel": "KB · tickets · memory",
+      "pos": [880, 490], "size": [180, 64],
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 532, "end_line": 545, "label": "tool execution" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/service/KnowledgeBaseService.java", "line": 105, "label": "hybrid search" }
+      ]
+    },
+    {
+      "id": "mcp", "type": "external", "label": "External MCP servers", "sublabel": "e.g. GitHub, Jira",
+      "pos": [880, 680], "size": [180, 64],
+      "sources": [{ "path": "backend/src/main/java/pl/piomin/services/deskpilot/mcp/McpClientTools.java", "line": 19, "label": "MCP client tools" }]
+    }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Spring Boot 4 backend :8080", "wraps": ["api", "orch", "agentsvc", "gateway", "tools"] },
+    { "kind": "security-group", "label": "admin only: cloud keys", "wraps": ["cloud"] }
+  ],
+  "connections": [
+    { "id": "users-spa", "from": "users", "to": "spa", "label": "browser", "variant": "emphasis" },
+    { "id": "spa-login", "from": "spa", "to": "keycloak", "label": "OIDC login (PKCE)", "variant": "security" },
+    { "id": "spa-api", "from": "spa", "to": "api", "label": "REST + SSE · JWT", "variant": "emphasis" },
+    { "id": "jwt-verify", "from": "keycloak", "to": "api", "label": "verify JWT", "variant": "security", "fromSide": "right", "toSide": "top" },
+    { "id": "api-orch", "from": "api", "to": "orch", "label": "chat / approve", "variant": "emphasis" },
+    { "id": "orch-guard", "from": "orch", "to": "agentsvc", "label": "check · route · review" },
+    { "id": "orch-gateway", "from": "orch", "to": "gateway", "label": "model call", "variant": "emphasis" },
+    { "id": "gateway-cloud", "from": "gateway", "to": "cloud", "label": "HTTPS (optional)", "variant": "dashed" },
+    { "id": "gateway-ollama", "from": "gateway", "to": "ollama", "label": "chat · tools", "variant": "emphasis" },
+    { "id": "api-db", "from": "api", "to": "postgres", "label": "JPA / Flyway" },
+    { "id": "orch-tools", "from": "orch", "to": "tools", "label": "tool calls" },
+    { "id": "tools-db", "from": "tools", "to": "postgres", "label": "SQL + vectors" },
+    { "id": "tools-mcp", "from": "tools", "to": "mcp", "label": "MCP · needs approval", "variant": "dashed" },
+    { "id": "tools-embed", "from": "tools", "to": "ollama", "label": "embeddings", "variant": "dashed", "fromSide": "right", "toSide": "bottom" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Agent run", "items": ["Guardrails, then specialist routing", "ReAct loop: model ↔ tools until an answer", "Risky tools pause for a reviewer's approval"] },
+    { "dot": "amber", "title": "Background", "items": ["Weekly knowledge-gap detection", "A/B experiments assigned per session", "Live updates over SSE, audit trail"] },
+    { "dot": "violet", "title": "Operations", "items": ["Traces to Jaeger (OTLP :4318)", "Optional Grafana lgtm metrics (:4328)", "Notification e-mails via Mailpit SMTP"] }
+  ]
+}

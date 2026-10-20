@@ -1,0 +1,428 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "DeskPilot Chat to Approved Ticket",
+    "output": "docs/diagrams/sequence-chat-approval-20261020-233020/chat-approval.html",
+    "locale": "en",
+    "viewBox": [
+      1080,
+      696
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/smayros-dev/deskPilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "957ea304fea2a6f556db935707e3a4ae4ec260af"
+    }
+  },
+  "participants": [
+    {
+      "id": "requester",
+      "type": "frontend",
+      "label": "Requester",
+      "sublabel": "Angular chat",
+      "sources": [
+        {
+          "path": "frontend/src/app/core/agent-api.ts",
+          "line": 38,
+          "end_line": 58,
+          "label": "stream calls"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "security",
+      "label": "API",
+      "sublabel": "JWT, limits, SSE",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/controller/SessionController.java",
+          "line": 104,
+          "end_line": 109,
+          "label": "messages/stream"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/controller/RunController.java",
+          "line": 85,
+          "end_line": 106,
+          "label": "approval"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/security/RateLimitFilter.java",
+          "line": 32,
+          "end_line": 81,
+          "label": "rate limit after JWT"
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "Agent",
+      "sublabel": "Orchestrator loop",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 164,
+          "end_line": 202,
+          "label": "doChat"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 218,
+          "end_line": 316,
+          "label": "decide + loop"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 552,
+          "end_line": 566,
+          "label": "finish + redaction"
+        }
+      ]
+    },
+    {
+      "id": "model",
+      "type": "cloud",
+      "label": "LLM gateway",
+      "sublabel": "Ollama or cloud",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/ModelGateway.java",
+          "line": 33,
+          "end_line": 44,
+          "label": "route call"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/specialist/SpecialistRouter.java",
+          "line": 87,
+          "label": "route()"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/SelfCheck.java",
+          "line": 39,
+          "end_line": 44,
+          "label": "self-check"
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "type": "backend",
+      "label": "Tools",
+      "sublabel": "KB search, tickets",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/tool/KnowledgeBaseTools.java",
+          "line": 39,
+          "end_line": 55,
+          "label": "search_knowledge_base"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/tool/TicketTools.java",
+          "line": 38,
+          "end_line": 47,
+          "label": "@RequiresApproval"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/service/KnowledgeBaseService.java",
+          "line": 97,
+          "end_line": 106,
+          "label": "hybrid search"
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "runs, vectors",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/TurnStore.java",
+          "line": 49,
+          "end_line": 55,
+          "label": "paused turn"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/service/RunService.java",
+          "line": 95,
+          "end_line": 121,
+          "label": "pause + event"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/service/TicketService.java",
+          "line": 26,
+          "end_line": 31,
+          "label": "save ticket"
+        }
+      ]
+    },
+    {
+      "id": "notify",
+      "type": "messagebus",
+      "label": "Notify",
+      "sublabel": "SSE hub, Mailpit",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/controller/LiveEventRelay.java",
+          "line": 39,
+          "end_line": 54,
+          "label": "SSE relay"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/notifications/NotificationService.java",
+          "line": 55,
+          "end_line": 90,
+          "label": "e-mails"
+        }
+      ]
+    },
+    {
+      "id": "reviewer",
+      "type": "frontend",
+      "label": "Reviewer",
+      "sublabel": "Approvals page",
+      "sources": [
+        {
+          "path": "frontend/src/app/core/agent-api.ts",
+          "line": 56,
+          "end_line": 58,
+          "label": "approval stream"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 226,
+      "label": "Ask"
+    },
+    {
+      "from": 236,
+      "to": 338,
+      "label": "Agent loop"
+    },
+    {
+      "from": 348,
+      "to": 422,
+      "label": "Pause"
+    },
+    {
+      "from": 432,
+      "to": 590,
+      "label": "Approve and resume"
+    }
+  ],
+  "messages": [
+    {
+      "id": "ask",
+      "from": "requester",
+      "to": "api",
+      "y": 160,
+      "label": "POST /messages/stream + JWT",
+      "variant": "security",
+      "note": "Spring Security checks the Keycloak JWT; RateLimitFilter answers 429 over the limit"
+    },
+    {
+      "id": "chat",
+      "from": "api",
+      "to": "agent",
+      "y": 188,
+      "label": "chat(): guardrail, start run",
+      "variant": "emphasis",
+      "note": "checkUserInput blocks prompt injection; SpecialistRouter records a HANDOFF step"
+    },
+    {
+      "id": "call-1",
+      "from": "agent",
+      "to": "model",
+      "y": 216,
+      "label": "call(prompt, tools)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "tool-search",
+      "from": "model",
+      "to": "agent",
+      "y": 244,
+      "label": "tool call: search_knowledge_base",
+      "variant": "return"
+    },
+    {
+      "id": "search",
+      "from": "agent",
+      "to": "tools",
+      "y": 272,
+      "label": "search_knowledge_base(query)",
+      "variant": "default",
+      "note": "pgvector + full-text ranks merged by RRF; top-k articles with [n] cites"
+    },
+    {
+      "id": "call-2",
+      "from": "agent",
+      "to": "model",
+      "y": 300,
+      "label": "call with articles",
+      "variant": "emphasis"
+    },
+    {
+      "id": "tool-ticket",
+      "from": "model",
+      "to": "agent",
+      "y": 328,
+      "label": "tool call: create_ticket",
+      "variant": "return",
+      "note": "Grounding check and ticket self-check run before the gate"
+    },
+    {
+      "id": "pause",
+      "from": "agent",
+      "to": "db",
+      "y": 356,
+      "label": "@RequiresApproval: AWAITING_APPROVAL",
+      "variant": "security",
+      "note": "The turn is saved in pending_turn; a restart loses nothing"
+    },
+    {
+      "id": "alert",
+      "from": "notify",
+      "to": "reviewer",
+      "y": 384,
+      "label": "e-mail + approvals badge",
+      "variant": "dashed",
+      "note": "RunStatusChanged after commit; e-mail via Mailpit in dev"
+    },
+    {
+      "id": "sse-paused",
+      "from": "api",
+      "to": "requester",
+      "y": 412,
+      "label": "SSE done: awaiting approval",
+      "variant": "return"
+    },
+    {
+      "id": "approve",
+      "from": "reviewer",
+      "to": "api",
+      "y": 440,
+      "label": "POST /runs/{id}/approval/stream",
+      "variant": "security",
+      "note": "Reviewer role required; same rate limit"
+    },
+    {
+      "id": "decide",
+      "from": "api",
+      "to": "agent",
+      "y": 468,
+      "label": "decide(run, approved)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "create",
+      "from": "agent",
+      "to": "tools",
+      "y": 496,
+      "label": "create_ticket(title, priority)",
+      "variant": "default",
+      "note": "TicketService saves the ticket and publishes TicketCreated"
+    },
+    {
+      "id": "ticket-mail",
+      "from": "notify",
+      "to": "requester",
+      "y": 524,
+      "label": "ticket e-mail + live event",
+      "variant": "dashed"
+    },
+    {
+      "id": "finish",
+      "from": "agent",
+      "to": "db",
+      "y": 552,
+      "label": "final answer, redacted: COMPLETED",
+      "variant": "default",
+      "note": "The model writes the answer; self-check may revise it; output redaction runs last"
+    },
+    {
+      "id": "sse-done",
+      "from": "api",
+      "to": "reviewer",
+      "y": 580,
+      "label": "SSE done (run)",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "api",
+      "from": 155,
+      "to": 418,
+      "type": "backend"
+    },
+    {
+      "participant": "agent",
+      "from": 183,
+      "to": 362,
+      "type": "backend"
+    },
+    {
+      "participant": "tools",
+      "from": 267,
+      "to": 278,
+      "type": "backend"
+    },
+    {
+      "participant": "api",
+      "from": 435,
+      "to": 586,
+      "type": "backend"
+    },
+    {
+      "participant": "agent",
+      "from": 463,
+      "to": 558,
+      "type": "backend"
+    },
+    {
+      "participant": "tools",
+      "from": 491,
+      "to": 502,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Ask and route",
+      "items": [
+        "Spring Security validates the Keycloak JWT; RateLimitFilter caps chat and approval calls per user",
+        "The input guardrail runs before the run starts; blocked messages never reach the model",
+        "SpecialistRouter picks a specialist and records a HANDOFF step"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Approval gate",
+      "items": [
+        "create_ticket is @RequiresApproval: the turn is saved in Postgres and the run waits as AWAITING_APPROVAL",
+        "After commit, reviewers get an e-mail (Mailpit in dev) and a live approvals badge",
+        "A backend restart loses nothing; the paused run can still be approved"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Resume and finish",
+      "items": [
+        "The reviewer's decision resumes the same loop; the ticket is created and the requester notified",
+        "The model writes the final answer, optionally revised by the self-check",
+        "Output redaction runs before the run is stored as COMPLETED and streamed as done"
+      ]
+    }
+  ]
+}

@@ -12,3 +12,9 @@ Thumbs.db
 # JVM crash files
 hs_err_pid*.log
 replay_pid*.log
+
+# Archify check receipts contain local absolute paths; the diagrams themselves (html + candidate.json) are committed.
+docs/diagrams/**/*.finalize.json
+docs/diagrams/**/*.finalize-summary.json
+docs/diagrams/**/*.delivery.json
+docs/diagrams/**/*.browser-check.json

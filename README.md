@@ -44,6 +44,8 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 
 ## Architecture
 
+Detailed documentation with diagrams is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): use cases per role, domain and agent-core class diagrams, components, the chat → approval sequence, and the states of a run and of a knowledge gap (Mermaid, rendered by GitHub). Interactive versions (architecture, sequence, run lifecycle, agent-loop workflow) built with Archify are in [`docs/diagrams/`](docs/diagrams/); open the HTML files locally in a browser.
+
 ```mermaid
 flowchart LR
     user([User / Reviewer]) -->|chat · approve| spa[Angular 22 SPA]
@@ -318,6 +320,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.24** — Documentation: `docs/ARCHITECTURE.md` with use-case, class, component, sequence and state diagrams (Mermaid) and interactive Archify diagrams of the architecture, the chat → approval sequence, the run lifecycle and the agent loop.
 - **1.0.23** — Measured with the evaluation: specialist agents on by default (25/25 vs 24/25), routing similarity threshold 0.7; knowledge-gap thresholds tuned on real embeddings (grouping 0.55, covered 0.65).
 - **1.0.22** — Prompt versions and A/B experiments (12m, V18); knowledge-gap detection with model-drafted articles (12d, V19); Grafana dashboard and alerts with OTLP metrics (12p); optional supervisor + specialist agents with hand-off in the trace (12f, V20).
 - **1.0.21** — Optional cloud models: Mistral and Gemini through their OpenAI-compatible APIs, enabled and keyed from the Settings page (keys encrypted, V17), usable for chat, vision and evaluations (12s).

@@ -1,0 +1,106 @@
+{
+  "schema_version": 2,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "DeskPilot Agent Run Lifecycle",
+    "output": "docs/diagrams/lifecycle-agent-run-20261020-233020/agent-run.html",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/smayros-dev/deskPilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "957ea304fea2a6f556db935707e3a4ae4ec260af"
+    }
+  },
+  "lanes": [
+    { "id": "main", "label": "RUNNING · ReAct loop" },
+    { "id": "waiting", "label": "Human approval" },
+    { "id": "recovery", "label": "Backend restart" },
+    { "id": "terminal", "label": "Final status" }
+  ],
+  "states": [
+    {
+      "id": "created", "type": "start", "label": "Run created", "sublabel": "status RUNNING", "lane": "main", "col": 0, "step": "01", "tag": "RUNNING",
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/model/AgentRun.java", "line": 85, "end_line": 94, "label": "new run is RUNNING" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 186, "end_line": 204, "label": "start, hand-off, loop" }
+      ]
+    },
+    {
+      "id": "thinking", "type": "active", "label": "Model call", "sublabel": "step budget checked", "lane": "main", "col": 1, "step": "02", "tag": "RUNNING",
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 250, "end_line": 260, "label": "budget check, callModel" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/ResilientChatModel.java", "line": 57, "end_line": 64, "label": "circuit breaker" }
+      ]
+    },
+    {
+      "id": "decide", "type": "decision", "label": "Reply check", "sublabel": "answer or tool calls?", "lane": "main", "col": 2, "step": "03", "tag": "gate",
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 262, "end_line": 278, "label": "grounding, final answer" }
+      ]
+    },
+    {
+      "id": "tools", "type": "active", "label": "Tool calls", "sublabel": "results fed back", "lane": "main", "col": 3, "step": "04", "tag": "RUNNING",
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 280, "end_line": 310, "label": "checks, gate, execute" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 513, "end_line": 526, "label": "executeToolCalls" }
+      ]
+    },
+    {
+      "id": "awaiting", "type": "waiting", "label": "AWAITING_APPROVAL", "sublabel": "turn saved, reviewer decides", "lane": "waiting", "col": 3, "tag": "pause",
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 299, "end_line": 308, "label": "pause for approval" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 218, "end_line": 235, "label": "decide and resume" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/service/RunService.java", "line": 94, "end_line": 107, "label": "pause / resume" }
+      ]
+    },
+    {
+      "id": "restart", "type": "external", "label": "Startup recovery", "sublabel": "unfinished runs checked", "lane": "recovery", "col": 0, "tag": "restart",
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/InterruptedRunRecovery.java", "line": 43, "end_line": 59, "label": "resumable or FAILED" }
+      ]
+    },
+    {
+      "id": "failed", "type": "failure", "label": "FAILED", "sublabel": "error, circuit open, empty", "lane": "terminal", "col": 1, "tag": "terminal",
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 312, "end_line": 318, "label": "exception → FAILED" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 270, "end_line": 273, "label": "empty answer" }
+      ]
+    },
+    {
+      "id": "completed", "type": "success", "label": "COMPLETED", "sublabel": "answer after self-check", "lane": "terminal", "col": 2, "tag": "terminal",
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 274, "end_line": 278, "label": "COMPLETED + checkAnswer" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/model/AgentRun.java", "line": 130, "end_line": 138, "label": "finish, isFinished" }
+      ]
+    },
+    {
+      "id": "escalated", "type": "neutral", "label": "ESCALATED", "sublabel": "human handoff or budget", "lane": "terminal", "col": 3, "tag": "terminal",
+      "sources": [
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/tool/EscalationTools.java", "line": 11, "end_line": 22, "label": "escalate_to_human" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 254, "end_line": 258, "label": "step budget" },
+        { "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java", "line": 154, "end_line": 161, "label": "evaluation abandon" }
+      ]
+    }
+  ],
+  "transitions": [
+    { "from": "created", "to": "thinking", "label": "loop starts" },
+    { "from": "thinking", "to": "decide", "label": "reply" },
+    { "from": "decide", "to": "tools", "label": "tool calls" },
+    { "from": "tools", "to": "thinking", "label": "results", "route": "top-channel" },
+    { "from": "tools", "to": "awaiting", "label": "approval needed", "variant": "security" },
+    { "from": "awaiting", "to": "tools", "label": "approved / rejected", "variant": "emphasis" },
+    { "from": "decide", "to": "completed", "label": "final answer", "variant": "emphasis" },
+    { "from": "decide", "to": "escalated", "label": "escalate_to_human" },
+    { "from": "thinking", "to": "failed", "label": "error", "variant": "security" },
+    { "from": "thinking", "to": "restart", "label": "restart", "variant": "dashed" },
+    { "from": "restart", "to": "failed", "label": "not resumable", "variant": "dashed" },
+    { "from": "awaiting", "to": "escalated", "label": "eval abandon", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "One loop, one status", "items": ["RUNNING covers model calls, checks and tool calls", "Without tool use the model is reminded once to search", "A ticket before any search is sent back, not paused", "Step budget reached ends as ESCALATED"] },
+    { "dot": "amber", "title": "Approval pause", "items": ["Any tool needing approval pauses the whole reply", "Approve runs the call; reject returns an error result", "The paused turn is stored and survives a restart", "A new message in that session gets 409 until decided"] },
+    { "dot": "rose", "title": "Before and after", "items": ["Blocked input (guardrail, 422) creates no run", "Model errors and an open circuit end as FAILED", "On restart, RUNNING runs become FAILED"] }
+  ]
+}

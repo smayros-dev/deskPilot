@@ -1,0 +1,527 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "DeskPilot Agent Loop: One Message",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": "docs/diagrams/workflow-agent-loop-20261020-233020/agent-loop.html",
+    "repository": {
+      "url": "https://github.com/smayros-dev/deskPilot.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "957ea304fea2a6f556db935707e3a4ae4ec260af"
+    }
+  },
+  "lanes": [
+    {
+      "id": "request",
+      "label": "Request & failure"
+    },
+    {
+      "id": "model",
+      "label": "ReAct loop"
+    },
+    {
+      "id": "tools",
+      "label": "Tools & checks"
+    },
+    {
+      "id": "approval",
+      "label": "Approval & result"
+    }
+  ],
+  "mainPath": [
+    "user",
+    "rate",
+    "guard",
+    "setup",
+    "budget",
+    "model",
+    "grounding",
+    "selfcheck",
+    "finish"
+  ],
+  "nodes": [
+    {
+      "id": "user",
+      "lane": "request",
+      "col": 0,
+      "type": "frontend",
+      "label": "Chat message",
+      "sublabel": "POST /messages",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/controller/SessionController.java",
+          "line": 97,
+          "end_line": 110,
+          "label": "message endpoints"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "rate",
+      "lane": "request",
+      "col": 1,
+      "type": "security",
+      "label": "Rate limit",
+      "sublabel": "per user, admins exempt",
+      "tag": "429 + Retry-After",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/security/RateLimitFilter.java",
+          "line": 41,
+          "end_line": 87,
+          "label": "Bucket4j filter"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "guard",
+      "lane": "request",
+      "col": 2,
+      "type": "security",
+      "label": "Input guardrails",
+      "sublabel": "injection, moderation",
+      "tag": "422 if blocked",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/guardrail/GuardrailService.java",
+          "line": 64,
+          "end_line": 82,
+          "label": "checkUserInput"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "setup",
+      "lane": "request",
+      "col": 3,
+      "type": "backend",
+      "label": "Run setup",
+      "sublabel": "A/B variant, specialist",
+      "tag": "if running / if on",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 181,
+          "end_line": 189,
+          "label": "experiment variant"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 194,
+          "end_line": 197,
+          "label": "specialist routing"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/service/ExperimentService.java",
+          "line": 116,
+          "end_line": 122,
+          "label": "hash of session"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "escalate",
+      "lane": "model",
+      "col": 2,
+      "type": "security",
+      "label": "Step limit",
+      "sublabel": "ESCALATED answer",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 255,
+          "end_line": 258,
+          "label": "MAX_ITERATIONS"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "failed",
+      "lane": "request",
+      "col": 4,
+      "type": "security",
+      "label": "Run failed",
+      "sublabel": "status FAILED",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 270,
+          "end_line": 273,
+          "label": "empty answer"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 312,
+          "end_line": 318,
+          "label": "exception"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "budget",
+      "lane": "model",
+      "col": 3,
+      "type": "security",
+      "label": "Step budget",
+      "sublabel": "steps < max steps?",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 252,
+          "end_line": 258,
+          "label": "loop head"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "model",
+      "lane": "model",
+      "col": 4,
+      "type": "cloud",
+      "label": "Model call",
+      "sublabel": "prompt + history",
+      "tag": "Ollama or cloud",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 321,
+          "end_line": 351,
+          "label": "callModel"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/ModelGateway.java",
+          "line": 33,
+          "label": "provider routing"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "grounding",
+      "lane": "model",
+      "col": 5,
+      "type": "security",
+      "label": "Grounding check",
+      "sublabel": "no tool used yet?",
+      "tag": "else remind once",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 263,
+          "end_line": 268,
+          "label": "remind once"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 359,
+          "end_line": 367,
+          "label": "needsGrounding"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "execute",
+      "lane": "tools",
+      "col": 2,
+      "type": "messagebus",
+      "label": "Run tools",
+      "sublabel": "KB, tickets, memory, MCP",
+      "tag": "output limited",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 513,
+          "end_line": 550,
+          "label": "executeToolCalls"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "gate",
+      "lane": "tools",
+      "col": 3,
+      "type": "security",
+      "label": "Approval gate",
+      "sublabel": "@RequiresApproval or MCP",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 298,
+          "end_line": 309,
+          "label": "hold all calls"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 495,
+          "end_line": 497,
+          "label": "needsApproval"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "ticketcheck",
+      "lane": "tools",
+      "col": 4,
+      "type": "security",
+      "label": "Ticket checks",
+      "sublabel": "search first, self-check",
+      "tag": "else sent back once",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 281,
+          "end_line": 297,
+          "label": "send back once"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 462,
+          "end_line": 478,
+          "label": "ticket self-check"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "selfcheck",
+      "lane": "tools",
+      "col": 5,
+      "type": "security",
+      "label": "Self-check",
+      "sublabel": "draft vs articles",
+      "tag": "toggle in Settings",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 274,
+          "end_line": 278,
+          "label": "COMPLETED only"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 448,
+          "end_line": 460,
+          "label": "checkAnswer"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "reviewer",
+      "lane": "approval",
+      "col": 2,
+      "type": "external",
+      "label": "Reviewer decides",
+      "sublabel": "approve or reject",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 218,
+          "end_line": 233,
+          "label": "doDecide"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 536,
+          "end_line": 539,
+          "label": "rejected result"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "pause",
+      "lane": "approval",
+      "col": 3,
+      "type": "security",
+      "label": "Paused",
+      "sublabel": "WAITING_APPROVAL",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 302,
+          "end_line": 308,
+          "label": "turn saved"
+        }
+      ],
+      "width": 124
+    },
+    {
+      "id": "finish",
+      "lane": "approval",
+      "col": 5,
+      "type": "frontend",
+      "label": "Finish & reply",
+      "sublabel": "redact, save, answer",
+      "tag": "COMPLETED / ESCALATED",
+      "sources": [
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/agent/AgentOrchestrator.java",
+          "line": 552,
+          "end_line": 566,
+          "label": "finish"
+        },
+        {
+          "path": "backend/src/main/java/pl/piomin/services/deskpilot/guardrail/GuardrailService.java",
+          "line": 84,
+          "end_line": 85,
+          "label": "sanitizeOutput"
+        }
+      ],
+      "width": 124
+    }
+  ],
+  "edges": [
+    {
+      "id": "send",
+      "from": "user",
+      "to": "rate"
+    },
+    {
+      "id": "allowed",
+      "from": "rate",
+      "to": "guard",
+      "label": "allowed"
+    },
+    {
+      "id": "passed",
+      "from": "guard",
+      "to": "setup",
+      "label": "passed"
+    },
+    {
+      "id": "enter",
+      "from": "setup",
+      "to": "budget",
+      "label": "start loop",
+      "variant": "emphasis"
+    },
+    {
+      "id": "steps-left",
+      "from": "budget",
+      "to": "model",
+      "label": "steps left",
+      "variant": "emphasis"
+    },
+    {
+      "id": "final-text",
+      "from": "model",
+      "to": "grounding",
+      "label": "final text",
+      "variant": "emphasis"
+    },
+    {
+      "id": "searched",
+      "from": "grounding",
+      "to": "selfcheck",
+      "label": "searched",
+      "variant": "emphasis"
+    },
+    {
+      "id": "checked",
+      "from": "selfcheck",
+      "to": "finish",
+      "variant": "emphasis"
+    },
+    {
+      "id": "tool-calls",
+      "from": "model",
+      "to": "ticketcheck",
+      "label": "tool calls"
+    },
+    {
+      "id": "ticket-ok",
+      "from": "ticketcheck",
+      "to": "gate",
+      "label": "ok"
+    },
+    {
+      "id": "not-gated",
+      "from": "gate",
+      "to": "execute",
+      "label": "not gated"
+    },
+    {
+      "id": "gated",
+      "from": "gate",
+      "to": "pause",
+      "label": "gated tool",
+      "variant": "security"
+    },
+    {
+      "id": "notify",
+      "from": "pause",
+      "to": "reviewer",
+      "label": "notify",
+      "variant": "security"
+    },
+    {
+      "id": "decision",
+      "from": "reviewer",
+      "to": "execute",
+      "label": "approve / reject",
+      "variant": "security"
+    },
+    {
+      "id": "results",
+      "from": "execute",
+      "to": "budget",
+      "label": "next step",
+      "role": "return",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "limit",
+      "from": "budget",
+      "to": "escalate",
+      "label": "limit reached",
+      "role": "error",
+      "variant": "security",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "error",
+      "from": "model",
+      "to": "failed",
+      "label": "error or empty",
+      "role": "error",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Behaviour-changing switches",
+      "items": [
+        "Settings: specialists, grounding check, self-check, enabled tools and approval tools",
+        "Experiments page: a running A/B experiment picks model and prompt per conversation",
+        "MODERATION_ENABLED adds a model-based input check; RATE_LIMIT_* sets the buckets"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Stops and pauses",
+      "items": [
+        "Gated tool calls pause the whole step; a rejection returns an error result the model must explain",
+        "Grounding and ticket checks send the model back at most once per turn",
+        "Self-check and routing model calls do not use up the step budget"
+      ]
+    }
+  ]
+}
