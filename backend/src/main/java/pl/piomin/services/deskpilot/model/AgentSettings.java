@@ -48,6 +48,9 @@ public class AgentSettings {
     /** Combine keyword and semantic ranking in knowledge-base searches. */
     private boolean hybridSearch;
 
+    /** Check answers and ticket requests against the retrieved articles (one extra model call each). */
+    private boolean selfCheck;
+
     @Convert(converter = StringSetConverter.class)
     @Column(nullable = false, length = 1000)
     private Set<String> disabledTools;
@@ -77,7 +80,7 @@ public class AgentSettings {
     /** All editable values at once, so the entity is never half-updated. */
     public record Values(String chatModel, double temperature, double topP, int contextWindow, int maxOutputTokens,
                          boolean thinking, int maxIterations, int ragTopK, double ragSimilarityThreshold,
-                         boolean groundingCheck, boolean hybridSearch, Set<String> disabledTools, Set<String> approvalTools, String systemPrompt) {
+                         boolean groundingCheck, boolean hybridSearch, boolean selfCheck, Set<String> disabledTools, Set<String> approvalTools, String systemPrompt) {
     }
 
     public void apply(Values values) {
@@ -92,6 +95,7 @@ public class AgentSettings {
         this.ragSimilarityThreshold = values.ragSimilarityThreshold();
         this.groundingCheck = values.groundingCheck();
         this.hybridSearch = values.hybridSearch();
+        this.selfCheck = values.selfCheck();
         this.disabledTools = Set.copyOf(values.disabledTools());
         this.approvalTools = Set.copyOf(values.approvalTools());
         this.systemPrompt = values.systemPrompt() == null || values.systemPrompt().isBlank() ? null : values.systemPrompt();
@@ -100,7 +104,7 @@ public class AgentSettings {
 
     public Values values() {
         return new Values(chatModel, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations,
-                ragTopK, ragSimilarityThreshold, groundingCheck, hybridSearch, disabledTools, approvalTools, systemPrompt);
+                ragTopK, ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, disabledTools, approvalTools, systemPrompt);
     }
 
     public Instant getUpdatedAt() {

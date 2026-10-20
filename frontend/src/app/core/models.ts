@@ -175,6 +175,8 @@ export interface AgentSettings {
   groundingCheck: boolean;
   /** Combine keyword and semantic ranking in knowledge-base searches. */
   hybridSearch: boolean;
+  /** Check answers and ticket requests against the retrieved articles. */
+  selfCheck: boolean;
   disabledTools: string[];
   approvalTools: string[];
   systemPrompt: string | null;

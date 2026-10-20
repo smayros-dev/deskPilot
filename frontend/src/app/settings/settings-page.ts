@@ -56,6 +56,7 @@ export class SettingsPage {
     ragSimilarityThreshold: [0.55, [Validators.min(0), Validators.max(1)]],
     groundingCheck: [true],
     hybridSearch: [true],
+    selfCheck: [true],
     systemPrompt: ['', Validators.maxLength(8000)],
     tools: new FormRecord<ToolControls>({}),
   });
@@ -122,6 +123,7 @@ export class SettingsPage {
       ragSimilarityThreshold: v.ragSimilarityThreshold,
       groundingCheck: v.groundingCheck,
       hybridSearch: v.hybridSearch,
+      selfCheck: v.selfCheck,
       disabledTools: tools.filter(([, t]) => !t.enabled).map(([name]) => name),
       approvalTools: tools.filter(([, t]) => t.approval).map(([name]) => name),
       systemPrompt: v.systemPrompt.trim() || null,

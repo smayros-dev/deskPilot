@@ -182,6 +182,65 @@ class AgentOrchestratorTest {
     }
 
     @Test
+    void selfCheckAddsTheKeyFactTheDraftLeftOut() {
+        setChecks(false, true);
+        when(knowledgeBaseService.search(eq("account locked"), anyInt(), anyDouble(), anyBoolean()))
+                .thenReturn(List.of(new KnowledgeBaseService.Hit(2, "Passwords", "Locked accounts unlock after 30 minutes", 0.8)));
+        givenModelReplies(
+                toolCall("", "search_knowledge_base", "{\"query\":\"account locked\"}"),
+                answer("Reset your password on the portal [2]."),
+                answer("REVISED: Wait 30 minutes: the account unlocks automatically [2]."));
+
+        AgentRun run = orchestrator.chat(sessionId, "My account is locked");
+
+        assertThat(run.getFinalAnswer()).isEqualTo("Wait 30 minutes: the account unlocks automatically [2].");
+        assertThat(steps(run)).filteredOn(s -> s.getType() == StepType.GUARDRAIL).singleElement()
+                .satisfies(s -> {
+                    assertThat(s.getName()).isEqualTo("self_check");
+                    assertThat(s.getContent()).contains("Draft: Reset your password on the portal [2].");
+                });
+        assertThat(chatMemory.get(sessionId)).last().extracting(Message::getText)
+                .isEqualTo("Wait 30 minutes: the account unlocks automatically [2].");
+    }
+
+    @Test
+    void selfCheckKeepsACorrectDraftAndSkipsAnswersWithoutArticles() {
+        setChecks(false, true);
+        when(knowledgeBaseService.search(eq("vpn"), anyInt(), anyDouble(), anyBoolean()))
+                .thenReturn(List.of(new KnowledgeBaseService.Hit(1, "VPN", "Switch to IPSec", 0.9)));
+        givenModelReplies(toolCall("", "search_knowledge_base", "{\"query\":\"vpn\"}"), answer("Switch to IPSec [1]."), answer("OK"));
+
+        assertThat(orchestrator.chat(sessionId, "VPN drops").getFinalAnswer()).isEqualTo("Switch to IPSec [1].");
+
+        String otherSession = sessionService.create("alice").getId();
+        givenModelReplies(answer("Hello!"));
+        AgentRun greeting = orchestrator.chat(otherSession, "Hi");
+        assertThat(greeting.getIterations()).isEqualTo(1);
+    }
+
+    @Test
+    void selfCheckSendsBackATicketTheArticlesSayIsNotNeeded() {
+        setChecks(false, true);
+        long ticketsBefore = ticketRepository.count();
+        when(knowledgeBaseService.search(eq("mouse"), anyInt(), anyDouble(), anyBoolean()))
+                .thenReturn(List.of(new KnowledgeBaseService.Hit(6, "Hardware", "Mice are picked up at the IT desk, no ticket", 0.8)));
+        givenModelReplies(
+                toolCall("", "search_knowledge_base", "{\"query\":\"mouse\"}"),
+                toolCall("", "create_ticket", "{\"title\":\"Mouse\",\"description\":\"Broken\",\"priority\":\"LOW\"}"),
+                answer("NO TICKET: pick up a new mouse at the IT desk on floor 2"),
+                answer("Pick up a new mouse at the IT desk on floor 2 [6]."),
+                answer("OK"));
+
+        AgentRun run = orchestrator.chat(sessionId, "My mouse is broken");
+
+        assertThat(run.getStatus()).isEqualTo(RunStatus.COMPLETED);
+        assertThat(run.getFinalAnswer()).contains("IT desk");
+        assertThat(ticketRepository.count()).isEqualTo(ticketsBefore);
+        assertThat(steps(run)).filteredOn(s -> "self_check".equals(s.getName())).extracting(AgentStep::getContent)
+                .anySatisfy(c -> assertThat(c).startsWith("Ticket not sent for approval"));
+    }
+
+    @Test
     void groundingCheckCanBeSwitchedOff() {
         setGroundingCheck(false);
         givenModelReplies(answer("Hello! How can I help?"));
@@ -353,7 +412,7 @@ class AgentOrchestratorTest {
     void appliesSettingsToTheModelCallAndRecordsTheModel() {
         when(modelCatalog.find("llama3.2:3b")).thenReturn(Optional.of(toolModel("llama3.2:3b")));
         AgentSettings.Values values = settingsService.get().values();
-        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true, true,
+        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true, true, false,
                 Set.of("save_memory"), values.approvalTools(), "You are a terse helpdesk bot."));
         givenModelReplies(answer("Done."));
 
@@ -376,7 +435,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(),
                 v.disabledTools(), Set.of(), v.systemPrompt()));
         givenModelReplies(
                 toolCall("", "create_ticket", "{\"title\":\"Mouse\",\"description\":\"Broken\",\"priority\":\"LOW\"}"),
@@ -393,7 +452,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(),
                 Set.of("escalate_to_human"), v.approvalTools(), v.systemPrompt()));
         givenModelReplies(toolCall("", "escalate_to_human", "{\"reason\":\"x\"}"), answer("OK"));
 
@@ -411,7 +470,7 @@ class AgentOrchestratorTest {
 
         assertThatThrownBy(() -> settingsService.update(new AgentSettings.Values("gemma:2b", v.temperature(), v.topP(),
                 v.contextWindow(), v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(),
-                v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
+                v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.selfCheck(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not support tool calling");
     }
@@ -539,11 +598,15 @@ class AgentOrchestratorTest {
     }
 
     private void setGroundingCheck(boolean on) {
+        setChecks(on, settingsService.get().values().selfCheck());
+    }
+
+    private void setChecks(boolean grounding, boolean selfCheck) {
         AgentSettings.Values v = settingsService.get().values();
         when(modelCatalog.find(v.chatModel())).thenReturn(Optional.of(toolModel(v.chatModel())));
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), on, v.hybridSearch(),
-                v.disabledTools(), v.approvalTools(), v.systemPrompt()));
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), grounding,
+                v.hybridSearch(), selfCheck, v.disabledTools(), v.approvalTools(), v.systemPrompt()));
     }
 
     private static ModelCatalog.ModelInfo toolModel(String name) {

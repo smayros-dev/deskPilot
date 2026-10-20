@@ -18,6 +18,7 @@ public record AgentConfig(
         double ragSimilarityThreshold,
         boolean groundingCheck,
         boolean hybridSearch,
+        boolean selfCheck,
         Set<String> disabledTools,
         Set<String> approvalTools,
         String systemPrompt) {
@@ -25,7 +26,7 @@ public record AgentConfig(
     /** The same settings with another chat model, e.g. to evaluate a model without switching the live agent. */
     public AgentConfig withChatModel(String model) {
         return new AgentConfig(model, temperature, topP, contextWindow, maxOutputTokens, thinking, maxIterations, ragTopK,
-                ragSimilarityThreshold, groundingCheck, hybridSearch, disabledTools, approvalTools, systemPrompt);
+                ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, disabledTools, approvalTools, systemPrompt);
     }
 
     public boolean isToolEnabled(String tool) {

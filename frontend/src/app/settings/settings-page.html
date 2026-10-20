@@ -110,6 +110,11 @@
         <small>Combine keyword and semantic ranking. Finds articles for short or product-specific questions that embeddings alone score too low.</small>
       </label>
       <label class="toggle">
+        <input type="checkbox" formControlName="selfCheck" />
+        <span>Self-check</span>
+        <small>Before answering, compare the draft with the retrieved articles and add missing key facts; before a ticket, check the articles say one is needed. One extra model call each.</small>
+      </label>
+      <label class="toggle">
         <input type="checkbox" formControlName="groundingCheck" />
         <span>Grounding check</span>
         <small>If the model answers without using any tool, remind it once to search the knowledge base first. Small local models often answer from general knowledge; costs one extra model call in those cases.</small>

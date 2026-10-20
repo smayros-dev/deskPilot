@@ -21,6 +21,7 @@ import pl.piomin.services.deskpilot.model.AgentSettings;
  * @param maxIterations   model calls allowed per run before escalating to a human
  * @param groundingCheck  when the model answers without any tool call, ask it once to search the knowledge base
  * @param hybridSearch    combine keyword (full-text) and semantic ranking in knowledge-base searches
+ * @param selfCheck       check answers and ticket requests against the retrieved articles (extra model call)
  */
 public record AgentSettingsDto(
         @NotBlank @Size(max = 100) String chatModel,
@@ -34,6 +35,7 @@ public record AgentSettingsDto(
         @DecimalMin("0.0") @DecimalMax("1.0") double ragSimilarityThreshold,
         boolean groundingCheck,
         boolean hybridSearch,
+        boolean selfCheck,
         @NotNull Set<@NotBlank String> disabledTools,
         @NotNull Set<@NotBlank String> approvalTools,
         @Size(max = 8000) String systemPrompt,
@@ -43,11 +45,11 @@ public record AgentSettingsDto(
         AgentSettings.Values v = settings.values();
         return new AgentSettingsDto(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(), v.maxOutputTokens(),
                 v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
-                v.hybridSearch(), v.disabledTools(), v.approvalTools(), v.systemPrompt(), settings.getUpdatedAt());
+                v.hybridSearch(), v.selfCheck(), v.disabledTools(), v.approvalTools(), v.systemPrompt(), settings.getUpdatedAt());
     }
 
     public AgentSettings.Values toValues() {
         return new AgentSettings.Values(chatModel.strip(), temperature, topP, contextWindow, maxOutputTokens, thinking,
-                maxIterations, ragTopK, ragSimilarityThreshold, groundingCheck, hybridSearch, disabledTools, approvalTools, systemPrompt);
+                maxIterations, ragTopK, ragSimilarityThreshold, groundingCheck, hybridSearch, selfCheck, disabledTools, approvalTools, systemPrompt);
     }
 }

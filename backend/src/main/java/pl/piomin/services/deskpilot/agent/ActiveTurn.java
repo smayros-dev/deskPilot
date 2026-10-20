@@ -22,6 +22,8 @@ final class ActiveTurn {
     private List<AssistantMessage.ToolCall> pendingToolCalls = List.of();
     /** Not saved with the turn: it belongs to the HTTP request currently driving the run. */
     private RunListener listener = RunListener.NONE;
+    /** Model calls made by the self-check in this request; they do not use up the agent's step budget. */
+    private int checkCalls;
 
     ActiveTurn(RunContext context, String userInput) {
         this.context = context;
@@ -69,6 +71,14 @@ final class ActiveTurn {
 
     RunListener listener() {
         return listener;
+    }
+
+    void countCheckCall() {
+        checkCalls++;
+    }
+
+    int checkCalls() {
+        return checkCalls;
     }
 
     RunContext context() {

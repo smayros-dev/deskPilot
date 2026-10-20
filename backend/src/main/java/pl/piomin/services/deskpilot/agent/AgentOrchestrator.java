@@ -78,13 +78,14 @@ public class AgentOrchestrator {
     private final GuardrailService guardrails;
     private final AgentMetrics metrics;
     private final ObservationRegistry observations;
+    private final SelfCheck selfCheck;
     private final String systemPrompt;
 
     public AgentOrchestrator(ChatModel chatModel, ChatMemory chatMemory, ToolRegistry toolRegistry,
                              RunService runService, SessionService sessionService, TurnStore turnStore,
                              AgentSettingsService settingsService,
                              ChatOptionsFactory chatOptionsFactory, GuardrailService guardrails, AgentMetrics metrics,
-                             ObservationRegistry observations,
+                             ObservationRegistry observations, SelfCheck selfCheck,
                              @Value("classpath:prompts/system-prompt.txt") Resource systemPrompt) throws IOException {
         this.chatModel = chatModel;
         this.chatMemory = chatMemory;
@@ -97,6 +98,7 @@ public class AgentOrchestrator {
         this.guardrails = guardrails;
         this.metrics = metrics;
         this.observations = observations;
+        this.selfCheck = selfCheck;
         this.systemPrompt = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
     }
 
@@ -208,7 +210,8 @@ public class AgentOrchestrator {
         AgentConfig config = turn.context().config();
         try {
             while (true) {
-                int iterations = runService.get(runId).getIterations();
+                // Self-check calls are counted as model calls but not against the agent's step budget.
+                int iterations = runService.get(runId).getIterations() - turn.checkCalls();
                 if (iterations >= config.maxIterations()) {
                     LOG.warn("Run {} hit the iteration limit ({})", runId, config.maxIterations());
                     return finish(turn, RunStatus.ESCALATED, MAX_ITERATIONS_ANSWER, startNanos);
@@ -229,6 +232,9 @@ public class AgentOrchestrator {
                         return finish(turn, RunStatus.FAILED, EMPTY_ANSWER, startNanos);
                     }
                     RunStatus status = turn.context().escalationReason().isPresent() ? RunStatus.ESCALATED : RunStatus.COMPLETED;
+                    if (status == RunStatus.COMPLETED) {
+                        answer = checkAnswer(turn, config, answer);
+                    }
                     return finish(turn, status, answer, startNanos);
                 }
 
@@ -238,6 +244,14 @@ public class AgentOrchestrator {
                             + "knowledge base; asked the model to search first: " + describe(reply.getToolCalls()), false, 0);
                     turn.add(ToolResponseMessage.builder().responses(reply.getToolCalls().stream()
                             .map(call -> new ToolResponseMessage.ToolResponse(call.id(), call.name(), "ERROR: " + SEARCH_BEFORE_TICKET))
+                            .toList()).build());
+                    continue;
+                }
+                Optional<String> instead = checkTicket(turn, config, reply);
+                if (instead.isPresent()) {
+                    turn.add(ToolResponseMessage.builder().responses(reply.getToolCalls().stream()
+                            .map(call -> new ToolResponseMessage.ToolResponse(call.id(), call.name(),
+                                    "ERROR: " + SelfCheck.NO_TICKET + instead.get()))
                             .toList()).build());
                     continue;
                 }
@@ -324,6 +338,49 @@ public class AgentOrchestrator {
         boolean blockedBefore = messages.stream().anyMatch(m -> m instanceof ToolResponseMessage r
                 && r.getResponses().stream().anyMatch(response -> response.responseData().endsWith(SEARCH_BEFORE_TICKET)));
         return !searched && !blockedBefore;
+    }
+
+    /** Self-check (12g): the draft is compared with the retrieved articles and corrected when a key fact is missing. */
+    private String checkAnswer(ActiveTurn turn, AgentConfig config, String draft) {
+        String articles = retrievedArticles(turn);
+        if (!config.selfCheck() || articles.isEmpty()) {
+            return draft;
+        }
+        turn.listener().thinking(runService.get(turn.runId()).getIterations() + 1);
+        Optional<String> revised = selfCheck.reviseAnswer(turn, articles, draft);
+        record(turn, StepType.GUARDRAIL, "self_check", revised.isPresent()
+                ? "Answer revised after checking it against the articles. Draft: " + draft
+                : "Answer checked against the articles: OK", false, 0);
+        return revised.orElse(draft);
+    }
+
+    /** Self-check (12g): a ticket the retrieved articles say is not needed is sent back once, before any approval. */
+    private Optional<String> checkTicket(ActiveTurn turn, AgentConfig config, AssistantMessage reply) {
+        List<AssistantMessage.ToolCall> tickets = reply.getToolCalls().stream()
+                .filter(call -> TICKET_TOOL.equals(call.name())).toList();
+        String articles = retrievedArticles(turn);
+        boolean checkedBefore = turn.messages().stream().anyMatch(m -> m instanceof ToolResponseMessage r
+                && r.getResponses().stream().anyMatch(response -> response.responseData().contains(SelfCheck.NO_TICKET)));
+        if (!config.selfCheck() || tickets.isEmpty() || articles.isEmpty() || checkedBefore) {
+            return Optional.empty();
+        }
+        turn.listener().thinking(runService.get(turn.runId()).getIterations() + 1);
+        Optional<String> instead = selfCheck.ticketNotNeeded(turn, articles, describe(tickets));
+        record(turn, StepType.GUARDRAIL, "self_check", instead
+                .map(reason -> "Ticket not sent for approval: the articles say none is needed (" + reason + "): " + describe(tickets))
+                .orElse("Ticket checked against the articles: needed"), false, 0);
+        return instead;
+    }
+
+    /** Results of the knowledge-base searches made in this turn, as the model saw them. */
+    private static String retrievedArticles(ActiveTurn turn) {
+        return turn.messages().stream()
+                .filter(m -> m instanceof ToolResponseMessage)
+                .flatMap(m -> ((ToolResponseMessage) m).getResponses().stream())
+                .filter(r -> KNOWLEDGE_SEARCH_TOOL.equals(r.name()) && !r.responseData().startsWith("ERROR")
+                        && r.responseData().contains("\"articles\":[{"))
+                .map(ToolResponseMessage.ToolResponse::responseData)
+                .collect(Collectors.joining("\n"));
     }
 
     private static String describe(List<AssistantMessage.ToolCall> calls) {

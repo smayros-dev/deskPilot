@@ -106,6 +106,8 @@ agent:
   max-iterations: 8
   # Default of the Settings toggle: remind the model to search the knowledge base before answering or opening a ticket.
   grounding-check: true
+  # Default of the Settings toggle: check answers and ticket requests against the retrieved articles.
+  self-check: true
   rag:
     similarity-threshold: 0.55
     top-k: 3
