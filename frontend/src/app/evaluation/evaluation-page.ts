@@ -5,10 +5,11 @@ import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import { AgentApi } from '../core/agent-api';
+import { I18n, TranslationKey } from '../core/i18n';
 import { ModelInfo } from '../core/models';
 import { Notifications } from '../core/notifications';
 import { DurationPipe } from '../shared/duration-pipe';
-import { Evaluation, EvaluationApi, Scenario } from './evaluation-api';
+import { Evaluation, EvaluationApi, EvaluationStatus, Scenario } from './evaluation-api';
 
 /** How often a running evaluation is refreshed, in milliseconds. */
 export const EVALUATION_POLL_MS = new InjectionToken<number>('EVALUATION_POLL_MS', {
@@ -28,6 +29,11 @@ export const EVALUATION_POLL_MS = new InjectionToken<number>('EVALUATION_POLL_MS
   styleUrl: './evaluation-page.css',
 })
 export class EvaluationPage {
+  protected readonly i18n = inject(I18n);
+
+  protected statusLabel(status: EvaluationStatus): TranslationKey {
+    return `evalStatus.${status}`;
+  }
   private readonly api = inject(EvaluationApi);
   private readonly agentApi = inject(AgentApi);
   private readonly notifications = inject(Notifications);
@@ -104,7 +110,7 @@ export class EvaluationPage {
     this.starting.set(true);
     try {
       const evaluation = await firstValueFrom(this.api.start(this.model(), [...this.selectedCategories()]));
-      this.notifications.info(`Evaluation of ${evaluation.model} started: ${evaluation.scenarioCount} scenarios.`);
+      this.notifications.info(this.i18n.t('evaluation.started', { model: evaluation.model, count: evaluation.scenarioCount }));
       this.evaluations.reload();
       this.selectedId.set(evaluation.id);
     } catch {
@@ -117,7 +123,7 @@ export class EvaluationPage {
   protected async cancel(evaluation: Evaluation): Promise<void> {
     try {
       await firstValueFrom(this.api.cancel(evaluation.id));
-      this.notifications.info('Evaluation cancelled; the scenario in progress still finishes.');
+      this.notifications.info(this.i18n.t('evaluation.cancelled'));
       this.evaluations.reload();
     } catch {
       // Toast shown by the error interceptor.

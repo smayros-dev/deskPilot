@@ -6,10 +6,10 @@
 
 .skip-link {
   position: absolute;
-  left: -999px;
+  inset-inline-start: -999px;
 }
 .skip-link:focus {
-  left: 1rem;
+  inset-inline-start: 1rem;
   top: 1rem;
   z-index: 30;
   background: var(--surface);
@@ -114,4 +114,14 @@ main:focus { outline: none; }
   font-weight: 700;
   line-height: 1.2rem;
   text-align: center;
+}
+
+.language select {
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.15rem 0.3rem;
 }

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { I18n } from '../core/i18n';
 
 import { ApprovalDecision, PendingApproval } from '../core/models';
 
@@ -14,8 +15,8 @@ interface ApprovalView extends PendingApproval {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="approval" aria-labelledby="approval-title">
-      <h3 id="approval-title">{{ readOnly() ? 'Waiting for a reviewer' : 'Approval needed' }}</h3>
-      <p>The agent wants to perform an action that needs a human decision:</p>
+      <h3 id="approval-title">{{ readOnly() ? i18n.t('approval.waiting') : i18n.t('approval.needed') }}</h3>
+      <p>{{ i18n.t('approval.intro') }}</p>
       @for (call of calls(); track call.toolCallId) {
         <div class="call">
           <code class="tool">{{ call.toolName }}</code>
@@ -29,11 +30,11 @@ interface ApprovalView extends PendingApproval {
       }
       @if (!readOnly()) {
       <form [formGroup]="form" (ngSubmit)="approve()">
-        <label for="comment">Comment for the agent (optional)</label>
-        <input id="comment" formControlName="comment" maxlength="1000" placeholder="e.g. Use priority MEDIUM next time" />
+        <label for="comment">{{ i18n.t('approval.comment') }}</label>
+        <input id="comment" formControlName="comment" maxlength="1000" [placeholder]="i18n.t('approval.commentPlaceholder')" />
         <div class="actions">
-          <button type="button" class="button danger" [disabled]="busy()" (click)="reject()">Reject</button>
-          <button type="submit" class="button primary" [disabled]="busy() || form.invalid">Approve</button>
+          <button type="button" class="button danger" [disabled]="busy()" (click)="reject()">{{ i18n.t('approval.reject') }}</button>
+          <button type="submit" class="button primary" [disabled]="busy() || form.invalid">{{ i18n.t('approval.approve') }}</button>
         </div>
       </form>
       }
@@ -65,6 +66,7 @@ export class ApprovalCard {
   /** Shows the pending calls without the decision form (users who are not reviewers). */
   readonly readOnly = input(false);
   readonly decide = output<ApprovalDecision>();
+  protected readonly i18n = inject(I18n);
 
   protected readonly form = inject(NonNullableFormBuilder).group({
     comment: ['', Validators.maxLength(1000)],

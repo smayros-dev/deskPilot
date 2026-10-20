@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { API_CONFIG } from '../core/api-config';
 import { saveBlob } from '../core/download';
+import { I18n } from '../core/i18n';
 
 export const AUDIT_ACTIONS = [
   'APPROVAL_APPROVED',
@@ -54,32 +55,32 @@ const PAGE_SIZE = 50;
   template: `
     <header class="page-header">
       <div>
-        <h1>Audit trail</h1>
-        <p class="muted">Approvals, settings changes, documents, evaluations and deletions of personal data, newest first.</p>
+        <h1>{{ i18n.t('audit.title') }}</h1>
+        <p class="muted">{{ i18n.t('audit.subtitle') }}</p>
       </div>
-      <button type="button" class="button" [disabled]="exporting()" (click)="exportCsv()">Export CSV</button>
+      <button type="button" class="button" [disabled]="exporting()" (click)="exportCsv()">{{ i18n.t('audit.export') }}</button>
     </header>
 
     <form class="card filters" (submit)="$event.preventDefault()">
       <label>
-        <span>Action</span>
+        <span>{{ i18n.t('audit.action') }}</span>
         <select [value]="action()" (change)="setFilter(action, $any($event.target).value)">
-          <option value="">All actions</option>
+          <option value="">{{ i18n.t('audit.allActions') }}</option>
           @for (option of actions; track option) {
             <option [value]="option">{{ label(option) }}</option>
           }
         </select>
       </label>
       <label>
-        <span>User</span>
-        <input type="text" placeholder="e.g. bob" [value]="actor()" (change)="setFilter(actor, $any($event.target).value)" />
+        <span>{{ i18n.t('audit.user') }}</span>
+        <input type="text" [placeholder]="i18n.t('audit.userPlaceholder')" [value]="actor()" (change)="setFilter(actor, $any($event.target).value)" />
       </label>
       <label>
-        <span>From</span>
+        <span>{{ i18n.t('audit.from') }}</span>
         <input type="date" [value]="from()" (change)="setFilter(from, $any($event.target).value)" />
       </label>
       <label>
-        <span>To (inclusive)</span>
+        <span>{{ i18n.t('audit.to') }}</span>
         <input type="date" [value]="to()" (change)="setFilter(to, $any($event.target).value)" />
       </label>
     </form>
@@ -90,17 +91,17 @@ const PAGE_SIZE = 50;
         <table>
           <thead>
             <tr>
-              <th scope="col">When</th>
-              <th scope="col">User</th>
-              <th scope="col">Action</th>
-              <th scope="col">Target</th>
-              <th scope="col">Details</th>
+              <th scope="col">{{ i18n.t('audit.colWhen') }}</th>
+              <th scope="col">{{ i18n.t('audit.colUser') }}</th>
+              <th scope="col">{{ i18n.t('audit.colAction') }}</th>
+              <th scope="col">{{ i18n.t('audit.colTarget') }}</th>
+              <th scope="col">{{ i18n.t('audit.colDetails') }}</th>
             </tr>
           </thead>
           <tbody>
             @for (event of result.items; track event.id) {
               <tr>
-                <td><time [attr.datetime]="event.at">{{ event.at | date: 'medium' }}</time></td>
+                <td><time [attr.datetime]="event.at">{{ event.at | date: 'medium' : undefined : i18n.locale() }}</time></td>
                 <td>{{ event.actor }}</td>
                 <td><span class="action" [attr.data-action]="event.action">{{ label(event.action) }}</span></td>
                 <td>
@@ -111,20 +112,20 @@ const PAGE_SIZE = 50;
                 <td class="details">{{ event.details }}</td>
               </tr>
             } @empty {
-              <tr><td colspan="5" class="muted">No audit entries match these filters.</td></tr>
+              <tr><td colspan="5" class="muted">{{ i18n.t('audit.none') }}</td></tr>
             }
           </tbody>
         </table>
       </div>
       @if (result.totalPages > 1) {
-        <nav class="pager" aria-label="Pages">
-          <button type="button" class="button" [disabled]="page() === 0" (click)="page.set(page() - 1)">Newer</button>
-          <span class="muted">Page {{ result.page + 1 }} of {{ result.totalPages }} · {{ result.total }} entries</span>
-          <button type="button" class="button" [disabled]="page() + 1 >= result.totalPages" (click)="page.set(page() + 1)">Older</button>
+        <nav class="pager" [attr.aria-label]="i18n.t('audit.pages')">
+          <button type="button" class="button" [disabled]="page() === 0" (click)="page.set(page() - 1)">{{ i18n.t('audit.newer') }}</button>
+          <span class="muted">{{ i18n.t('audit.page', { page: result.page + 1, pages: result.totalPages, total: result.total }) }}</span>
+          <button type="button" class="button" [disabled]="page() + 1 >= result.totalPages" (click)="page.set(page() + 1)">{{ i18n.t('audit.older') }}</button>
         </nav>
       }
     } @else if (events.isLoading()) {
-      <p class="muted">Loading…</p>
+      <p class="muted">{{ i18n.t('common.loading') }}</p>
     }
   `,
   styles: `
@@ -142,6 +143,7 @@ const PAGE_SIZE = 50;
   `,
 })
 export class AuditPage {
+  protected readonly i18n = inject(I18n);
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${inject(API_CONFIG).baseUrl}/audit`;
 
@@ -184,9 +186,8 @@ export class AuditPage {
     this.page.set(0);
   }
 
-  protected label(action: string): string {
-    const text = action.toLowerCase().replaceAll('_', ' ');
-    return text.charAt(0).toUpperCase() + text.slice(1);
+  protected label(action: AuditAction): string {
+    return this.i18n.t(`auditAction.${action}`);
   }
 
   protected async exportCsv(): Promise<void> {

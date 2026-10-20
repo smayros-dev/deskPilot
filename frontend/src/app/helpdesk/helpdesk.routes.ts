@@ -5,17 +5,17 @@ export const HELPDESK_ROUTES: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'tickets' },
   {
     path: 'tickets',
-    title: 'Tickets',
+    title: 'title.tickets',
     loadComponent: () => import('./tickets-page').then((m) => m.TicketsPage),
   },
   {
     path: 'knowledge',
-    title: 'Knowledge base',
+    title: 'title.knowledge',
     loadComponent: () => import('./knowledge-page').then((m) => m.KnowledgePage),
   },
   {
     path: 'memories',
-    title: 'Memories',
+    title: 'title.memories',
     loadComponent: () => import('./memories-page').then((m) => m.MemoriesPage),
   },
 ];

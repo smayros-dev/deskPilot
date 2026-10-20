@@ -6,6 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AgentApi } from '../core/agent-api';
 import { AuthService } from '../core/auth';
 import { EventsService } from '../core/events';
+import { I18n } from '../core/i18n';
 import { Ticket, TicketPriority } from '../core/models';
 
 type PriorityFilter = TicketPriority | 'ALL';
@@ -17,33 +18,33 @@ type PriorityFilter = TicketPriority | 'ALL';
   template: `
     <header class="page-header">
       <div>
-        <h1>{{ auth.isReviewer() || auth.isAdmin() ? 'All tickets' : 'Your tickets' }}</h1>
-        <p class="muted">Created by the agent after a reviewer approved them.</p>
+        <h1>{{ auth.isReviewer() || auth.isAdmin() ? i18n.t('tickets.all') : i18n.t('tickets.yours') }}</h1>
+        <p class="muted">{{ i18n.t('tickets.subtitle') }}</p>
       </div>
-      <button type="button" class="button" (click)="tickets.reload()" [disabled]="tickets.isLoading()">Refresh</button>
+      <button type="button" class="button" (click)="tickets.reload()" [disabled]="tickets.isLoading()">{{ i18n.t('common.refresh') }}</button>
     </header>
 
-    <div class="filters" role="group" aria-label="Filter by priority">
+    <div class="filters" role="group" [attr.aria-label]="i18n.t('tickets.filter')">
       @for (option of priorities; track option) {
         <button type="button" class="chip" [class.selected]="filter() === option" [attr.aria-pressed]="filter() === option" (click)="filter.set(option)">
-          {{ option === 'ALL' ? 'All' : option }}
+          {{ option === 'ALL' ? i18n.t('common.all') : option }}
         </button>
       }
     </div>
 
     @if (tickets.hasValue()) {
       <div class="master-detail">
-        <ul class="list card" aria-label="Tickets">
+        <ul class="list card" [attr.aria-label]="i18n.t('tickets.list')">
           @for (ticket of filtered(); track ticket.id) {
             <li>
               <button type="button" class="row" [class.selected]="selected()?.id === ticket.id" (click)="selected.set(ticket)">
                 <span class="prio" [attr.data-priority]="ticket.priority">{{ ticket.priority }}</span>
                 <span class="title">#{{ ticket.id }} {{ ticket.title }}</span>
-                <span class="muted">{{ ticket.createdAt | date: 'short' }}</span>
+                <span class="muted">{{ ticket.createdAt | date: 'short' : undefined : i18n.locale() }}</span>
               </button>
             </li>
           } @empty {
-            <li class="muted empty">No tickets{{ filter() === 'ALL' ? '' : ' with this priority' }}.</li>
+            <li class="muted empty">{{ filter() === 'ALL' ? i18n.t('tickets.none') : i18n.t('tickets.noneWithPriority') }}</li>
           }
         </ul>
 
@@ -51,17 +52,17 @@ type PriorityFilter = TicketPriority | 'ALL';
           <article class="card detail">
             <h2>#{{ ticket.id }} {{ ticket.title }}</h2>
             <dl>
-              <dt>Priority</dt><dd>{{ ticket.priority }}</dd>
-              <dt>Status</dt><dd>{{ ticket.status }}</dd>
-              <dt>Requested by</dt><dd>{{ ticket.requestedBy }}</dd>
-              <dt>Created</dt><dd>{{ ticket.createdAt | date: 'medium' }}</dd>
+              <dt>{{ i18n.t('tickets.priority') }}</dt><dd>{{ ticket.priority }}</dd>
+              <dt>{{ i18n.t('tickets.status') }}</dt><dd>{{ ticket.status }}</dd>
+              <dt>{{ i18n.t('tickets.requestedBy') }}</dt><dd>{{ ticket.requestedBy }}</dd>
+              <dt>{{ i18n.t('tickets.created') }}</dt><dd>{{ ticket.createdAt | date: 'medium' : undefined : i18n.locale() }}</dd>
             </dl>
             <p>{{ ticket.description }}</p>
           </article>
         }
       </div>
     } @else if (tickets.isLoading()) {
-      <p class="muted">Loading tickets…</p>
+      <p class="muted">{{ i18n.t('tickets.loading') }}</p>
     }
   `,
   styles: `
@@ -88,6 +89,7 @@ type PriorityFilter = TicketPriority | 'ALL';
 export class TicketsPage {
   private readonly api = inject(AgentApi);
   protected readonly auth = inject(AuthService);
+  protected readonly i18n = inject(I18n);
 
   protected readonly priorities: PriorityFilter[] = ['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
   protected readonly tickets = httpResource<Ticket[]>(() => this.api.url('/tickets'), { defaultValue: [] });

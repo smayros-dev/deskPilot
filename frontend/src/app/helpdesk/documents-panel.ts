@@ -3,6 +3,7 @@ import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, output, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
+import { I18n, TranslationKey } from '../core/i18n';
 import { KnowledgeDocument } from '../core/models';
 import { Notifications } from '../core/notifications';
 import { DOCUMENTS_POLL_MS, DocumentsApi, documentProblem } from './documents-api';
@@ -17,7 +18,7 @@ import { DOCUMENTS_POLL_MS, DocumentsApi, documentProblem } from './documents-ap
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="card" aria-labelledby="documents-title">
-      <h2 id="documents-title">Documents</h2>
+      <h2 id="documents-title">{{ i18n.t('documents.title') }}</h2>
       <div
         class="drop-zone"
         [class.dragging]="dragging()"
@@ -25,19 +26,19 @@ import { DOCUMENTS_POLL_MS, DocumentsApi, documentProblem } from './documents-ap
         (dragleave)="dragging.set(false)"
         (drop)="onDrop($event)"
       >
-        <p>Drop a PDF, Markdown, text or HTML file here (up to 10 MB), or</p>
+        <p>{{ i18n.t('documents.drop') }}</p>
         <label class="button">
-          Choose a file
+          {{ i18n.t('documents.choose') }}
           <input type="file" class="visually-hidden" accept=".pdf,.md,.markdown,.txt,.html,.htm" (change)="onPick($event)" />
         </label>
         <label class="title-field">
-          <span>Title (optional)</span>
-          <input type="text" maxlength="200" [value]="title()" (input)="title.set($any($event.target).value)" placeholder="Defaults to the file name" />
+          <span>{{ i18n.t('documents.titleOptional') }}</span>
+          <input type="text" maxlength="200" [value]="title()" (input)="title.set($any($event.target).value)" [placeholder]="i18n.t('documents.titlePlaceholder')" />
         </label>
         @if (uploading(); as name) {
           <div class="uploading" role="status">
-            <span>Uploading {{ name }}…</span>
-            <progress aria-label="Uploading"></progress>
+            <span>{{ i18n.t('documents.uploading', { name: name }) }}</span>
+            <progress [attr.aria-label]="i18n.t('documents.uploading', { name: name })"></progress>
           </div>
         }
         @if (problem(); as message) {
@@ -50,12 +51,12 @@ import { DOCUMENTS_POLL_MS, DocumentsApi, documentProblem } from './documents-ap
           <table>
             <thead>
               <tr>
-                <th scope="col">Document</th>
-                <th scope="col">Status</th>
-                <th scope="col">Articles</th>
-                <th scope="col">Size</th>
-                <th scope="col">Uploaded</th>
-                <th scope="col"><span class="visually-hidden">Actions</span></th>
+                <th scope="col">{{ i18n.t('documents.colDocument') }}</th>
+                <th scope="col">{{ i18n.t('documents.colStatus') }}</th>
+                <th scope="col">{{ i18n.t('documents.colArticles') }}</th>
+                <th scope="col">{{ i18n.t('documents.colSize') }}</th>
+                <th scope="col">{{ i18n.t('documents.colUploaded') }}</th>
+                <th scope="col"><span class="visually-hidden">{{ i18n.t('documents.colActions') }}</span></th>
               </tr>
             </thead>
             <tbody>
@@ -66,20 +67,20 @@ import { DOCUMENTS_POLL_MS, DocumentsApi, documentProblem } from './documents-ap
                     <small class="muted">{{ document.fileName }} · {{ document.format.toLowerCase() }}</small>
                   </td>
                   <td>
-                    <span class="status" [attr.data-status]="document.status">{{ document.status.toLowerCase() }}</span>
+                    <span class="status" [attr.data-status]="document.status">{{ i18n.t(statusLabel(document.status)) }}</span>
                     @if (document.error) {
                       <small class="error-text">{{ document.error }}</small>
                     }
                   </td>
                   <td>{{ document.chunks }}</td>
-                  <td>{{ document.sizeBytes / 1024 | number: '1.0-0' }} KB</td>
+                  <td>{{ document.sizeBytes / 1024 | number: '1.0-0' : i18n.locale() }} KB</td>
                   <td>
-                    {{ document.uploadedAt | date: 'short' }}
-                    <small class="muted">by {{ document.uploadedBy }}</small>
+                    {{ document.uploadedAt | date: 'short' : undefined : i18n.locale() }}
+                    <small class="muted">{{ i18n.t('documents.by', { user: document.uploadedBy }) }}</small>
                   </td>
                   <td class="actions">
-                    <button type="button" class="link-button" [disabled]="document.status === 'PROCESSING'" (click)="reindex(document)">Re-index</button>
-                    <button type="button" class="link-button danger" (click)="remove(document)">Delete</button>
+                    <button type="button" class="link-button" [disabled]="document.status === 'PROCESSING'" (click)="reindex(document)">{{ i18n.t('documents.reindex') }}</button>
+                    <button type="button" class="link-button danger" (click)="remove(document)">{{ i18n.t('common.delete') }}</button>
                   </td>
                 </tr>
               }
@@ -87,7 +88,7 @@ import { DOCUMENTS_POLL_MS, DocumentsApi, documentProblem } from './documents-ap
           </table>
         </div>
       } @else if (documents.hasValue()) {
-        <p class="muted">No document uploaded yet. The seeded helpdesk articles are always available.</p>
+        <p class="muted">{{ i18n.t('documents.none') }}</p>
       }
     </section>
   `,
@@ -119,6 +120,11 @@ import { DOCUMENTS_POLL_MS, DocumentsApi, documentProblem } from './documents-ap
   `,
 })
 export class DocumentsPanel {
+  protected readonly i18n = inject(I18n);
+
+  protected statusLabel(status: KnowledgeDocument['status']): TranslationKey {
+    return `docStatus.${status}`;
+  }
   private readonly api = inject(DocumentsApi);
   private readonly notifications = inject(Notifications);
   private readonly pollMs = inject(DOCUMENTS_POLL_MS);
@@ -178,7 +184,7 @@ export class DocumentsPanel {
   }
 
   async upload(file: File): Promise<void> {
-    const problem = documentProblem(file);
+    const problem = documentProblem(file, (key, params) => this.i18n.t(key, params));
     this.problem.set(problem);
     if (problem) {
       return;
@@ -186,7 +192,7 @@ export class DocumentsPanel {
     this.uploading.set(file.name);
     try {
       const document = await firstValueFrom(this.api.upload(file, this.title() || null));
-      this.notifications.info(`“${document.title}” uploaded; it is being split into articles.`);
+      this.notifications.info(this.i18n.t('documents.uploaded', { title: document.title }));
       this.title.set('');
       this.documents.reload();
     } catch {
@@ -206,12 +212,12 @@ export class DocumentsPanel {
   }
 
   protected async remove(document: KnowledgeDocument): Promise<void> {
-    if (!confirm(`Delete “${document.title}” and its ${document.chunks} articles from the knowledge base?`)) {
+    if (!confirm(this.i18n.t('documents.confirmDelete', { title: document.title, count: document.chunks }))) {
       return;
     }
     try {
       await firstValueFrom(this.api.delete(document.id));
-      this.notifications.info(`“${document.title}” deleted.`);
+      this.notifications.info(this.i18n.t('documents.deleted', { title: document.title }));
       this.documents.reload();
       this.changed.emit();
     } catch {

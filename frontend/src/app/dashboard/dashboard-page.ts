@@ -6,12 +6,13 @@ import { RouterLink } from '@angular/router';
 
 import { AgentApi } from '../core/agent-api';
 import { AuthService } from '../core/auth';
+import { I18n, TranslationKey } from '../core/i18n';
 import { AgentMetrics, RatedAnswer } from '../core/models';
 import { DurationPipe } from '../shared/duration-pipe';
 
 interface StatusSlice {
   key: string;
-  label: string;
+  label: TranslationKey;
   count: number;
   share: number;
 }
@@ -25,6 +26,7 @@ interface StatusSlice {
   styleUrl: './dashboard-page.css',
 })
 export class DashboardPage {
+  protected readonly i18n = inject(I18n);
   private readonly api = inject(AgentApi);
 
   private readonly auth = inject(AuthService);
@@ -43,12 +45,13 @@ export class DashboardPage {
     }
     const m = this.metrics.value();
     const total = Math.max(1, m.totalRuns);
-    return [
-      { key: 'completed', label: 'Completed', count: m.completed },
-      { key: 'escalated', label: 'Escalated', count: m.escalated },
-      { key: 'failed', label: 'Failed', count: m.failed },
-      { key: 'awaiting', label: 'Awaiting approval', count: m.awaitingApproval },
-    ].map((slice) => ({ ...slice, share: slice.count / total }));
+    const slices: Omit<StatusSlice, 'share'>[] = [
+      { key: 'completed', label: 'outcome.completed', count: m.completed },
+      { key: 'escalated', label: 'outcome.escalated', count: m.escalated },
+      { key: 'failed', label: 'outcome.failed', count: m.failed },
+      { key: 'awaiting', label: 'outcome.awaiting', count: m.awaitingApproval },
+    ];
+    return slices.map((slice) => ({ ...slice, share: slice.count / total }));
   });
 
   protected readonly maxToolCalls = computed(() =>

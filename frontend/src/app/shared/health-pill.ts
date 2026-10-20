@@ -2,6 +2,7 @@ import { HttpContext, httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 
 import { API_CONFIG, SILENT_ERRORS } from '../core/api-config';
+import { I18n } from '../core/i18n';
 import { Health } from '../core/models';
 
 const REFRESH_MS = 30_000;
@@ -24,6 +25,7 @@ const REFRESH_MS = 30_000;
 })
 export class HealthPill {
   private readonly config = inject(API_CONFIG);
+  private readonly i18n = inject(I18n);
 
   private readonly health = httpResource<Health>(() => ({
     url: `${this.config.actuatorUrl}/health`,
@@ -45,16 +47,16 @@ export class HealthPill {
   protected readonly label = computed(() => {
     switch (this.state()) {
       case 'up':
-        return 'Model online';
+        return this.i18n.t('health.online');
       case 'down':
-        return 'Model offline';
+        return this.i18n.t('health.offline');
       default:
-        return 'Checking…';
+        return this.i18n.t('health.checking');
     }
   });
 
   protected readonly tooltip = computed(() =>
-    this.state() === 'down' ? 'Start Ollama (ollama serve) and the backend, then wait for the next check.' : 'Ollama is reachable',
+    this.state() === 'down' ? this.i18n.t('health.offlineHint') : this.i18n.t('health.onlineHint'),
   );
 
   constructor() {

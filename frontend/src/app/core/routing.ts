@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, effect, inject, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import {
   CanDeactivateFn,
@@ -12,6 +12,8 @@ import { catchError, of } from 'rxjs';
 
 import { AgentApi } from './agent-api';
 import { ChatStore } from './chat-store';
+import { I18n, TranslationKey } from './i18n';
+import { EN } from './i18n/en';
 import { Run } from './models';
 
 /** Loads the run before the details page renders; unknown ids go to the 404 page. */
@@ -25,7 +27,7 @@ export const runResolver: ResolveFn<Run> = (route) => {
 /** Warns before leaving the chat while the agent is still working on a request. */
 export const leaveWhileBusyGuard: CanDeactivateFn<unknown> = () => {
   const store = inject(ChatStore);
-  return !store.sending() || confirm('The agent is still working on your request. Leave anyway? The answer will appear when you come back.');
+  return !store.sending() || confirm(inject(I18n).t('guard.leaveBusy'));
 };
 
 /** Implemented by pages with a form, so leaving them does not silently drop edits. */
@@ -34,15 +36,25 @@ export interface HasUnsavedChanges {
 }
 
 export const unsavedChangesGuard: CanDeactivateFn<HasUnsavedChanges> = (component) =>
-  !component.hasUnsavedChanges() || confirm('You have unsaved changes. Leave without saving?');
+  !component.hasUnsavedChanges() || confirm(inject(I18n).t('guard.unsaved'));
 
-/** Prefixes every route title with the app name. */
+/** Route titles are translation keys; they are shown in the current language and follow language changes. */
 @Injectable({ providedIn: 'root' })
 export class AppTitleStrategy extends TitleStrategy {
   private readonly title = inject(Title);
+  private readonly i18n = inject(I18n);
+  private readonly pageKey = signal<string | undefined>(undefined);
+
+  constructor() {
+    super();
+    effect(() => {
+      const key = this.pageKey();
+      const page = key && key in EN ? this.i18n.t(key as TranslationKey) : key;
+      this.title.setTitle(page ? `${page} · DeskPilot` : 'DeskPilot');
+    });
+  }
 
   override updateTitle(snapshot: RouterStateSnapshot): void {
-    const pageTitle = this.buildTitle(snapshot);
-    this.title.setTitle(pageTitle ? `${pageTitle} · DeskPilot` : 'DeskPilot');
+    this.pageKey.set(this.buildTitle(snapshot));
   }
 }

@@ -13,4 +13,10 @@ describe('DurationPipe', () => {
   ])('formats %s as %s', (input, expected) => {
     expect(pipe.transform(input)).toBe(expected);
   });
+
+  it('uses the units and decimal separator of the UI language', () => {
+    expect(pipe.transform(4200, 'fr')).toBe('4,2 s');
+    expect(pipe.transform(95_000, 'fr')).toBe('1 min 35 s');
+    expect(pipe.transform(95_000, 'ar')).toBe('1 د 35 ث');
+  });
 });

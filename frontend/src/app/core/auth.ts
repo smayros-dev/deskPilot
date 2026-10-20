@@ -5,6 +5,7 @@ import { AuthConfig, OAuthService } from 'angular-oauth2-oidc';
 import { filter } from 'rxjs';
 
 import { API_CONFIG } from './api-config';
+import { I18n } from './i18n';
 
 export type Role = 'user' | 'reviewer' | 'admin';
 
@@ -36,6 +37,7 @@ interface AccessTokenClaims {
 export class AuthService {
   private readonly oauth = inject(OAuthService);
   private readonly settings = inject(AUTH_SETTINGS);
+  private readonly i18n = inject(I18n);
 
   private readonly _claims = signal<AccessTokenClaims | null>(null);
   private readonly _error = signal<string | null>(null);
@@ -59,7 +61,7 @@ export class AuthService {
       this.oauth.setupAutomaticSilentRefresh();
       this.readToken();
     } catch {
-      this._error.set(`Cannot reach the sign-in service at ${this.settings.issuer}. Is Keycloak running?`);
+      this._error.set(this.i18n.t('auth.cannotReach', { issuer: this.settings.issuer ?? '' }));
     }
   }
 

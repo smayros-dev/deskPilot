@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { ApprovalCard } from '../chat/approval-card';
 import { AgentApi } from '../core/agent-api';
 import { EventsService } from '../core/events';
+import { I18n } from '../core/i18n';
 import { ApprovalDecision, Run } from '../core/models';
 import { Notifications } from '../core/notifications';
 
@@ -18,10 +19,10 @@ import { Notifications } from '../core/notifications';
   template: `
     <header class="page-header">
       <div>
-        <h1>Approvals</h1>
-        <p class="muted">Actions the agent wants to take on behalf of users. The run continues as soon as you decide.</p>
+        <h1>{{ i18n.t('approvals.title') }}</h1>
+        <p class="muted">{{ i18n.t('approvals.subtitle') }}</p>
       </div>
-      <button type="button" class="button" (click)="queue.reload()" [disabled]="queue.isLoading()">Refresh</button>
+      <button type="button" class="button" (click)="queue.reload()" [disabled]="queue.isLoading()">{{ i18n.t('common.refresh') }}</button>
     </header>
 
     @if (queue.hasValue()) {
@@ -30,18 +31,18 @@ import { Notifications } from '../core/notifications';
           <li class="card">
             <div class="request">
               <strong>{{ run.userId }}</strong>
-              <span class="muted">asked {{ run.createdAt | date: 'short' }}</span>
-              <a [routerLink]="['/runs', run.id]">Trace</a>
+              <span class="muted">{{ i18n.t('approvals.asked', { date: (run.createdAt | date: 'short' : undefined : i18n.locale()) ?? '' }) }}</span>
+              <a [routerLink]="['/runs', run.id]">{{ i18n.t('approvals.trace') }}</a>
             </div>
             <blockquote>{{ run.userInput }}</blockquote>
             <app-approval-card [approvals]="run.pendingApprovals" [busy]="deciding() === run.id" (decide)="decide(run, $event)" />
           </li>
         } @empty {
-          <li class="card muted">Nothing to review. New requests appear here when the agent asks for approval.</li>
+          <li class="card muted">{{ i18n.t('approvals.empty') }}</li>
         }
       </ol>
     } @else if (queue.isLoading()) {
-      <p class="muted">Loading…</p>
+      <p class="muted">{{ i18n.t('common.loading') }}</p>
     }
   `,
   styles: `
@@ -52,6 +53,7 @@ import { Notifications } from '../core/notifications';
   `,
 })
 export class ApprovalsPage {
+  protected readonly i18n = inject(I18n);
   private readonly api = inject(AgentApi);
   private readonly notifications = inject(Notifications);
 
@@ -76,7 +78,8 @@ export class ApprovalsPage {
     this.deciding.set(run.id);
     try {
       const result = await firstValueFrom(this.api.decide(run.id, decision));
-      this.notifications.info(`${decision.approved ? 'Approved' : 'Rejected'}; the run is now ${result.status.toLowerCase().replace('_', ' ')}.`);
+      const status = this.i18n.t(`status.${result.status}`).toLowerCase();
+      this.notifications.info(this.i18n.t(decision.approved ? 'approvals.approved' : 'approvals.rejected', { status }));
       this.queue.reload();
     } catch {
       // Toast shown by the error interceptor.

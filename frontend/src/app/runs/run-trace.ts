@@ -1,28 +1,16 @@
 import { DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 
+import { I18n, TranslationKey } from '../core/i18n';
 import { Run, RunStep, StepType } from '../core/models';
 import { Answer } from '../shared/answer';
 import { DurationPipe } from '../shared/duration-pipe';
 
 interface StepView extends RunStep {
-  label: string;
   body: string;
   isJson: boolean;
 }
 
-const STEP_LABELS: Record<StepType, string> = {
-  USER_INPUT: 'User',
-  THOUGHT: 'Thought',
-  TOOL_CALL: 'Tool call',
-  TOOL_RESULT: 'Tool result',
-  APPROVAL_REQUESTED: 'Approval requested',
-  APPROVAL_DECISION: 'Human decision',
-  ANSWER: 'Answer',
-  GUARDRAIL: 'Guardrail',
-  ERROR: 'Error',
-  IMAGE_ANALYSIS: 'Screenshot read',
-};
 
 /** The ReAct trace of one run: thoughts, tool calls and results, approvals and the answer. */
 @Component({
@@ -30,17 +18,17 @@ const STEP_LABELS: Record<StepType, string> = {
   imports: [DecimalPipe, DurationPipe, Answer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="stats" role="list" aria-label="Run statistics">
+    <div class="stats" role="list" [attr.aria-label]="i18n.t('trace.stats')">
       @if (run().model) {
         <span role="listitem"><code>{{ run().model }}</code></span>
       }
-      <span role="listitem"><strong>{{ run().stats.activeMillis | duration }}</strong> active</span>
-      <span role="listitem"><strong>{{ run().stats.iterations }}</strong> model calls</span>
-      <span role="listitem"><strong>{{ run().stats.toolCalls }}</strong> tool calls</span>
+      <span role="listitem"><strong>{{ run().stats.activeMillis | duration: i18n.lang() }}</strong> {{ i18n.t('trace.active') }}</span>
+      <span role="listitem"><strong>{{ run().stats.iterations }}</strong> {{ i18n.t('trace.modelCalls') }}</span>
+      <span role="listitem"><strong>{{ run().stats.toolCalls }}</strong> {{ i18n.t('trace.toolCalls') }}</span>
       @if (run().stats.toolErrors > 0) {
-        <span role="listitem" class="error-text"><strong>{{ run().stats.toolErrors }}</strong> tool errors</span>
+        <span role="listitem" class="error-text"><strong>{{ run().stats.toolErrors }}</strong> {{ i18n.t('trace.toolErrors') }}</span>
       }
-      <span role="listitem"><strong>{{ totalTokens() | number }}</strong> tokens</span>
+      <span role="listitem"><strong>{{ totalTokens() | number: undefined : i18n.locale() }}</strong> {{ i18n.t('trace.tokens') }}</span>
     </div>
 
     <ol class="steps">
@@ -61,12 +49,12 @@ const STEP_LABELS: Record<StepType, string> = {
                 @default { ❗ }
               }
             </span>
-            <span class="label">{{ step.label }}</span>
+            <span class="label">{{ i18n.t(stepLabel(step.type)) }}</span>
             @if (step.name && step.type !== 'ANSWER') {
               <code>{{ step.name }}</code>
             }
             @if (step.durationMillis > 0) {
-              <span class="muted">{{ step.durationMillis | duration }}</span>
+              <span class="muted">{{ step.durationMillis | duration: i18n.lang() }}</span>
             }
           </div>
           @if (step.body) {
@@ -80,7 +68,7 @@ const STEP_LABELS: Record<StepType, string> = {
           }
         </li>
       } @empty {
-        <li class="muted">No steps recorded.</li>
+        <li class="muted">{{ i18n.t('trace.noSteps') }}</li>
       }
     </ol>
   `,
@@ -89,11 +77,11 @@ const STEP_LABELS: Record<StepType, string> = {
     .stats strong { color: var(--text); }
     .error-text, .error-text strong { color: var(--danger); }
     .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
-    .step { border-left: 3px solid var(--border); padding: 0.25rem 0 0.25rem 0.75rem; }
-    .step[data-type='TOOL_CALL'], .step[data-type='TOOL_RESULT'] { border-left-color: var(--accent); }
-    .step[data-type='APPROVAL_REQUESTED'], .step[data-type='APPROVAL_DECISION'] { border-left-color: var(--warn); }
-    .step[data-type='ANSWER'] { border-left-color: var(--ok); }
-    .step.error, .step[data-type='GUARDRAIL'] { border-left-color: var(--danger); }
+    .step { border-inline-start: 3px solid var(--border); padding-block: 0.25rem; padding-inline: 0.75rem 0; }
+    .step[data-type='TOOL_CALL'], .step[data-type='TOOL_RESULT'] { border-inline-start-color: var(--accent); }
+    .step[data-type='APPROVAL_REQUESTED'], .step[data-type='APPROVAL_DECISION'] { border-inline-start-color: var(--warn); }
+    .step[data-type='ANSWER'] { border-inline-start-color: var(--ok); }
+    .step.error, .step[data-type='GUARDRAIL'] { border-inline-start-color: var(--danger); }
     .step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
     .label { font-weight: 600; }
     .muted { color: var(--text-muted); font-size: 0.8rem; }
@@ -104,13 +92,18 @@ const STEP_LABELS: Record<StepType, string> = {
 })
 export class RunTrace {
   readonly run = input.required<Run>();
+  protected readonly i18n = inject(I18n);
+
+  protected stepLabel(type: StepType): TranslationKey {
+    return `step.${type}`;
+  }
 
   protected readonly totalTokens = computed(() => this.run().stats.promptTokens + this.run().stats.completionTokens);
 
   protected readonly steps = computed<StepView[]>(() =>
     this.run().steps.map((step) => {
       const pretty = prettyJson(step.content);
-      return { ...step, label: STEP_LABELS[step.type], body: pretty ?? step.content ?? '', isJson: pretty !== null };
+      return { ...step, body: pretty ?? step.content ?? '', isJson: pretty !== null };
     }),
   );
 }

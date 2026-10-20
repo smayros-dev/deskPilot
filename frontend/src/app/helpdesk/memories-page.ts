@@ -7,6 +7,7 @@ import { firstValueFrom } from 'rxjs';
 import { AgentApi } from '../core/agent-api';
 import { ChatStore } from '../core/chat-store';
 import { saveBlob } from '../core/download';
+import { I18n } from '../core/i18n';
 import { Memory } from '../core/models';
 import { Notifications } from '../core/notifications';
 import { PrivacyApi } from './privacy-api';
@@ -19,11 +20,11 @@ import { PrivacyApi } from './privacy-api';
   template: `
     <header class="page-header">
       <div>
-        <h1>Your memories</h1>
-        <p class="muted">Facts the agent saved with <code>save_memory</code> and recalls in later conversations.</p>
+        <h1>{{ i18n.t('memories.title') }}</h1>
+        <p class="muted">{{ i18n.t('memories.subtitle') }}</p>
       </div>
       @if (memories.hasValue() && memories.value().length > 0) {
-        <button type="button" class="button danger" [disabled]="busy()" (click)="deleteAllMemories()">Forget everything</button>
+        <button type="button" class="button danger" [disabled]="busy()" (click)="deleteAllMemories()">{{ i18n.t('memories.forgetAll') }}</button>
       }
     </header>
 
@@ -33,33 +34,28 @@ import { PrivacyApi } from './privacy-api';
           <li>
             <span>{{ memory.content }}</span>
             <span class="meta">
-              <time class="muted" [attr.datetime]="memory.createdAt">{{ memory.createdAt | date: 'medium' }}</time>
+              <time class="muted" [attr.datetime]="memory.createdAt">{{ memory.createdAt | date: 'medium' : undefined : i18n.locale() }}</time>
               <button type="button" class="link-button" [disabled]="busy()" (click)="deleteMemory(memory)"
-                      [attr.aria-label]="'Forget: ' + memory.content">Forget</button>
+                      [attr.aria-label]="i18n.t('memories.forgetLabel', { content: memory.content })">{{ i18n.t('memories.forget') }}</button>
             </span>
           </li>
         } @empty {
           <li class="muted">
-            Nothing remembered yet. Tell the agent something about your setup in the <a routerLink="/chat">chat</a>,
-            e.g. “Remember that I use a MacBook”.
+            {{ i18n.t('memories.emptyBefore') }} <a routerLink="/chat">{{ i18n.t('memories.emptyLink') }}</a>{{ i18n.t('memories.emptyAfter') }}
           </li>
         }
       </ul>
     } @else if (memories.isLoading()) {
-      <p class="muted">Loading…</p>
+      <p class="muted">{{ i18n.t('common.loading') }}</p>
     }
 
     <section class="card privacy" aria-labelledby="privacy-title">
-      <h2 id="privacy-title">Your data</h2>
-      <p class="muted">
-        DeskPilot keeps your conversations (questions, answers and the agent's reasoning), these memories and the tickets
-        you requested. You can download all of it, or delete your conversations and memories. Tickets stay with the
-        helpdesk.
-      </p>
+      <h2 id="privacy-title">{{ i18n.t('privacy.title') }}</h2>
+      <p class="muted">{{ i18n.t('privacy.text') }}</p>
       <div class="actions">
-        <button type="button" class="button" [disabled]="busy()" (click)="download()">Download my data</button>
+        <button type="button" class="button" [disabled]="busy()" (click)="download()">{{ i18n.t('privacy.download') }}</button>
         <button type="button" class="button danger" [disabled]="busy()" (click)="deleteAllData()">
-          Delete my conversations and memories
+          {{ i18n.t('privacy.deleteAll') }}
         </button>
       </div>
     </section>
@@ -77,6 +73,7 @@ import { PrivacyApi } from './privacy-api';
   `,
 })
 export class MemoriesPage {
+  protected readonly i18n = inject(I18n);
   private readonly api = inject(AgentApi);
   private readonly privacy = inject(PrivacyApi);
   private readonly chat = inject(ChatStore);
@@ -86,12 +83,12 @@ export class MemoriesPage {
   protected readonly busy = signal(false);
 
   protected async deleteMemory(memory: Memory): Promise<void> {
-    await this.run(() => firstValueFrom(this.privacy.deleteMemory(memory.id)), 'Forgotten.');
+    await this.run(() => firstValueFrom(this.privacy.deleteMemory(memory.id)), this.i18n.t('memories.forgotten'));
   }
 
   protected async deleteAllMemories(): Promise<void> {
-    if (confirm('Forget everything the agent remembers about you?')) {
-      await this.run(() => firstValueFrom(this.privacy.deleteAllMemories()), 'All memories deleted.');
+    if (confirm(this.i18n.t('memories.confirmForgetAll'))) {
+      await this.run(() => firstValueFrom(this.privacy.deleteAllMemories()), this.i18n.t('memories.allDeleted'));
     }
   }
 
@@ -107,11 +104,10 @@ export class MemoriesPage {
   }
 
   protected async deleteAllData(): Promise<void> {
-    if (!confirm('Delete all your conversations and memories? This cannot be undone. Your tickets are kept.')) {
+    if (!confirm(this.i18n.t('privacy.confirmDeleteAll'))) {
       return;
     }
-    const deleted = await this.run(() => firstValueFrom(this.privacy.deleteAllData()),
-      'Your conversations and memories were deleted.');
+    const deleted = await this.run(() => firstValueFrom(this.privacy.deleteAllData()), this.i18n.t('privacy.deleted'));
     if (deleted) {
       // The current conversation no longer exists: start a fresh one for the chat.
       await this.chat.newConversation();

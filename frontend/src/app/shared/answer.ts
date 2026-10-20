@@ -1,8 +1,9 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Citation, citationsOf } from '../core/citations';
+import { I18n } from '../core/i18n';
 import { Run } from '../core/models';
 import { parseMarkdown } from './markdown';
 
@@ -50,7 +51,7 @@ import { parseMarkdown } from './markdown';
 
     @if (citations().length > 0) {
       <div class="sources">
-        <span class="label">Sources</span>
+        <span class="label">{{ i18n.t('answer.sources') }}</span>
         <ol>
           @for (citation of citations(); track citation.articleId) {
             <li>
@@ -73,7 +74,7 @@ import { parseMarkdown } from './markdown';
             @let citation = citationById().get(part.id);
             @if (citation) {
               <sup><a class="cite" routerLink="/helpdesk/knowledge" [queryParams]="{ article: citation.articleId }"
-                      [title]="citation.title" [attr.aria-label]="'Source ' + citation.number + ': ' + citation.title">{{ citation.number }}</a></sup>
+                      [title]="citation.title" [attr.aria-label]="i18n.t('answer.source', { n: citation.number, title: citation.title })">{{ citation.number }}</a></sup>
             } @else {
               <span>[{{ part.id }}]</span>
             }
@@ -105,6 +106,7 @@ import { parseMarkdown } from './markdown';
   `,
 })
 export class Answer {
+  protected readonly i18n = inject(I18n);
   readonly text = input.required<string | null | undefined>();
   /** The run the answer belongs to; its knowledge-base searches tell which article each [n] marker means. */
   readonly run = input<Run | null>(null);

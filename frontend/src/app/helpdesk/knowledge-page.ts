@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, afterRenderEffect, comp
 
 import { AgentApi } from '../core/agent-api';
 import { AuthService } from '../core/auth';
+import { I18n } from '../core/i18n';
 import { Article } from '../core/models';
 import { DocumentsPanel } from './documents-panel';
 
@@ -13,8 +14,8 @@ import { DocumentsPanel } from './documents-panel';
   template: `
     <header class="page-header">
       <div>
-        <h1>Knowledge base</h1>
-        <p class="muted">The articles the agent searches (keywords and meaning, with nomic-embed-text). It may only answer from these.</p>
+        <h1>{{ i18n.t('knowledge.title') }}</h1>
+        <p class="muted">{{ i18n.t('knowledge.subtitle') }}</p>
       </div>
     </header>
 
@@ -23,20 +24,20 @@ import { DocumentsPanel } from './documents-panel';
     }
 
     <label class="search">
-      <span class="visually-hidden">Filter articles</span>
-      <input type="search" placeholder="Filter by title or keyword…" [value]="query()" (input)="query.set($any($event.target).value)" />
+      <span class="visually-hidden">{{ i18n.t('knowledge.filter') }}</span>
+      <input type="search" [placeholder]="i18n.t('knowledge.filterPlaceholder')" [value]="query()" (input)="query.set($any($event.target).value)" />
     </label>
 
     @if (articles.hasValue()) {
-      <p class="muted count">{{ filtered().length }} of {{ articles.value().length }} articles</p>
+      <p class="muted count">{{ i18n.t('knowledge.count', { shown: filtered().length, total: articles.value().length }) }}</p>
       <div class="articles">
         @for (article of filtered(); track article.id) {
           <article class="card" [id]="'article-' + article.id" [class.highlight]="article.id === highlighted()">
             <h2>{{ article.title }}</h2>
             @if (article.documentTitle) {
-              <p class="source">📄 From the document <strong>{{ article.documentTitle }}</strong></p>
+              <p class="source">📄 {{ i18n.t('knowledge.fromDocument') }} <strong>{{ article.documentTitle }}</strong></p>
             } @else {
-              <ul class="tags" aria-label="Keywords">
+              <ul class="tags" [attr.aria-label]="i18n.t('knowledge.keywords')">
                 @for (tag of article.tags.split(','); track tag) {
                   <li>{{ tag }}</li>
                 }
@@ -45,7 +46,7 @@ import { DocumentsPanel } from './documents-panel';
             <p>{{ article.content }}</p>
           </article>
         } @empty {
-          <p class="muted">No article matches “{{ query() }}”.</p>
+          <p class="muted">{{ i18n.t('knowledge.noMatch', { query: query() }) }}</p>
         }
       </div>
     }
@@ -64,6 +65,7 @@ import { DocumentsPanel } from './documents-panel';
   `,
 })
 export class KnowledgePage {
+  protected readonly i18n = inject(I18n);
   private readonly api = inject(AgentApi);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly auth = inject(AuthService);

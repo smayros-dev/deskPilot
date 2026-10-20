@@ -6,22 +6,23 @@ import { FormControl, FormGroup, FormRecord, NonNullableFormBuilder, ReactiveFor
 
 import { AgentApi } from '../core/agent-api';
 import { AuthService } from '../core/auth';
+import { I18n, TranslationKey } from '../core/i18n';
 import { AgentSettings, ModelInfo, ToolInfo } from '../core/models';
 import { SettingsStore } from '../core/settings-store';
 
 type ToolControls = FormGroup<{ enabled: FormControl<boolean>; approval: FormControl<boolean> }>;
 
 interface Preset {
-  name: string;
-  hint: string;
+  name: TranslationKey;
+  hint: TranslationKey;
   values: Pick<AgentSettings, 'temperature' | 'topP' | 'contextWindow' | 'maxOutputTokens' | 'thinking' | 'maxIterations'>;
 }
 
 /** Quick starting points; every value can still be adjusted afterwards. */
 const PRESETS: Preset[] = [
-  { name: 'Fast', hint: 'Short answers, small context. Best on CPU.', values: { temperature: 0.2, topP: 0.9, contextWindow: 4096, maxOutputTokens: 512, thinking: false, maxIterations: 5 } },
-  { name: 'Balanced', hint: 'The default trade-off.', values: { temperature: 0.2, topP: 0.9, contextWindow: 8192, maxOutputTokens: 2048, thinking: false, maxIterations: 8 } },
-  { name: 'Thorough', hint: 'Reasoning on, larger context. Needs a GPU to be usable.', values: { temperature: 0.3, topP: 0.95, contextWindow: 16384, maxOutputTokens: 4096, thinking: true, maxIterations: 12 } },
+  { name: 'settings.presetFast', hint: 'settings.presetFastHint', values: { temperature: 0.2, topP: 0.9, contextWindow: 4096, maxOutputTokens: 512, thinking: false, maxIterations: 5 } },
+  { name: 'settings.presetBalanced', hint: 'settings.presetBalancedHint', values: { temperature: 0.2, topP: 0.9, contextWindow: 8192, maxOutputTokens: 2048, thinking: false, maxIterations: 8 } },
+  { name: 'settings.presetThorough', hint: 'settings.presetThoroughHint', values: { temperature: 0.3, topP: 0.95, contextWindow: 16384, maxOutputTokens: 4096, thinking: true, maxIterations: 12 } },
 ];
 
 const GIB = 1024 ** 3;
@@ -34,6 +35,7 @@ const GIB = 1024 ** 3;
   styleUrl: './settings-page.css',
 })
 export class SettingsPage {
+  protected readonly i18n = inject(I18n);
   private readonly api = inject(AgentApi);
   private readonly fb = inject(NonNullableFormBuilder);
   protected readonly store = inject(SettingsStore);
@@ -138,7 +140,7 @@ export class SettingsPage {
   }
 
   protected async reset(): Promise<void> {
-    if (!confirm('Reset all settings to the application defaults?')) {
+    if (!confirm(this.i18n.t('settings.confirmReset'))) {
       return;
     }
     const defaults = await this.store.reset();
