@@ -1,0 +1,14 @@
+{
+  "name": "deskpilot-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fake-ollama": "node fake-ollama.mjs",
+    "test": "playwright test",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.15.21"
+  }
+}

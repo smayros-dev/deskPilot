@@ -1,0 +1,42 @@
+# End-to-end tests (e2e/): the full stack with a scripted fake Ollama (e2e/fake-ollama.mjs) instead of real models.
+# Only active with SPRING_PROFILES_ACTIVE=e2e; it changes configuration only, no production code path.
+server:
+  port: ${SERVER_PORT:8090}
+
+spring:
+  docker:
+    compose:
+      # The e2e database is given explicitly (CI service container, or deskpilot_e2e in the dev Postgres).
+      enabled: false
+  datasource:
+    url: ${E2E_DB_URL:jdbc:postgresql://localhost:5432/deskpilot_e2e}
+    username: ${E2E_DB_USER:deskpilot}
+    password: ${E2E_DB_PASSWORD:deskpilot}
+  ai:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11500}
+    retry:
+      max-attempts: 1
+
+management:
+  tracing:
+    export:
+      enabled: false
+
+agent:
+  # Fixed key so the run never writes ~/.deskpilot (keys stored from the UI are not part of the e2e tests).
+  secret-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+  rate-limit:
+    per-minute: 0
+    per-day: 0
+  notifications:
+    enabled: false
+  knowledge-gaps:
+    cron: "-"
+  # The fake model follows a script; checks that ask the model for a second opinion would need their own script.
+  self-check: false
+  specialists:
+    enabled: false
+  rag:
+    # Bag-of-words embeddings of the fake model score lower than nomic-embed-text.
+    similarity-threshold: 0.05
