@@ -1,4 +1,6 @@
 agent:
+  notifications:
+    enabled: false
   # Tests script the model; the grounding check has its own tests that switch it on.
   grounding-check: false
   self-check: false
