@@ -38,9 +38,16 @@ services:
     ports:
       - "16686:16686"
 
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    ports:
+      - "8026:8025"
+
   backend:
     build: ./backend
     environment:
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/deskpilot
       SPRING_DATASOURCE_USERNAME: deskpilot
       SPRING_DATASOURCE_PASSWORD: deskpilot
@@ -59,6 +66,8 @@ services:
       keycloak:
         condition: service_started
       jaeger:
+        condition: service_started
+      mailpit:
         condition: service_started
 
   frontend:

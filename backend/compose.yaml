@@ -35,5 +35,12 @@ services:
       - "16686:16686"
       - "4318:4318"
 
+  # Catches the notification e-mails (12j). Web UI: http://localhost:8026 (1025/8025 are often taken by other projects).
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    ports:
+      - "1026:1025"
+      - "8026:8025"
+
 volumes:
   deskpilot-pgdata:

@@ -55,6 +55,7 @@ public class TestSecurityConfiguration {
                     .issuedAt(now)
                     .expiresAt(now.plusSeconds(300))
                     .claim("preferred_username", username)
+                    .claim("email", username + "@example.com")
                     .claim("realm_access", Map.of("roles", List.of(roles)))
                     .build();
             return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(SignatureAlgorithm.RS256).build(), claims))

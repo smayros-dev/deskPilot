@@ -35,6 +35,15 @@ spring:
         jwt:
           # Keycloak realm from compose.yaml; the browser and the backend must see the same URL.
           issuer-uri: ${DESKPILOT_ISSUER_URI:http://localhost:8180/realms/deskpilot}
+  mail:
+    # Mailpit from compose.yaml in development (web UI: http://localhost:8026).
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1026}
+    properties:
+      # A slow or stopped mail server must not hold a notification thread for long.
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 10000
+      "[mail.smtp.writetimeout]": 10000
   ai:
     mcp:
       server:
@@ -116,6 +125,10 @@ management:
     export:
       otlp:
         enabled: false
+  health:
+    mail:
+      # A stopped mail server must not mark the whole application DOWN; sending failures are only logged.
+      enabled: false
   endpoint:
     health:
       # Public: overall and per-component status (the UI shows whether the model is online). Details: admins only.
@@ -125,6 +138,14 @@ management:
 
 agent:
   max-iterations: 8
+  notifications:
+    # E-mails to reviewers (approval needed), requesters (ticket created) and admins (approval overdue).
+    enabled: ${NOTIFICATIONS_ENABLED:true}
+    reviewers: ${NOTIFICATIONS_REVIEWERS:bob@example.com,admin@example.com}
+    admins: ${NOTIFICATIONS_ADMINS:admin@example.com}
+    approval-sla: ${NOTIFICATIONS_APPROVAL_SLA:PT30M}
+    webhook-url: ${NOTIFICATIONS_WEBHOOK_URL:}
+    base-url: ${NOTIFICATIONS_BASE_URL:http://localhost:4200}
   # Default of the Settings toggle: remind the model to search the knowledge base before answering or opening a ticket.
   grounding-check: true
   # Default of the Settings toggle: check answers and ticket requests against the retrieved articles.

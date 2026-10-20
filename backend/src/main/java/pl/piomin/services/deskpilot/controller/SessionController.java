@@ -30,6 +30,7 @@ import pl.piomin.services.deskpilot.dto.SessionResponse;
 import pl.piomin.services.deskpilot.exception.GlobalExceptionHandler;
 import pl.piomin.services.deskpilot.exception.NotFoundException;
 import pl.piomin.services.deskpilot.model.AgentSession;
+import pl.piomin.services.deskpilot.notifications.ContactService;
 import pl.piomin.services.deskpilot.service.RunService;
 
 /** Conversations of the authenticated user; other users' sessions answer 404. */
@@ -42,10 +43,13 @@ public class SessionController {
     private final AgentOrchestrator orchestrator;
     private final RunService runService;
     private final RunResponseMapper mapper;
+    private final ContactService contacts;
     private final GlobalExceptionHandler errors;
 
     public SessionController(SessionService sessionService, AgentOrchestrator orchestrator, RunService runService,
-                             RunResponseMapper mapper, GlobalExceptionHandler errors) {
+                             RunResponseMapper mapper, GlobalExceptionHandler errors,
+                             ContactService contacts) {
+        this.contacts = contacts;
         this.sessionService = sessionService;
         this.orchestrator = orchestrator;
         this.runService = runService;
@@ -56,6 +60,7 @@ public class SessionController {
     /** Starts a conversation for the caller; the user id comes from the token, never from the request. */
     @PostMapping
     public ResponseEntity<SessionResponse> create(Authentication authentication) {
+        contacts.remember(authentication); // e-mail address for ticket confirmations (12j)
         AgentSession session = sessionService.create(authentication.getName());
         return ResponseEntity.created(URI.create("/api/sessions/" + session.getId())).body(toResponse(session));
     }
