@@ -138,12 +138,17 @@
             <tr [formGroup]="toolControls(tool.name)">
               <th scope="row">
                 <code>{{ tool.name }}</code>
+                @if (tool.external) {
+                  <span class="badge" title="Provided by an external MCP server">MCP</span>
+                }
                 <small>{{ tool.description }}</small>
               </th>
               <td><input type="checkbox" formControlName="enabled" [attr.aria-label]="'Enable ' + tool.name" /></td>
               <td>
                 <input type="checkbox" formControlName="approval" [attr.aria-label]="'Require approval for ' + tool.name" />
-                @if (tool.approvalByDefault && !toolControls(tool.name).controls.approval.value) {
+                @if (tool.external) {
+                  <em class="muted">always, external system</em>
+                } @else if (tool.approvalByDefault && !toolControls(tool.name).controls.approval.value) {
                   <em class="warn">runs without review</em>
                 }
               </td>

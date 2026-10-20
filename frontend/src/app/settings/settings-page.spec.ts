@@ -36,8 +36,9 @@ const MODELS: ModelInfo[] = [
 ];
 
 const TOOLS: ToolInfo[] = [
-  { name: 'search_knowledge_base', description: 'Search the KB', approvalByDefault: false },
-  { name: 'create_ticket', description: 'Create a ticket', approvalByDefault: true },
+  { name: 'search_knowledge_base', description: 'Search the KB', approvalByDefault: false, external: false },
+  { name: 'create_ticket', description: 'Create a ticket', approvalByDefault: true, external: false },
+  { name: 'mcp_github_create_issue', description: 'Create a GitHub issue', approvalByDefault: true, external: true },
 ];
 
 describe('SettingsPage', () => {
@@ -101,7 +102,7 @@ describe('SettingsPage', () => {
       updatedAt: undefined,
       chatModel: 'qwen3:4b',
       disabledTools: ['search_knowledge_base'],
-      approvalTools: [],
+      approvalTools: ['mcp_github_create_issue'], // external tools always need approval
     });
     req.flush({ ...req.request.body, updatedAt: '2026-10-19T11:00:00Z' });
     await fixture.whenStable();
@@ -128,5 +129,14 @@ describe('SettingsPage', () => {
     expect(element.querySelector<HTMLSelectElement>('#chatModel')!.disabled).toBe(true);
     expect(element.querySelector('button[type=submit]')).toBeNull();
     expect(element.querySelector('.notice')?.textContent).toContain('admin');
+  });
+
+  it('marks MCP tools and keeps their approval checked and locked', async () => {
+    const { element } = await render();
+
+    const approval = element.querySelector<HTMLInputElement>('input[aria-label="Require approval for mcp_github_create_issue"]')!;
+    expect(approval.checked).toBe(true);
+    expect(approval.disabled).toBe(true);
+    expect(element.querySelector('tr:has(input[aria-label="Enable mcp_github_create_issue"]) .badge')?.textContent).toContain('MCP');
   });
 });

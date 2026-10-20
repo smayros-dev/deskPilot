@@ -140,13 +140,13 @@ order of the recommended path below. Value / effort are rough estimates for this
 ### B. Smarter agent
 - [ ] **12e — Multimodal tickets:** the user attaches a screenshot of an error; a vision model (`gemma4:26b` is installed and supports images) reads it, and the text goes into the search and the ticket. *Value: high · Effort: M*
 - [ ] **12f — Supervisor + specialist agents:** a router sends each request to a specialist (network/VPN, accounts/MFA, hardware, software) with its own prompt, tools and examples; the trace shows the hand-off. *Value: medium · Effort: L*
-- [ ] **12g — Self-check before answering:** a reflection pass compares the draft answer with the retrieved articles and rewrites or escalates unsupported claims (configurable, off on CPU). *Value: medium · Effort: S*
+- [x] **12g — Self-check before answering ✅ (answers and tickets; knowledge 12/13, tickets 4/4):** a reflection pass compares the draft answer with the retrieved articles and rewrites or escalates unsupported claims (configurable, off on CPU). *Value: medium · Effort: S*
 - [ ] **12h — Conversation summarization:** long sessions are summarized into memory instead of truncated, so the context window holds more history. *Value: medium · Effort: S*
 
 ### C. Integrations
-- [ ] **12i — MCP:** expose DeskPilot's tools as an MCP server (Spring AI MCP server starter) and let the agent call external MCP servers (e.g. GitHub Issues or Jira as the real ticket system) behind the same approval gate. *Value: high · Effort: M*
+- [x] **12i — MCP ✅ (server: read-only KB tools at /mcp with JWT; client: external tools always need approval; auth headers for external servers not yet):** expose DeskPilot's tools as an MCP server (Spring AI MCP server starter) and let the agent call external MCP servers (e.g. GitHub Issues or Jira as the real ticket system) behind the same approval gate. *Value: high · Effort: M*
 - [ ] **12j — Notifications:** e-mail (Mailpit in development) and/or Slack/Teams webhook when an approval is waiting or a ticket is created; approvals not decided within an SLA are escalated automatically. *Value: medium · Effort: S*
-- [ ] **12k — Real-time updates:** replace the 5-second polling of paused runs with a per-user SSE channel (approval decided, ticket updated, new item in the reviewers' queue with a counter in the nav). *Value: medium · Effort: S*
+- [x] **12k — Real-time updates ✅ (GET /api/events, single instance):** replace the 5-second polling of paused runs with a per-user SSE channel (approval decided, ticket updated, new item in the reviewers' queue with a counter in the nav). *Value: medium · Effort: S*
 
 ### D. Quality, safety & operations
 - [x] **12l — User feedback loop ✅:** 👍/👎 and a comment on every answer, stored with the run; shown on the dashboard and turned into evaluation scenarios. *Value: high · Effort: S*

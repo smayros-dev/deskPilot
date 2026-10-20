@@ -257,7 +257,7 @@ public class AgentOrchestrator {
                 }
                 recordToolCallSteps(turn, reply);
                 List<AssistantMessage.ToolCall> gated = reply.getToolCalls().stream()
-                        .filter(call -> config.requiresApproval(call.name()))
+                        .filter(call -> needsApproval(config, call.name()))
                         .toList();
                 if (!gated.isEmpty()) {
                     // Hold back every call of this message: their results must be returned together.
@@ -387,6 +387,11 @@ public class AgentOrchestrator {
         return calls.stream().map(call -> call.name() + " " + call.arguments()).collect(Collectors.joining("; "));
     }
 
+    /** Approval policy from the settings; external (MCP) tools always need a human decision. */
+    private boolean needsApproval(AgentConfig config, String tool) {
+        return config.requiresApproval(tool) || toolRegistry.isExternal(tool);
+    }
+
     private void recordToolCallSteps(ActiveTurn turn, AssistantMessage reply) {
         reply.getToolCalls().forEach(call -> record(turn, StepType.TOOL_CALL, call.name(), call.arguments(), false, 0));
     }
@@ -424,7 +429,7 @@ public class AgentOrchestrator {
         if (tool.isEmpty()) {
             return new ToolOutcome("Unknown or disabled tool '" + call.name() + "'. Use only the tools you were given.", true);
         }
-        if (decision != null && !decision.approved() && context.config().requiresApproval(call.name())) {
+        if (decision != null && !decision.approved() && needsApproval(context.config(), call.name())) {
             String reason = decision.comment() == null || decision.comment().isBlank() ? "no reason given" : decision.comment();
             return new ToolOutcome("Rejected by the human reviewer (" + reason + "). Do not retry; tell the user.", true);
         }

@@ -24,6 +24,9 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 - **Sign-in and roles**: OpenID Connect login through Keycloak (Authorization Code + PKCE). The user id comes from the token; only **reviewers** can approve actions (from their own Approvals queue) and only **admins** can change settings.
 - **Tracing**: one OpenTelemetry trace per agent run, with every model and tool call as a span, viewable in Jaeger.
 - **Grounding check**: when the model answers or opens a ticket without searching the knowledge base, it is sent back once to search first (measured: 64% → 84% of the evaluation scenarios).
+- **Self-check**: before answering, the draft is compared with the retrieved articles (missing key facts are added); before a ticket goes to a reviewer, the model checks that the articles really require one.
+- **Real-time updates**: a per-user Server-Sent Events channel (`GET /api/events`) pushes run changes to their owner, new tickets, and the number of runs waiting for approval to reviewers (live badge on the Approvals link). The chat only polls while the stream is down.
+- **MCP**: DeskPilot's read-only knowledge-base tools are available to other agents and IDEs over the Model Context Protocol, and tools of external MCP servers can be given to the agent (always behind the approval gate).
 - **Runtime settings**: switch the model and tune temperature, top-p, context window, thinking mode, RAG and tools from the UI, with no restart.
 
 ## Architecture
@@ -179,6 +182,7 @@ checked at the approval step and never created; evaluation runs do not count in 
 | + grounding check for tickets | **21/25 (84%)** | 10/13 | 3/4 | 2/2 | 44 s / 71 s |
 | + refined ticket reminder (ticket scenarios) | — | — | **4/4** | — | — |
 | + hybrid search (knowledge scenarios) | — | **11/13** | — | — | 62 s / — |
+| + self-check (knowledge + ticket scenarios) | — | **12/13** | **4/4** | — | ~110 s* / — |
 
 What the evaluation found and what fixed it:
 - **The model answered from general knowledge** in 7 of 13 knowledge questions: no search, invented procedures
@@ -192,9 +196,34 @@ What the evaluation found and what fixed it:
   can be switched off on the Settings page.
 - **Retrieval gaps** ("install visual studio code", "broken mouse" found no article above the similarity threshold)
   were fixed by **hybrid search** (12c): both questions now retrieve the right article.
-- **Left**: two answers where the model has the right article but misses a key fact (the 30-minute automatic unlock;
-  accessories handed out at the IT desk without a ticket — the ticket still goes to a reviewer).
+- **Self-check** (12g) fixed the unnecessary ticket for a mouse: the articles say accessories are handed out at the IT
+  desk, so the ticket is sent back before it reaches a reviewer.
+- **Left**: one answer (account locked) suggests a password reset instead of waiting 30 minutes; the self-check judged
+  it acceptable. *Latency of the last run inflated by other builds running on the same machine.
   `gemma4:26b` was not compared: far too slow on this CPU.
+
+## MCP (Model Context Protocol)
+
+- **DeskPilot as an MCP server**: `http://localhost:8080/mcp` (Streamable HTTP) exposes `search_knowledge_base` and
+  `get_knowledge_article`, read-only, to other agents and IDEs. Send `Authorization: Bearer <access token>` from Keycloak,
+  for a user with the `user` role. Tools that change data (tickets, memories, escalation) are not exposed.
+- **External MCP servers**: their tools join the agent as `mcp_<server>_<tool>`, always need a reviewer's approval, and
+  never receive user or run data. They appear on the Settings page with an "MCP" badge. Example:
+
+  ```yaml
+  spring:
+    ai:
+      mcp:
+        client:
+          streamable-http:
+            connections:
+              github:
+                url: https://api.githubcopilot.com
+                endpoint: /mcp/
+  ```
+
+  Stdio servers work too (`spring.ai.mcp.client.stdio.connections.<name>.command/args/env`). Servers that need an auth
+  header (e.g. a GitHub token) are not supported yet.
 
 ## CI
 
@@ -218,6 +247,7 @@ OLLAMA_IT=true ./mvnw test -Dtest="*SmokeTest"   # real local model: chat, RAG, 
 | `POST` | `/api/sessions/{id}/messages/stream` | Same, as `text/event-stream`: `run`, `thinking`, `step`… then `done` (final run) or `error` (Problem Detail) |
 | `GET` | `/api/sessions/{id}/runs` | Conversation history |
 | `GET` | `/api/runs/{id}` | One run with its steps |
+| `GET` | `/api/events` | Live updates as Server-Sent Events: `run` (your runs), `ticket` (your tickets; all for reviewers), `approvals` (`{"pending": n}`, reviewers) |
 | `GET` | `/api/runs` | Reviewers: runs waiting for approval, oldest first |
 | `PUT` `DELETE` | `/api/runs/{id}/feedback` | Owner: rate a finished answer (`{"rating": "UP"|"DOWN", "comment": "..."}`) or remove the rating |
 | `GET` | `/api/feedback?rating=DOWN` | Reviewers: latest negative feedback |
@@ -235,6 +265,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.16** — Self-check of answers and tickets (12g, Flyway V10); real-time updates over a per-user SSE channel with a live approval badge (12k); MCP server for the knowledge base and MCP client for external tools behind the approval gate (12i).
 - **1.0.15** — Hybrid search (12c): Postgres full-text ranking merged with pgvector by Reciprocal Rank Fusion (Flyway V7), Settings toggle; knowledge scenarios 10/13 → 11/13.
 - **1.0.14** — Step 10 results: prompt v2 and the grounding check (answers and tickets, Settings toggle, Flyway V6); qwen3:8b from 64% to 84% of the scenarios.
 - **1.0.13** — Cited answers with safe Markdown rendering (12a); 👍/👎 feedback on answers with satisfaction metrics (12l).

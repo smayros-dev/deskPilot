@@ -6,6 +6,7 @@ import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import pl.piomin.services.deskpilot.agent.tool.ExternalTools;
 import pl.piomin.services.deskpilot.agent.tool.ToolRegistry;
 import pl.piomin.services.deskpilot.config.AgentProperties;
 import pl.piomin.services.deskpilot.model.AgentSettings;
@@ -68,6 +69,8 @@ public class AgentSettingsService {
         Set<String> unknown = new HashSet<>(values.disabledTools());
         unknown.addAll(values.approvalTools());
         unknown.removeAll(toolRegistry.names());
+        // An MCP server may be offline for a while; its tools stay in the settings.
+        unknown.removeIf(name -> name.startsWith(ExternalTools.NAME_PREFIX));
         if (!unknown.isEmpty()) {
             throw new IllegalArgumentException("Unknown tools: " + unknown);
         }

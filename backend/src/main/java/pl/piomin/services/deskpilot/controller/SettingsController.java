@@ -57,7 +57,8 @@ public class SettingsController {
         return toolRegistry.all().stream()
                 .map(tool -> tool.getToolDefinition())
                 .map(def -> new ToolInfo(def.name(), def.description(),
-                        toolRegistry.defaultApprovalTools().contains(def.name())))
+                        toolRegistry.defaultApprovalTools().contains(def.name()) || toolRegistry.isExternal(def.name()),
+                        toolRegistry.isExternal(def.name())))
                 .toList();
     }
 }

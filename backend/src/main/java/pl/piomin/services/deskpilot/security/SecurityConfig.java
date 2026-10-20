@@ -44,6 +44,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/evaluations", "/api/evaluations/**").hasRole(ADMIN)
                         .requestMatchers("/actuator/**").hasRole(ADMIN)
                         .requestMatchers("/api/**").hasRole(USER)
+                        // MCP server (Streamable HTTP): read-only knowledge-base tools for other agents and IDEs.
+                        .requestMatchers("/mcp", "/mcp/**").hasRole(USER)
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
