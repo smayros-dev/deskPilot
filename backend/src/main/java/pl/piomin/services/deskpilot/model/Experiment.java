@@ -62,6 +62,10 @@ public class Experiment {
 
     private Instant stoppedAt;
 
+    /** Why DeskPilot stopped the experiment itself; null when an admin stopped it or it is running. */
+    @Column(length = 300)
+    private String stopReason;
+
     protected Experiment() {
     }
 
@@ -85,9 +89,20 @@ public class Experiment {
     }
 
     public void stop(String actor) {
+        stop(actor, null);
+    }
+
+    /** @param reason why it was stopped automatically; null for an admin's decision */
+    public void stop(String actor, String reason) {
         this.status = ExperimentStatus.STOPPED;
         this.stoppedBy = actor;
         this.stoppedAt = Instant.now();
+        this.stopReason = reason == null ? null : reason.substring(0, Math.min(reason.length(), 300));
+    }
+
+    /** Whether one of the variants runs on this provider. */
+    public boolean uses(String provider) {
+        return provider.equals(aProvider) || provider.equals(bProvider);
     }
 
     public boolean isRunning() {
@@ -132,5 +147,9 @@ public class Experiment {
 
     public Instant getStoppedAt() {
         return stoppedAt;
+    }
+
+    public String getStopReason() {
+        return stopReason;
     }
 }

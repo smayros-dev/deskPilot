@@ -175,6 +175,11 @@ agent:
     min-questions: 2
     # Questions the knowledge base answers score 0.54-0.83 against their article, uncovered ones 0.45-0.60.
     covered-similarity: 0.65
+  experiments:
+    # A/B experiments (12m): stop an experiment after this many consecutive provider errors of one variant.
+    max-provider-failures: ${EXPERIMENT_MAX_PROVIDER_FAILURES:3}
+    # Finished runs (or ratings) each variant needs before results are tested for significance.
+    min-sample: ${EXPERIMENT_MIN_SAMPLE:10}
   specialists:
     # Supervisor + specialist agents (12f): default of the Settings toggle (evaluation: 25/25 on vs 24/25 off).
     enabled: ${AGENT_SPECIALISTS:true}

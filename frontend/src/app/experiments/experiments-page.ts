@@ -4,8 +4,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, sig
 import { firstValueFrom } from 'rxjs';
 
 import { parseModelChoice } from '../core/cloud';
-import { Experiment, ExperimentsApi, PromptVersion, VariantRequest } from '../core/experiments';
-import { I18n } from '../core/i18n';
+import { Experiment, ExperimentsApi, PromptVersion, Significance, VariantRequest } from '../core/experiments';
+import { I18n, TranslationKey } from '../core/i18n';
 import { ModelOptions } from '../core/model-options';
 import { Notifications } from '../core/notifications';
 import { DurationPipe } from '../shared/duration-pipe';
@@ -71,6 +71,14 @@ export class ExperimentsPage {
       return null;
     }
     return a.successRate > b.successRate ? 'A' : 'B';
+  }
+
+  protected verdictKey(significance: Significance): TranslationKey {
+    return `experiments.verdict.${significance.verdict}`;
+  }
+
+  protected testLabel(significance: Significance): string {
+    return this.i18n.t(significance.test === 'fisher' ? 'experiments.testFisher' : 'experiments.testZ');
   }
 
   protected modelLabel(provider: string, model: string): string {

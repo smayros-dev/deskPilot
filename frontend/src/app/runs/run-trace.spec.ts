@@ -50,5 +50,15 @@ describe('RunTrace', () => {
     TestBed.resetTestingModule();
     const plain = await render({ ...routedRun(), specialist: null, steps: [] });
     expect(plain.querySelector('app-specialist-badge')).toBeNull();
+    expect(plain.querySelector('app-experiment-badge')).toBeNull();
+  });
+
+  it('shows the experiment variant of the run when the API sends it', async () => {
+    const element = await render({ ...routedRun(), experiment: { id: 'e1', name: 'llama vs qwen', variant: 'B' } });
+
+    const badge = element.querySelector<HTMLElement>('.stats app-experiment-badge .badge')!;
+    expect(badge.textContent).toContain('🧪');
+    expect(badge.textContent).toContain('Variant B');
+    expect(badge.title).toBe('A/B experiment "llama vs qwen", variant B');
   });
 });

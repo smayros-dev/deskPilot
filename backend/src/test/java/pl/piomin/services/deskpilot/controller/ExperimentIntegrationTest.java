@@ -156,6 +156,19 @@ class ExperimentIntegrationTest {
         assertThat(instructionsByModel.get("llama3.2:3b")).contains(MARKER);
         assertThat(instructionsByModel.get("qwen3:8b")).doesNotContain(MARKER);
 
+        // Users are not told their variant; reviewers and admins see it on the run.
+        RunResponse bRun = firstRunByModel.get("llama3.2:3b");
+        assertThat(bRun.experiment()).isNull();
+        alice.get().uri("/api/runs/{id}", bRun.id()).exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.experiment").doesNotExist();
+        admin.get().uri("/api/runs/{id}", bRun.id()).exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.experiment.id").isEqualTo(started.id())
+                .jsonPath("$.experiment.name").isEqualTo("llama vs qwen")
+                .jsonPath("$.experiment.variant").isEqualTo("B");
+
         alice.put().uri("/api/runs/{id}/feedback", firstRunByModel.get("llama3.2:3b").id())
                 .body(new FeedbackRequest(FeedbackRating.UP, null)).exchange()
                 .expectStatus().isOk();
@@ -173,6 +186,12 @@ class ExperimentIntegrationTest {
         assertThat(b.up()).isEqualTo(1);
         assertThat(b.satisfactionRate()).isEqualTo(1.0);
         assertThat(a.up() + a.down()).isZero();
+        // Both variants answered every time: no verdict on so few runs, and never a difference.
+        assertThat(results.comparison().minSample()).isEqualTo(10);
+        assertThat(results.comparison().success().verdict())
+                .isIn(ExperimentResponse.Verdict.NOT_ENOUGH_DATA, ExperimentResponse.Verdict.NO_SIGNIFICANT_DIFFERENCE);
+        assertThat(results.comparison().satisfaction().verdict()).isEqualTo(ExperimentResponse.Verdict.NOT_ENOUGH_DATA);
+        assertThat(results.stopReason()).isNull();
 
         // Stopped: chats go back to the model of the settings.
         admin.post().uri("/api/experiments/{id}/stop", started.id()).exchange()

@@ -13,6 +13,7 @@ public record RunResponse(
         String userId,
         String model,
         String specialist,
+        Experiment experiment,
         RunStatus status,
         String userInput,
         String answer,
@@ -22,6 +23,13 @@ public record RunResponse(
         Instant createdAt,
         Instant completedAt,
         Feedback feedback) {
+
+    /**
+     * The A/B experiment the run's conversation was assigned to (12m). Only sent to reviewers and admins, so users are
+     * not told which variant they get; null outside experiments.
+     */
+    public record Experiment(String id, String name, String variant) {
+    }
 
     /** The user's rating of the answer; null until they give one. */
     public record Feedback(FeedbackRating rating, String comment, Instant updatedAt) {

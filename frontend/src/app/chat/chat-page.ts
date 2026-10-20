@@ -11,6 +11,7 @@ import { Answer } from '../shared/answer';
 import { AutoScroll } from '../shared/auto-scroll';
 import { DurationPipe } from '../shared/duration-pipe';
 import { FeedbackButtons } from '../shared/feedback-buttons';
+import { ExperimentBadge } from '../shared/experiment-badge';
 import { SpecialistBadge, specialistLabel } from '../shared/specialist-badge';
 import { StatusBadge } from '../shared/status-badge';
 import { ApprovalCard } from './approval-card';
@@ -22,7 +23,7 @@ const EXAMPLES: TranslationKey[] = ['chat.example1', 'chat.example2', 'chat.exam
 
 @Component({
   selector: 'app-chat-page',
-  imports: [ConversationList, FeedbackButtons, RouterLink, ChatInput, ApprovalCard, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe, Answer, SpecialistBadge],
+  imports: [ConversationList, FeedbackButtons, RouterLink, ChatInput, ApprovalCard, ModelSwitcher, RunTrace, StatusBadge, AutoScroll, DurationPipe, Answer, SpecialistBadge, ExperimentBadge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.css',

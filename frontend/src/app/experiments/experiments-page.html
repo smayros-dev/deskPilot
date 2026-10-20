@@ -46,6 +46,24 @@
       </tbody>
     </table>
   </div>
+  @if (experiment.comparison; as comparison) {
+    <dl class="significance" [attr.aria-label]="i18n.t('experiments.significance')">
+      @for (metric of [
+        { key: 'success', label: i18n.t('experiments.metricSuccess'), value: comparison.success },
+        { key: 'satisfaction', label: i18n.t('experiments.metricSatisfaction'), value: comparison.satisfaction }
+      ]; track metric.key) {
+        <div [attr.data-metric]="metric.key" [attr.data-verdict]="metric.value.verdict">
+          <dt>{{ metric.label }}</dt>
+          <dd>
+            <strong>{{ i18n.t(verdictKey(metric.value), { min: comparison.minSample, a: metric.value.samplesA, b: metric.value.samplesB }) }}</strong>
+            @if (metric.value.pValue !== null) {
+              <span class="muted"> · {{ i18n.t('experiments.pValue', { p: metric.value.pValue, test: testLabel(metric.value) }) }}</span>
+            }
+          </dd>
+        </div>
+      }
+    </dl>
+  }
 </ng-template>
 
 @if (running(); as current) {
@@ -127,6 +145,9 @@
           · {{ i18n.t('experiments.split', { a: 100 - experiment.bPercent, b: experiment.bPercent }) }}
         </span>
       </div>
+      @if (experiment.stopReason) {
+        <p class="auto-stopped" role="note">⚠ {{ i18n.t('experiments.autoStopped', { reason: experiment.stopReason }) }}</p>
+      }
       <ng-container *ngTemplateOutlet="results; context: { $implicit: experiment }" />
     </article>
   } @empty {

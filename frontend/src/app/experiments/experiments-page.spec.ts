@@ -108,6 +108,42 @@ describe('ExperimentsPage', () => {
     expect(element.querySelector('#new-title')).toBeNull();
   });
 
+  it('shows whether B differs from A beyond chance', async () => {
+    const { element } = await render([
+      experiment({
+        comparison: {
+          minSample: 10,
+          success: { samplesA: 120, samplesB: 110, rateA: 0.6, rateB: 0.75, test: 'z', pValue: 0.0142, verdict: 'B_BETTER' },
+          satisfaction: { samplesA: 6, samplesB: 4, rateA: 0.5, rateB: 1, test: null, pValue: null, verdict: 'NOT_ENOUGH_DATA' },
+        },
+      }),
+    ]);
+
+    const success = element.querySelector<HTMLElement>('.running .significance [data-metric=success]')!;
+    expect(success.dataset['verdict']).toBe('B_BETTER');
+    expect(success.textContent).toContain('B is better (95 %)');
+    expect(success.textContent).toContain('p = 0.0142, two-proportion z-test');
+    const satisfaction = element.querySelector<HTMLElement>('.running .significance [data-metric=satisfaction]')!;
+    expect(satisfaction.textContent).toContain('Not enough data: 10 per variant needed (A: 6, B: 4)');
+    expect(satisfaction.textContent).not.toContain('p =');
+  });
+
+  it('explains why an experiment was stopped automatically', async () => {
+    const { element } = await render([
+      experiment({
+        status: 'STOPPED',
+        stoppedBy: 'system',
+        stoppedAt: '2026-10-20T12:00:00Z',
+        stopReason: 'Mistral AI was disabled or lost its API key',
+      }),
+      experiment({ id: 'e0', status: 'STOPPED', stoppedBy: 'admin', stoppedAt: '2026-10-19T12:00:00Z' }),
+    ]);
+
+    const notes = Array.from(element.querySelectorAll('.past .auto-stopped'));
+    expect(notes).toHaveLength(1);
+    expect(notes[0].textContent).toContain('Stopped automatically: Mistral AI was disabled or lost its API key');
+  });
+
   it('stops the running experiment after confirmation', async () => {
     const { fixture, element } = await render([experiment({})]);
     vi.spyOn(window, 'confirm').mockReturnValue(true);

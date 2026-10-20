@@ -580,6 +580,19 @@ export const EN = {
   'gapReason.TICKET': 'ticket',
   'gapReason.NEGATIVE_FEEDBACK': '👎',
   'gapReason.NOT_FOUND': 'nothing found',
+  'experiment.badge': 'Variant {variant}',
+  'experiment.badgeTitle': 'A/B experiment "{name}", variant {variant}',
+  'experiments.significance': 'Significance (95 %)',
+  'experiments.metricSuccess': 'Success rate',
+  'experiments.metricSatisfaction': 'Share of 👍',
+  'experiments.verdict.NOT_ENOUGH_DATA': 'Not enough data: {min} per variant needed (A: {a}, B: {b})',
+  'experiments.verdict.NO_SIGNIFICANT_DIFFERENCE': 'No significant difference',
+  'experiments.verdict.B_BETTER': 'B is better (95 %)',
+  'experiments.verdict.B_WORSE': 'B is worse (95 %)',
+  'experiments.pValue': 'p = {p}, {test}',
+  'experiments.testZ': 'two-proportion z-test',
+  'experiments.testFisher': 'Fisher\'s exact test',
+  'experiments.autoStopped': 'Stopped automatically: {reason}',
 } satisfies Record<string, string>;
 
 export type TranslationKey = keyof typeof EN;
