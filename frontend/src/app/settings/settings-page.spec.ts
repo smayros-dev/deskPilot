@@ -20,6 +20,7 @@ const SETTINGS: AgentSettings = {
   ragTopK: 3,
   ragSimilarityThreshold: 0.55,
   groundingCheck: true,
+  hybridSearch: true,
   disabledTools: [],
   approvalTools: ['create_ticket'],
   systemPrompt: null,

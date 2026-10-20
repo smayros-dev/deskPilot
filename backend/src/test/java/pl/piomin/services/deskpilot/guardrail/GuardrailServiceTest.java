@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class GuardrailServiceTest {
 
     private final GuardrailService guardrails = new GuardrailService(new AgentProperties(8,
-            new AgentProperties.Rag(0.5, 3, false),
+            new AgentProperties.Rag(0.5, 3, false, true),
             new AgentProperties.Guardrails(200, 600, List.of(
                     "ignore (all |any )?(the )?(previous|prior|above) (instructions|rules|prompts?)",
                     "(reveal|print|show|repeat) (me )?(your|the) (system prompt|instructions|hidden rules)"))));

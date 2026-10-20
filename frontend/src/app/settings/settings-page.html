@@ -105,6 +105,11 @@
         <small>Articles below this score count as "not relevant", so the agent rephrases or admits it has no answer.</small>
       </label>
       <label class="toggle">
+        <input type="checkbox" formControlName="hybridSearch" />
+        <span>Hybrid search</span>
+        <small>Combine keyword and semantic ranking. Finds articles for short or product-specific questions that embeddings alone score too low.</small>
+      </label>
+      <label class="toggle">
         <input type="checkbox" formControlName="groundingCheck" />
         <span>Grounding check</span>
         <small>If the model answers without using any tool, remind it once to search the knowledge base first. Small local models often answer from general knowledge; costs one extra model call in those cases.</small>

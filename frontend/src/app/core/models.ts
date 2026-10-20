@@ -173,6 +173,8 @@ export interface AgentSettings {
   ragSimilarityThreshold: number;
   /** Remind the model to search the knowledge base when it answers without any tool. */
   groundingCheck: boolean;
+  /** Combine keyword and semantic ranking in knowledge-base searches. */
+  hybridSearch: boolean;
   disabledTools: string[];
   approvalTools: string[];
   systemPrompt: string | null;

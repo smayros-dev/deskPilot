@@ -32,7 +32,7 @@ class ToolRegistryTest {
     private final TicketService ticketService = mock(TicketService.class);
     private final MemoryService memoryService = mock(MemoryService.class);
     private final GuardrailService guardrails = new GuardrailService(new AgentProperties(8,
-            new AgentProperties.Rag(0.5, 3, false), new AgentProperties.Guardrails(4000, 6000, List.of())));
+            new AgentProperties.Rag(0.5, 3, false, true), new AgentProperties.Guardrails(4000, 6000, List.of())));
     private final ToolRegistry registry = new ToolRegistry(List.of(
             new KnowledgeBaseTools(knowledgeBaseService),
             new TicketTools(ticketService),
@@ -55,7 +55,7 @@ class ToolRegistryTest {
     void searchUsesTheRunsRagSettings() {
         call("search_knowledge_base", "{\"query\":\"printer\"}");
 
-        verify(knowledgeBaseService).search("printer", 3, 0.55);
+        verify(knowledgeBaseService).search("printer", 3, 0.55, true);
     }
 
     @Test
@@ -72,7 +72,7 @@ class ToolRegistryTest {
 
     @Test
     void searchReturnsArticles() {
-        when(knowledgeBaseService.search("vpn drops", 3, 0.55))
+        when(knowledgeBaseService.search("vpn drops", 3, 0.55, true))
                 .thenReturn(List.of(new KnowledgeBaseService.Hit(1, "VPN", "Use IPSec", 0.8123)));
 
         String result = call("search_knowledge_base", "{\"query\":\"vpn drops\"}");
@@ -82,7 +82,7 @@ class ToolRegistryTest {
 
     @Test
     void searchHitsCarryACiteMarkerBuiltFromTheArticleId() {
-        when(knowledgeBaseService.search("printer", 3, 0.55)).thenReturn(List.of(
+        when(knowledgeBaseService.search("printer", 3, 0.55, true)).thenReturn(List.of(
                 new KnowledgeBaseService.Hit(4, "Printers", "Add PRN-3-02", 0.7),
                 new KnowledgeBaseService.Hit(2, "Passwords", "Reset", 0.6)));
 
@@ -93,7 +93,7 @@ class ToolRegistryTest {
 
     @Test
     void searchWithoutHitsTellsTheAgentToReformulate() {
-        when(knowledgeBaseService.search("cake recipe", 3, 0.55)).thenReturn(List.of());
+        when(knowledgeBaseService.search("cake recipe", 3, 0.55, true)).thenReturn(List.of());
 
         assertThat(call("search_knowledge_base", "{\"query\":\"cake recipe\"}")).contains("No relevant article");
     }

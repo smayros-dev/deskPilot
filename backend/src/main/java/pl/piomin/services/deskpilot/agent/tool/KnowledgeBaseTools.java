@@ -47,7 +47,7 @@ public class KnowledgeBaseTools implements AgentTools {
             throw new IllegalArgumentException("query must not be blank");
         }
         AgentConfig config = RunContext.from(toolContext).config();
-        List<Article> articles = knowledgeBaseService.search(query, config.ragTopK(), config.ragSimilarityThreshold()).stream()
+        List<Article> articles = knowledgeBaseService.search(query, config.ragTopK(), config.ragSimilarityThreshold(), config.hybridSearch()).stream()
                 .map(hit -> new Article(hit.articleId(), Article.citeOf(hit.articleId()), hit.title(), hit.content(),
                         Math.round(hit.score() * 100) / 100.0))
                 .toList();

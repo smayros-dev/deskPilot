@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -30,11 +31,13 @@ public record AgentProperties(
      * @param topK                maximum number of articles returned per search
      * @param indexOnStartup      embed the knowledge base into the vector store when the app starts
      *                            (needs Ollama; disabled in tests)
+     * @param hybridSearch        default of the Settings toggle: combine keyword and semantic ranking
      */
     public record Rag(
             @DecimalMin("0.0") @DecimalMax("1.0") double similarityThreshold,
             @Min(1) @Max(10) int topK,
-            boolean indexOnStartup) {
+            boolean indexOnStartup,
+            @DefaultValue("true") boolean hybridSearch) {
     }
 
     /**

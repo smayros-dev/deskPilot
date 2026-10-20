@@ -11,7 +11,7 @@ Built with **Angular** + **Spring Boot** + **Spring AI**, on a **free local mode
 ## Features
 
 - **ReAct agent loop**: the model reasons, calls tools, observes results and repeats, within a configurable step budget.
-- **Agentic RAG**: semantic search over helpdesk articles in PostgreSQL + pgvector. The agent decides when to search and rephrases when results aren't relevant.
+- **Agentic RAG with hybrid search**: articles in PostgreSQL are ranked both semantically (pgvector) and by keywords (full-text search), merged with Reciprocal Rank Fusion. The agent decides when to search and rephrases when results aren't relevant.
 - **Human in the loop**: tools marked `@RequiresApproval` (for example `create_ticket`) pause the run until a reviewer approves or rejects it.
 - **Memory**: short-term conversation memory and long-term per-user facts (which refuse secrets).
 - **Guardrails**: a prompt-injection filter, redaction of passwords, API keys and card numbers, and tool-output limits.
@@ -178,6 +178,7 @@ checked at the approval step and never created; evaluation runs do not count in 
 | + grounding check for answers (19 scenarios) | 16/19 | 11/13 | 3/4 | 2/2 | — |
 | + grounding check for tickets | **21/25 (84%)** | 10/13 | 3/4 | 2/2 | 44 s / 71 s |
 | + refined ticket reminder (ticket scenarios) | — | — | **4/4** | — | — |
+| + hybrid search (knowledge scenarios) | — | **11/13** | — | — | 62 s / — |
 
 What the evaluation found and what fixed it:
 - **The model answered from general knowledge** in 7 of 13 knowledge questions: no search, invented procedures
@@ -189,8 +190,10 @@ What the evaluation found and what fixed it:
   before any search, once per turn.
 - **Cost**: one extra model call when a check fires, so the average latency rose from 25 s to 44 s on CPU. The check
   can be switched off on the Settings page.
-- **Left**: two retrieval gaps (the search for "install visual studio code" and "broken mouse" returns no article
-  above the similarity threshold), which is what hybrid search (Step 12c) addresses, and one incomplete answer.
+- **Retrieval gaps** ("install visual studio code", "broken mouse" found no article above the similarity threshold)
+  were fixed by **hybrid search** (12c): both questions now retrieve the right article.
+- **Left**: two answers where the model has the right article but misses a key fact (the 30-minute automatic unlock;
+  accessories handed out at the IT desk without a ticket — the ticket still goes to a reviewer).
   `gemma4:26b` was not compared: far too slow on this CPU.
 
 ## CI
@@ -232,6 +235,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.15** — Hybrid search (12c): Postgres full-text ranking merged with pgvector by Reciprocal Rank Fusion (Flyway V7), Settings toggle; knowledge scenarios 10/13 → 11/13.
 - **1.0.14** — Step 10 results: prompt v2 and the grounding check (answers and tickets, Settings toggle, Flyway V6); qwen3:8b from 64% to 84% of the scenarios.
 - **1.0.13** — Cited answers with safe Markdown rendering (12a); 👍/👎 feedback on answers with satisfaction metrics (12l).
 - **1.0.12** — Evaluation: 25 scenarios, background runner with deterministic scoring, admin Evaluation page comparing models; evaluation runs kept out of the live metrics; bounded Spring AI retry so an unreachable model fails in seconds.

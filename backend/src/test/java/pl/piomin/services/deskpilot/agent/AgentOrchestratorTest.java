@@ -46,6 +46,7 @@ import pl.piomin.services.deskpilot.service.RunService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -133,7 +134,7 @@ class AgentOrchestratorTest {
     @Test
     void groundingReminderLeadsTheModelToSearchBeforeAnswering() {
         setGroundingCheck(true);
-        when(knowledgeBaseService.search(eq("password length"), anyInt(), anyDouble()))
+        when(knowledgeBaseService.search(eq("password length"), anyInt(), anyDouble(), anyBoolean()))
                 .thenReturn(List.of(new KnowledgeBaseService.Hit(2, "Passwords", "At least 14 characters", 0.9)));
         givenModelReplies(
                 answer("At least 12 characters."),
@@ -151,7 +152,7 @@ class AgentOrchestratorTest {
     void ticketRequestedBeforeAnySearchIsSentBackOnce() {
         setGroundingCheck(true);
         long ticketsBefore = ticketRepository.count();
-        when(knowledgeBaseService.search(eq("mouse"), anyInt(), anyDouble()))
+        when(knowledgeBaseService.search(eq("mouse"), anyInt(), anyDouble(), anyBoolean()))
                 .thenReturn(List.of(new KnowledgeBaseService.Hit(6, "Hardware", "Mice are handed out at the IT desk", 0.8)));
         givenModelReplies(
                 toolCall("", "create_ticket", "{\"title\":\"Mouse\",\"description\":\"Broken\",\"priority\":\"HIGH\"}"),
@@ -193,7 +194,7 @@ class AgentOrchestratorTest {
 
     @Test
     void runsToolAndFeedsResultBackToModel() {
-        when(knowledgeBaseService.search(eq("vpn"), anyInt(), anyDouble()))
+        when(knowledgeBaseService.search(eq("vpn"), anyInt(), anyDouble(), anyBoolean()))
                 .thenReturn(List.of(new KnowledgeBaseService.Hit(1, "VPN", "Switch to IPSec", 0.9)));
         givenModelReplies(
                 toolCall("Let me check the knowledge base.", "search_knowledge_base", "{\"query\":\"vpn\"}"),
@@ -287,7 +288,7 @@ class AgentOrchestratorTest {
 
     @Test
     void escalatesWhenIterationLimitIsReached() {
-        when(knowledgeBaseService.search(any(), anyInt(), anyDouble())).thenReturn(List.of());
+        when(knowledgeBaseService.search(any(), anyInt(), anyDouble(), anyBoolean())).thenReturn(List.of());
         givenModelReplies(toolCall("", "search_knowledge_base", "{\"query\":\"x\"}"));
 
         AgentRun run = orchestrator.chat(sessionId, "Something odd");
@@ -352,7 +353,7 @@ class AgentOrchestratorTest {
     void appliesSettingsToTheModelCallAndRecordsTheModel() {
         when(modelCatalog.find("llama3.2:3b")).thenReturn(Optional.of(toolModel("llama3.2:3b")));
         AgentSettings.Values values = settingsService.get().values();
-        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true,
+        settingsService.update(new AgentSettings.Values("llama3.2:3b", 0.7, 0.8, 4096, 512, false, 3, 2, 0.6, true, true,
                 Set.of("save_memory"), values.approvalTools(), "You are a terse helpdesk bot."));
         givenModelReplies(answer("Done."));
 
@@ -375,7 +376,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(),
                 v.disabledTools(), Set.of(), v.systemPrompt()));
         givenModelReplies(
                 toolCall("", "create_ticket", "{\"title\":\"Mouse\",\"description\":\"Broken\",\"priority\":\"LOW\"}"),
@@ -392,7 +393,7 @@ class AgentOrchestratorTest {
         when(modelCatalog.find("qwen3:8b")).thenReturn(Optional.of(toolModel("qwen3:8b")));
         AgentSettings.Values v = settingsService.get().values();
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(),
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(),
                 Set.of("escalate_to_human"), v.approvalTools(), v.systemPrompt()));
         givenModelReplies(toolCall("", "escalate_to_human", "{\"reason\":\"x\"}"), answer("OK"));
 
@@ -410,7 +411,7 @@ class AgentOrchestratorTest {
 
         assertThatThrownBy(() -> settingsService.update(new AgentSettings.Values("gemma:2b", v.temperature(), v.topP(),
                 v.contextWindow(), v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(),
-                v.ragSimilarityThreshold(), v.groundingCheck(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
+                v.ragSimilarityThreshold(), v.groundingCheck(), v.hybridSearch(), v.disabledTools(), v.approvalTools(), v.systemPrompt())))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("does not support tool calling");
     }
@@ -509,7 +510,7 @@ class AgentOrchestratorTest {
 
     @Test
     void listenerFollowsTheRunStepByStep() {
-        when(knowledgeBaseService.search(eq("printer"), anyInt(), anyDouble()))
+        when(knowledgeBaseService.search(eq("printer"), anyInt(), anyDouble(), anyBoolean()))
                 .thenReturn(List.of(new KnowledgeBaseService.Hit(2, "Printers", "Add PRN-3-02 from Settings", 0.8)));
         givenModelReplies(
                 toolCall("Searching.", "search_knowledge_base", "{\"query\":\"printer\"}"),
@@ -541,7 +542,7 @@ class AgentOrchestratorTest {
         AgentSettings.Values v = settingsService.get().values();
         when(modelCatalog.find(v.chatModel())).thenReturn(Optional.of(toolModel(v.chatModel())));
         settingsService.update(new AgentSettings.Values(v.chatModel(), v.temperature(), v.topP(), v.contextWindow(),
-                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), on,
+                v.maxOutputTokens(), v.thinking(), v.maxIterations(), v.ragTopK(), v.ragSimilarityThreshold(), on, v.hybridSearch(),
                 v.disabledTools(), v.approvalTools(), v.systemPrompt()));
     }
 
