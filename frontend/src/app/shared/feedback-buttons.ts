@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, input, linkedSignal, model,
 import { firstValueFrom } from 'rxjs';
 
 import { AgentApi } from '../core/agent-api';
+import { I18n } from '../core/i18n';
 import { FeedbackRating, RunFeedback } from '../core/models';
 
 /**
@@ -12,21 +13,21 @@ import { FeedbackRating, RunFeedback } from '../core/models';
   selector: 'app-feedback-buttons',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="feedback" role="group" aria-label="Rate this answer">
-      <button type="button" class="vote" title="Helpful" aria-label="Helpful"
+    <div class="feedback" role="group" [attr.aria-label]="i18n.t('feedback.group')">
+      <button type="button" class="vote" [title]="i18n.t('feedback.helpful')" [attr.aria-label]="i18n.t('feedback.helpful')"
               [attr.aria-pressed]="feedback()?.rating === 'UP'" [disabled]="saving()" (click)="rate('UP')">👍</button>
-      <button type="button" class="vote" title="Not helpful" aria-label="Not helpful"
+      <button type="button" class="vote" [title]="i18n.t('feedback.notHelpful')" [attr.aria-label]="i18n.t('feedback.notHelpful')"
               [attr.aria-pressed]="feedback()?.rating === 'DOWN'" [disabled]="saving()" (click)="rate('DOWN')">👎</button>
       @if (commenting()) {
         <form class="comment-form" (submit)="$event.preventDefault(); sendComment()">
-          <input type="text" maxlength="1000" placeholder="What was wrong? (optional)" aria-label="What was wrong with the answer"
+          <input type="text" maxlength="1000" [placeholder]="i18n.t('feedback.placeholder')" [attr.aria-label]="i18n.t('feedback.whatWrong')"
                  [value]="comment()" (input)="comment.set($any($event.target).value)" />
-          <button type="submit" class="link-button" [disabled]="saving()">Send</button>
-          <button type="button" class="link-button" (click)="commenting.set(false)">Skip</button>
+          <button type="submit" class="link-button" [disabled]="saving()">{{ i18n.t('common.send') }}</button>
+          <button type="button" class="link-button" (click)="commenting.set(false)">{{ i18n.t('feedback.skip') }}</button>
         </form>
       } @else if (feedback(); as given) {
         <span class="thanks">
-          Thanks for the feedback
+          {{ i18n.t('feedback.thanks') }}
           @if (given.comment) { · <q>{{ given.comment }}</q> }
         </span>
       }
@@ -53,6 +54,7 @@ import { FeedbackRating, RunFeedback } from '../core/models';
   `,
 })
 export class FeedbackButtons {
+  protected readonly i18n = inject(I18n);
   private readonly api = inject(AgentApi);
 
   readonly runId = input.required<string>();

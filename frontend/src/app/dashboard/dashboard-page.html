@@ -1,76 +1,76 @@
 <header class="page-header">
   <div>
-    <h1>Agent dashboard</h1>
-    <p class="muted">Measured on every run the agent has handled. Local model, so cost is $0; tokens are still tracked.</p>
+    <h1>{{ i18n.t('dashboard.title') }}</h1>
+    <p class="muted">{{ i18n.t('dashboard.subtitle') }}</p>
   </div>
-  <button type="button" class="button" (click)="refresh()" [disabled]="metrics.isLoading()">Refresh</button>
+  <button type="button" class="button" (click)="refresh()" [disabled]="metrics.isLoading()">{{ i18n.t('common.refresh') }}</button>
 </header>
 
 @if (metrics.error()) {
   <section class="card">
-    <p>Could not load metrics. Is the backend running?</p>
-    <button type="button" class="button" (click)="refresh()">Retry</button>
+    <p>{{ i18n.t('dashboard.loadError') }}</p>
+    <button type="button" class="button" (click)="refresh()">{{ i18n.t('common.retry') }}</button>
   </section>
 } @else if (metrics.hasValue()) {
   @let m = metrics.value();
 
-  <section class="tiles" aria-label="Key metrics">
+  <section class="tiles" [attr.aria-label]="i18n.t('dashboard.keyMetrics')">
     <article class="tile">
-      <span class="tile-label">Task success rate</span>
-      <span class="tile-value">{{ m.taskSuccessRate | percent: '1.0-1' }}</span>
-      <span class="tile-sub">{{ m.completed }} of {{ m.finishedRuns }} finished runs</span>
+      <span class="tile-label">{{ i18n.t('dashboard.success') }}</span>
+      <span class="tile-value">{{ m.taskSuccessRate | percent: '1.0-1' : i18n.locale() }}</span>
+      <span class="tile-sub">{{ i18n.t('dashboard.successSub', { completed: m.completed, finished: m.finishedRuns }) }}</span>
     </article>
     <article class="tile">
-      <span class="tile-label">Avg latency</span>
-      <span class="tile-value">{{ m.avgLatencyMillis | duration }}</span>
-      <span class="tile-sub">p95 {{ m.p95LatencyMillis | duration }}</span>
+      <span class="tile-label">{{ i18n.t('dashboard.latency') }}</span>
+      <span class="tile-value">{{ m.avgLatencyMillis | duration: i18n.lang() }}</span>
+      <span class="tile-sub">{{ i18n.t('dashboard.p95', { value: (m.p95LatencyMillis | duration: i18n.lang()) }) }}</span>
     </article>
     <article class="tile">
-      <span class="tile-label">Tool accuracy</span>
-      <span class="tile-value">{{ 1 - m.toolErrorRate | percent: '1.0-1' }}</span>
-      <span class="tile-sub">{{ m.toolCalls | number }} tool calls</span>
+      <span class="tile-label">{{ i18n.t('dashboard.toolAccuracy') }}</span>
+      <span class="tile-value">{{ 1 - m.toolErrorRate | percent: '1.0-1' : i18n.locale() }}</span>
+      <span class="tile-sub">{{ i18n.t('dashboard.toolCallsSub', { count: (m.toolCalls | number: undefined : i18n.locale()) ?? '' }) }}</span>
     </article>
     <article class="tile">
-      <span class="tile-label">Human escalation</span>
-      <span class="tile-value">{{ m.escalationRate | percent: '1.0-1' }}</span>
-      <span class="tile-sub">{{ m.escalated }} runs escalated</span>
+      <span class="tile-label">{{ i18n.t('dashboard.escalation') }}</span>
+      <span class="tile-value">{{ m.escalationRate | percent: '1.0-1' : i18n.locale() }}</span>
+      <span class="tile-sub">{{ i18n.t('dashboard.escalatedSub', { count: m.escalated }) }}</span>
     </article>
     <article class="tile">
-      <span class="tile-label">Avg reasoning steps</span>
-      <span class="tile-value">{{ m.avgIterations | number: '1.0-1' }}</span>
-      <span class="tile-sub">model calls per run</span>
+      <span class="tile-label">{{ i18n.t('dashboard.steps') }}</span>
+      <span class="tile-value">{{ m.avgIterations | number: '1.0-1' : i18n.locale() }}</span>
+      <span class="tile-sub">{{ i18n.t('dashboard.stepsSub') }}</span>
     </article>
     <article class="tile">
-      <span class="tile-label">Approvals</span>
+      <span class="tile-label">{{ i18n.t('dashboard.approvals') }}</span>
       <span class="tile-value">{{ m.approvalsRequested }}</span>
-      <span class="tile-sub">{{ m.approvalsRejected }} rejected</span>
+      <span class="tile-sub">{{ i18n.t('dashboard.rejectedSub', { count: m.approvalsRejected }) }}</span>
     </article>
     <article class="tile">
-      <span class="tile-label">Tokens</span>
-      <span class="tile-value">{{ m.promptTokens + m.completionTokens | number }}</span>
-      <span class="tile-sub">{{ m.completionTokens | number }} generated</span>
+      <span class="tile-label">{{ i18n.t('dashboard.tokens') }}</span>
+      <span class="tile-value">{{ m.promptTokens + m.completionTokens | number: undefined : i18n.locale() }}</span>
+      <span class="tile-sub">{{ i18n.t('dashboard.generatedSub', { count: (m.completionTokens | number: undefined : i18n.locale()) ?? '' }) }}</span>
     </article>
     <article class="tile">
-      <span class="tile-label">User satisfaction</span>
+      <span class="tile-label">{{ i18n.t('dashboard.satisfaction') }}</span>
       <span class="tile-value">
-        @if (m.feedback.up + m.feedback.down > 0) { {{ m.feedback.satisfactionRate | percent: '1.0-0' }} } @else { – }
+        @if (m.feedback.up + m.feedback.down > 0) { {{ m.feedback.satisfactionRate | percent: '1.0-0' : i18n.locale() }} } @else { – }
       </span>
       <span class="tile-sub">👍 {{ m.feedback.up }} · 👎 {{ m.feedback.down }}</span>
     </article>
     <article class="tile">
-      <span class="tile-label">Blocked inputs</span>
+      <span class="tile-label">{{ i18n.t('dashboard.blocked') }}</span>
       <span class="tile-value">{{ m.inputsBlockedSinceStart }}</span>
-      <span class="tile-sub">guardrail, since start</span>
+      <span class="tile-sub">{{ i18n.t('dashboard.blockedSub') }}</span>
     </article>
   </section>
 
   <div class="grid-2">
     <section class="card" aria-labelledby="outcomes-title">
-      <h2 id="outcomes-title">Run outcomes</h2>
+      <h2 id="outcomes-title">{{ i18n.t('dashboard.outcomes') }}</h2>
       @if (m.totalRuns === 0) {
-        <p class="muted">No runs yet. Ask the agent something in the chat.</p>
+        <p class="muted">{{ i18n.t('dashboard.noRuns') }}</p>
       } @else {
-        <div class="stack" role="img" [attr.aria-label]="'Run outcomes out of ' + m.totalRuns + ' runs'">
+        <div class="stack" role="img" [attr.aria-label]="i18n.t('dashboard.outcomesLabel', { count: m.totalRuns })">
           @for (slice of statusSlices(); track slice.key) {
             @if (slice.count > 0) {
               <span class="segment" [attr.data-key]="slice.key" [style.flex-grow]="slice.count"></span>
@@ -81,7 +81,7 @@
           @for (slice of statusSlices(); track slice.key) {
             <li>
               <span class="swatch" [attr.data-key]="slice.key" aria-hidden="true"></span>
-              {{ slice.label }} <strong>{{ slice.count }}</strong> <span class="muted">({{ slice.share | percent: '1.0-0' }})</span>
+              {{ i18n.t(slice.label) }} <strong>{{ slice.count }}</strong> <span class="muted">({{ slice.share | percent: '1.0-0' : i18n.locale() }})</span>
             </li>
           }
         </ul>
@@ -90,35 +90,35 @@
 
     @if (canReadFeedback()) {
       <section class="card" aria-labelledby="negative-title">
-        <h2 id="negative-title">Latest negative feedback</h2>
+        <h2 id="negative-title">{{ i18n.t('dashboard.negative') }}</h2>
         <ul class="negative">
           @for (item of negativeFeedback.value(); track item.runId) {
             <li>
               <a [routerLink]="['/runs', item.runId]">{{ item.question }}</a>
               @if (item.comment) { <q>{{ item.comment }}</q> }
-              <span class="muted">{{ item.userId }} · {{ item.model ?? 'unknown model' }} · {{ item.updatedAt | date: 'short' }}</span>
+              <span class="muted">{{ item.userId }} · {{ item.model ?? i18n.t('dashboard.unknownModel') }} · {{ item.updatedAt | date: 'short' : undefined : i18n.locale() }}</span>
             </li>
           } @empty {
-            <li class="muted">No 👎 yet.</li>
+            <li class="muted">{{ i18n.t('dashboard.noNegative') }}</li>
           }
         </ul>
       </section>
     }
 
     <section class="card" aria-labelledby="models-title">
-      <h2 id="models-title">Models</h2>
+      <h2 id="models-title">{{ i18n.t('dashboard.models') }}</h2>
       @if (m.models.length === 0) {
-        <p class="muted">No finished runs yet.</p>
+        <p class="muted">{{ i18n.t('dashboard.noFinished') }}</p>
       } @else {
         <table>
           <thead>
             <tr>
-              <th scope="col">Model</th>
-              <th scope="col">Runs</th>
-              <th scope="col">Success</th>
-              <th scope="col">Avg latency</th>
-              <th scope="col">Avg steps</th>
-              <th scope="col">Avg tokens</th>
+              <th scope="col">{{ i18n.t('dashboard.colModel') }}</th>
+              <th scope="col">{{ i18n.t('dashboard.colRuns') }}</th>
+              <th scope="col">{{ i18n.t('dashboard.colSuccess') }}</th>
+              <th scope="col">{{ i18n.t('dashboard.colLatency') }}</th>
+              <th scope="col">{{ i18n.t('dashboard.colSteps') }}</th>
+              <th scope="col">{{ i18n.t('dashboard.colTokens') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -126,10 +126,10 @@
               <tr>
                 <th scope="row"><code>{{ model.model }}</code></th>
                 <td>{{ model.runs }}</td>
-                <td [class.warn]="model.successRate < 0.8">{{ model.successRate | percent: '1.0-0' }}</td>
-                <td>{{ model.avgLatencyMillis | duration }}</td>
-                <td>{{ model.avgIterations | number: '1.0-1' }}</td>
-                <td>{{ model.avgTokens | number: '1.0-0' }}</td>
+                <td [class.warn]="model.successRate < 0.8">{{ model.successRate | percent: '1.0-0' : i18n.locale() }}</td>
+                <td>{{ model.avgLatencyMillis | duration: i18n.lang() }}</td>
+                <td>{{ model.avgIterations | number: '1.0-1' : i18n.locale() }}</td>
+                <td>{{ model.avgTokens | number: '1.0-0' : i18n.locale() }}</td>
               </tr>
             }
           </tbody>
@@ -140,17 +140,17 @@
     <!-- Below the fold on small screens: only rendered once scrolled into view. -->
     @defer (on viewport) {
       <section class="card" aria-labelledby="tools-title">
-        <h2 id="tools-title">Tools</h2>
+        <h2 id="tools-title">{{ i18n.t('dashboard.tools') }}</h2>
         @if (m.tools.length === 0) {
-          <p class="muted">No tool calls yet.</p>
+          <p class="muted">{{ i18n.t('dashboard.noToolCalls') }}</p>
         } @else {
           <table>
             <thead>
               <tr>
-                <th scope="col">Tool</th>
-                <th scope="col">Calls</th>
-                <th scope="col">Accuracy</th>
-                <th scope="col">Avg time</th>
+                <th scope="col">{{ i18n.t('dashboard.colTool') }}</th>
+                <th scope="col">{{ i18n.t('dashboard.colCalls') }}</th>
+                <th scope="col">{{ i18n.t('dashboard.colAccuracy') }}</th>
+                <th scope="col">{{ i18n.t('dashboard.colTime') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -161,8 +161,8 @@
                     <span class="bar" [style.width.rem]="(5 * tool.calls) / maxToolCalls()"></span>
                     {{ tool.calls }}
                   </td>
-                  <td [class.warn]="tool.accuracy < 0.9">{{ tool.accuracy | percent: '1.0-0' }}</td>
-                  <td>{{ tool.avgMillis | duration }}</td>
+                  <td [class.warn]="tool.accuracy < 0.9">{{ tool.accuracy | percent: '1.0-0' : i18n.locale() }}</td>
+                  <td>{{ tool.avgMillis | duration: i18n.lang() }}</td>
                 </tr>
               }
             </tbody>
@@ -170,9 +170,9 @@
         }
       </section>
     } @placeholder {
-      <section class="card"><h2>Tools</h2></section>
+      <section class="card"><h2>{{ i18n.t('dashboard.tools') }}</h2></section>
     }
   </div>
 } @else {
-  <p class="muted">Loading metrics…</p>
+  <p class="muted">{{ i18n.t('dashboard.loading') }}</p>
 }

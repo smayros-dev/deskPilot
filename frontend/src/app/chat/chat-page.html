@@ -1,12 +1,12 @@
 <div class="chat-layout">
-  <section class="chat card" aria-label="Conversation">
+  <section class="chat card" [attr.aria-label]="i18n.t('chat.conversation')">
     <header class="chat-header">
-      <h1>IT Helpdesk</h1>
+      <h1>{{ i18n.t('chat.title') }}</h1>
       <div class="chat-tools">
         @if (auth.isAdmin()) {
           <app-model-switcher [disabled]="store.sending()" />
         }
-        <button type="button" class="button" [disabled]="store.sending()" (click)="newConversation()">New conversation</button>
+        <button type="button" class="button" [disabled]="store.sending()" (click)="newConversation()">{{ i18n.t('chat.newConversation') }}</button>
       </div>
     </header>
 
@@ -15,7 +15,7 @@
         <div class="bubble user">
           {{ run.userInput }}
           @if (hasScreenshot(run)) {
-            <span class="screenshot-chip" title="A screenshot was attached and read by the vision model">🖼️ screenshot</span>
+            <span class="screenshot-chip" [title]="i18n.t('chat.screenshotHint')">🖼️ {{ i18n.t('chat.screenshot') }}</span>
           }
         </div>
 
@@ -36,14 +36,14 @@
           }
           @default {
             <div class="bubble agent" [class.failed]="run.status === 'FAILED'">
-              <app-answer [text]="run.answer ?? 'The request failed before the agent could answer.'" [run]="run" />
+              <app-answer [text]="run.answer ?? i18n.t('chat.failedNoAnswer')" [run]="run" />
               <div class="meta">
                 <app-status-badge [status]="run.status" />
-                <span>{{ run.stats.activeMillis | duration }}</span>
+                <span>{{ run.stats.activeMillis | duration: i18n.lang() }}</span>
                 <button type="button" class="link-button" (click)="toggleTrace(run.id)" [attr.aria-expanded]="expanded().has(run.id)">
-                  {{ expanded().has(run.id) ? 'Hide' : 'Show' }} reasoning
+                  {{ expanded().has(run.id) ? i18n.t('chat.hideReasoning') : i18n.t('chat.showReasoning') }}
                 </button>
-                <a [routerLink]="['/runs', run.id]">Details</a>
+                <a [routerLink]="['/runs', run.id]">{{ i18n.t('chat.details') }}</a>
               </div>
               <app-feedback-buttons [runId]="run.id" [feedback]="run.feedback ?? null"
                                     (feedbackChange)="store.setFeedback(run.id, $event)" />
@@ -58,18 +58,18 @@
               <app-run-trace [run]="run" />
             </div>
           } @loading (minimum 200ms) {
-            <p class="muted">Loading trace…</p>
+            <p class="muted">{{ i18n.t('chat.loadingTrace') }}</p>
           }
         }
       } @empty {
         @if (!store.sending()) {
           <div class="welcome">
-            <p>Hi! I can answer questions from the IT knowledge base, open tickets (after a human approves them) and remember your setup.</p>
-            <p class="muted">Try one of these:</p>
+            <p>{{ i18n.t('chat.welcome') }}</p>
+            <p class="muted">{{ i18n.t('chat.tryThese') }}</p>
             <ul class="examples">
               @for (example of examples; track example) {
                 <li>
-                  <button type="button" class="chip" [disabled]="!store.canSend()" (click)="send({ message: example, image: null })">{{ example }}</button>
+                  <button type="button" class="chip" [disabled]="!store.canSend()" (click)="send({ message: i18n.t(example), image: null })">{{ i18n.t(example) }}</button>
                 </li>
               }
             </ul>
@@ -81,13 +81,13 @@
         <div class="bubble agent typing" role="status">
           <div class="activity">
             <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
-            {{ store.activity() || 'Agent is working' }}… {{ elapsedSeconds() }} s
+            {{ store.activity() || i18n.t('chat.working') }}… {{ elapsedSeconds() }} {{ i18n.t('unit.s') }}
             @if (elapsedSeconds() > 15) {
-              <span class="muted">(the local model runs on CPU, this can take a minute)</span>
+              <span class="muted">{{ i18n.t('chat.cpuHint') }}</span>
             }
           </div>
           @if (store.liveSteps().length > 0) {
-            <ol class="live-steps" aria-label="Steps so far">
+            <ol class="live-steps" [attr.aria-label]="i18n.t('chat.stepsSoFar')">
               @for (step of store.liveSteps(); track step.id) {
                 <li [class.error]="step.error">
                   @switch (step.type) {
@@ -95,9 +95,9 @@
                     @case ('TOOL_CALL') { 🔧 <code>{{ step.name }}</code> <span class="muted">{{ step.content }}</span> }
                     @case ('TOOL_RESULT') { {{ step.error ? '⚠️' : '📄' }} <code>{{ step.name }}</code> <span class="muted">{{ step.content }}</span> }
                     @case ('APPROVAL_DECISION') { {{ step.name === 'APPROVED' ? '✅' : '⛔' }} <span>{{ step.name?.toLowerCase() }} {{ step.content }}</span> }
-                    @case ('ANSWER') { 💬 <span>Answer ready</span> }
-                    @case ('IMAGE_ANALYSIS') { 🖼️ <span>Screenshot read by {{ step.name }}: {{ step.content }}</span> }
-                    @default { • <span>{{ step.type.toLowerCase().replace('_', ' ') }}</span> }
+                    @case ('ANSWER') { 💬 <span>{{ i18n.t('chat.answerReady') }}</span> }
+                    @case ('IMAGE_ANALYSIS') { 🖼️ <span>{{ i18n.t('chat.screenshotRead', { model: step.name ?? '' }) }} {{ step.content }}</span> }
+                    @default { • <span>{{ i18n.t($any('step.' + step.type)) }}</span> }
                   }
                 </li>
               }
@@ -111,9 +111,9 @@
       @if (store.awaitingApproval()) {
         <p class="muted">
           @if (auth.isReviewer()) {
-            Approve or reject the pending action to continue the conversation.
+            {{ i18n.t('chat.approveToContinue') }}
           } @else {
-            A reviewer has to approve this action; the answer appears here as soon as they decide.
+            {{ i18n.t('chat.reviewerMustApprove') }}
           }
         </p>
       }
@@ -121,28 +121,28 @@
     </footer>
   </section>
 
-  <aside class="side" aria-label="Conversations and last run">
+  <aside class="side" [attr.aria-label]="i18n.t('chat.side')">
     <section class="card">
       <app-conversation-list />
     </section>
     @let last = store.lastSettledRun();
     @if (last) {
       <section class="card">
-        <h2>Last run</h2>
+        <h2>{{ i18n.t('chat.lastRun') }}</h2>
         @defer (on viewport) {
           <app-run-trace [run]="last" />
         } @placeholder {
-          <p class="muted">Trace</p>
+          <p class="muted">{{ i18n.t('chat.trace') }}</p>
         }
       </section>
     } @else {
       <section class="card">
-        <h2>How it works</h2>
+        <h2>{{ i18n.t('chat.howTitle') }}</h2>
         <ol class="how">
-          <li><strong>Reason</strong>: the model decides what to do next.</li>
-          <li><strong>Act</strong>: it calls tools (knowledge-base search, tickets, memory).</li>
-          <li><strong>Observe</strong>: tool results go back to the model.</li>
-          <li><strong>Ask a human</strong> before risky actions like creating a ticket.</li>
+          <li><strong>{{ i18n.t('chat.howReason') }}</strong>{{ i18n.t('chat.howReasonText') }}</li>
+          <li><strong>{{ i18n.t('chat.howAct') }}</strong>{{ i18n.t('chat.howActText') }}</li>
+          <li><strong>{{ i18n.t('chat.howObserve') }}</strong>{{ i18n.t('chat.howObserveText') }}</li>
+          <li><strong>{{ i18n.t('chat.howAsk') }}</strong>{{ i18n.t('chat.howAskText') }}</li>
         </ol>
       </section>
     }

@@ -7,42 +7,42 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'chat' },
   {
     path: 'chat',
-    title: 'Chat',
+    title: 'title.chat',
     canDeactivate: [leaveWhileBusyGuard],
     loadComponent: () => import('./chat/chat-page').then((m) => m.ChatPage),
   },
   {
     path: 'runs/:runId',
-    title: 'Run trace',
+    title: 'title.run',
     resolve: { run: runResolver },
     loadComponent: () => import('./runs/run-page').then((m) => m.RunPage),
   },
   {
     path: 'approvals',
-    title: 'Approvals',
+    title: 'title.approvals',
     canMatch: [hasRole('reviewer')],
     loadComponent: () => import('./approvals/approvals-page').then((m) => m.ApprovalsPage),
   },
   {
     path: 'evaluation',
-    title: 'Evaluation',
+    title: 'title.evaluation',
     canMatch: [hasRole('admin')],
     loadComponent: () => import('./evaluation/evaluation-page').then((m) => m.EvaluationPage),
   },
   {
     path: 'audit',
-    title: 'Audit trail',
+    title: 'title.audit',
     canMatch: [hasRole('admin')],
     loadComponent: () => import('./audit/audit-page').then((m) => m.AuditPage),
   },
   {
     path: 'dashboard',
-    title: 'Dashboard',
+    title: 'title.dashboard',
     loadComponent: () => import('./dashboard/dashboard-page').then((m) => m.DashboardPage),
   },
   {
     path: 'settings',
-    title: 'Settings',
+    title: 'title.settings',
     canDeactivate: [unsavedChangesGuard],
     loadComponent: () => import('./settings/settings-page').then((m) => m.SettingsPage),
   },
@@ -52,7 +52,7 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    title: 'Not found',
+    title: 'title.notFound',
     loadComponent: () => import('./not-found-page').then((m) => m.NotFoundPage),
   },
 ];

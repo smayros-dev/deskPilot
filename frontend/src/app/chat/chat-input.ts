@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import { I18n } from '../core/i18n';
 
 import { ImageAttachment } from '../core/models';
 
@@ -26,21 +27,21 @@ function notBlank(control: AbstractControl<string>): ValidationErrors | null {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <form [formGroup]="form" (ngSubmit)="submit()" class="composer">
-      <label for="message" class="visually-hidden">Message</label>
+      <label for="message" class="visually-hidden">{{ i18n.t('input.message') }}</label>
       <textarea
         id="message"
         formControlName="message"
         rows="2"
         [attr.maxlength]="maxLength"
-        [placeholder]="placeholder()"
+        [placeholder]="placeholder() ?? i18n.t('input.placeholder')"
         (keydown.enter)="onEnter($any($event))"
         (paste)="onPaste($event)"
       ></textarea>
       @if (image(); as attached) {
         <div class="attachment">
-          <img [src]="'data:' + attached.mimeType + ';base64,' + attached.data" alt="Attached screenshot" />
-          <span>Screenshot attached</span>
-          <button type="button" class="link-button" (click)="image.set(null)">Remove</button>
+          <img [src]="'data:' + attached.mimeType + ';base64,' + attached.data" [alt]="i18n.t('input.attachedAlt')" />
+          <span>{{ i18n.t('input.attached') }}</span>
+          <button type="button" class="link-button" (click)="image.set(null)">{{ i18n.t('input.remove') }}</button>
         </div>
       }
       @if (imageError(); as error) {
@@ -49,19 +50,19 @@ function notBlank(control: AbstractControl<string>): ValidationErrors | null {
       <div class="composer-footer">
         <span class="hint" [class.over]="remaining() < 0" aria-live="polite">
           @if (remaining() < 200) {
-            {{ remaining() }} characters left ·
+            {{ i18n.t('input.charsLeft', { n: remaining() }) }}
           }
-          Enter to send, Shift+Enter for a new line
+          {{ i18n.t('input.enterHint') }}
           @if (allowImages()) {
-            · paste or attach a screenshot
+            {{ i18n.t('input.pasteHint') }}
           }
         </span>
         <div class="actions">
           @if (allowImages()) {
             <input #file type="file" class="visually-hidden" [accept]="imageTypes" (change)="onFile(file)" />
-            <button type="button" class="button" [disabled]="disabled()" (click)="file.click()" aria-label="Attach a screenshot">📎</button>
+            <button type="button" class="button" [disabled]="disabled()" (click)="file.click()" [attr.aria-label]="i18n.t('input.attach')">📎</button>
           }
-          <button type="submit" class="button primary" [disabled]="form.invalid || disabled()">Send</button>
+          <button type="submit" class="button primary" [disabled]="form.invalid || disabled()">{{ i18n.t('common.send') }}</button>
         </div>
       </div>
     </form>
@@ -81,9 +82,11 @@ function notBlank(control: AbstractControl<string>): ValidationErrors | null {
 export class ChatInput {
   readonly disabled = input(false);
   readonly allowImages = input(false);
-  readonly placeholder = input('Describe your IT problem…');
+  /** Defaults to the translated "Describe your IT problem…". */
+  readonly placeholder = input<string | null>(null);
   readonly send = output<ChatSubmission>();
 
+  protected readonly i18n = inject(I18n);
   protected readonly maxLength = MAX_MESSAGE_LENGTH;
   protected readonly imageTypes = IMAGE_TYPES.join(',');
   protected readonly form = inject(NonNullableFormBuilder).group({
@@ -116,11 +119,11 @@ export class ChatInput {
   async attach(file: File): Promise<boolean> {
     this.imageError.set(null);
     if (!IMAGE_TYPES.includes(file.type)) {
-      this.imageError.set('Only PNG, JPEG or WebP screenshots can be attached.');
+      this.imageError.set(this.i18n.t('input.onlyTypes'));
       return false;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      this.imageError.set('The screenshot is larger than 5 MB.');
+      this.imageError.set(this.i18n.t('input.tooLarge'));
       return false;
     }
     this.image.set({ mimeType: file.type, data: await toBase64(file) });

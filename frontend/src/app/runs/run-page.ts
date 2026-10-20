@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, input, linkedSignal } from 
 import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../core/auth';
+import { I18n } from '../core/i18n';
 import { Run, RunFeedback } from '../core/models';
 import { Answer } from '../shared/answer';
 import { FeedbackButtons } from '../shared/feedback-buttons';
@@ -16,15 +17,15 @@ import { RunTrace } from './run-trace';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let r = run();
-    <a routerLink="/chat" class="back">← Back to chat</a>
+    <a routerLink="/chat" class="back">{{ i18n.t('run.back') }}</a>
     <section class="card">
       <header class="run-header">
         <div>
           <h1>{{ r.userInput }}</h1>
           <p class="muted">
-            Run <code>{{ r.id }}</code> · started {{ r.createdAt | date: 'medium' }}
+            {{ i18n.t('run.run') }} <code>{{ r.id }}</code> · {{ i18n.t('run.started', { date: (r.createdAt | date: 'medium' : undefined : i18n.locale()) ?? '' }) }}
             @if (r.completedAt) {
-              · finished {{ r.completedAt | date: 'mediumTime' }}
+              · {{ i18n.t('run.finished', { time: (r.completedAt | date: 'mediumTime' : undefined : i18n.locale()) ?? '' }) }}
             }
           </p>
         </div>
@@ -39,17 +40,17 @@ import { RunTrace } from './run-trace';
           <div class="rate"><app-feedback-buttons [runId]="r.id" [(feedback)]="feedback" /></div>
         } @else if (r.feedback; as given) {
           <p class="muted rate">
-            Rated {{ given.rating === 'UP' ? '👍' : '👎' }} by {{ r.userId }}
+            {{ i18n.t('run.ratedBy', { rating: given.rating === 'UP' ? '👍' : '👎', user: r.userId }) }}
             @if (given.comment) { · <q>{{ given.comment }}</q> }
           </p>
         }
       }
 
-      <h2>Reasoning trace</h2>
+      <h2>{{ i18n.t('run.reasoningTrace') }}</h2>
       <app-run-trace [run]="r" />
 
       <details>
-        <summary>Raw JSON</summary>
+        <summary>{{ i18n.t('run.rawJson') }}</summary>
         <pre>{{ r | json }}</pre>
       </details>
     </section>
@@ -66,6 +67,7 @@ import { RunTrace } from './run-trace';
   `,
 })
 export class RunPage {
+  protected readonly i18n = inject(I18n);
   protected readonly auth = inject(AuthService);
 
   readonly run = input.required<Run>();

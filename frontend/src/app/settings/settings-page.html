@@ -1,144 +1,144 @@
 <header class="page-header">
   <div>
-    <h1>Agent settings</h1>
+    <h1>{{ i18n.t('settings.title') }}</h1>
     <p class="muted">
-      Applied from the next message, no restart needed.
+      {{ i18n.t('settings.applied') }}
       @if (store.settings()?.updatedAt; as updatedAt) {
-        Last saved {{ updatedAt | date: 'medium' }}.
+        {{ i18n.t('settings.lastSaved', { date: (updatedAt | date: 'medium' : undefined : i18n.locale()) ?? '' }) }}
       }
     </p>
   </div>
   @if (auth.isAdmin()) {
     <div class="actions">
-      <button type="button" class="button" (click)="reset()" [disabled]="store.saving()">Reset to defaults</button>
+      <button type="button" class="button" (click)="reset()" [disabled]="store.saving()">{{ i18n.t('settings.reset') }}</button>
     </div>
   }
 </header>
 
 @if (!auth.isAdmin()) {
-  <p class="notice" role="note">Read-only: only users with the <strong>admin</strong> role can change the agent settings.</p>
+  <p class="notice" role="note">{{ i18n.t('settings.readOnly') }}</p>
 }
 
 <form [formGroup]="form" (ngSubmit)="save()" class="settings">
   <section class="card" aria-labelledby="model-title">
-    <h2 id="model-title">Model</h2>
-    <label for="chatModel">Chat model</label>
+    <h2 id="model-title">{{ i18n.t('settings.model') }}</h2>
+    <label for="chatModel">{{ i18n.t('settings.chatModel') }}</label>
     <select id="chatModel" formControlName="chatModel">
       @for (model of chatModels(); track model.name) {
         <option [value]="model.name" [disabled]="!model.supportsTools">
           {{ model.name }}
           @if (model.parameterSize) { · {{ model.parameterSize }} }
-          · {{ model.sizeBytes / gib | number: '1.1-1' }} GB
-          @if (!model.supportsTools) { (no tool calling) }
+          · {{ model.sizeBytes / gib | number: '1.1-1' : i18n.locale() }} GB
+          @if (!model.supportsTools) { {{ i18n.t('settings.noTools') }} }
         </option>
       } @empty {
-        <option value="" disabled>{{ models.isLoading() ? 'Loading models…' : 'No models found in Ollama' }}</option>
+        <option value="" disabled>{{ models.isLoading() ? i18n.t('settings.loadingModels') : i18n.t('settings.noModels') }}</option>
       }
     </select>
     @if (selectedModel(); as model) {
-      <ul class="capabilities" aria-label="Model capabilities">
+      <ul class="capabilities" [attr.aria-label]="i18n.t('settings.capabilities')">
         @for (capability of model.capabilities; track capability) {
           <li>{{ capability }}</li>
         }
       </ul>
     }
-    <p class="hint">Install more models with <code>ollama pull &lt;name&gt;</code>, e.g. <code>qwen3:4b</code> (faster) or <code>qwen3:14b</code> (smarter). Only models that support tool calling can run the agent.</p>
+    <p class="hint">{{ i18n.t('settings.modelHint') }}</p>
 
-    <label for="visionModel">Vision model (reads screenshots attached to messages)</label>
+    <label for="visionModel">{{ i18n.t('settings.visionModel') }}</label>
     <select id="visionModel" formControlName="visionModel">
-      <option value="">Off — screenshots cannot be attached</option>
+      <option value="">{{ i18n.t('settings.visionOff') }}</option>
       @for (model of visionModels(); track model.name) {
         <option [value]="model.name">{{ model.name }} @if (model.parameterSize) { · {{ model.parameterSize }} }</option>
       }
     </select>
-    <p class="hint">Needs a model with the <code>vision</code> capability. Large ones (e.g. <code>gemma4:26b</code>) take minutes per screenshot on a CPU; a small one such as <code>qwen2.5vl:7b</code> is much faster.</p>
+    <p class="hint">{{ i18n.t('settings.visionHint') }}</p>
 
-    <div class="presets" role="group" aria-label="Presets">
+    <div class="presets" role="group" [attr.aria-label]="i18n.t('settings.presets')">
       @for (preset of presets; track preset.name) {
-        <button type="button" class="chip" [title]="preset.hint" [disabled]="!auth.isAdmin()" (click)="applyPreset(preset)">{{ preset.name }}</button>
+        <button type="button" class="chip" [title]="i18n.t(preset.hint)" [disabled]="!auth.isAdmin()" (click)="applyPreset(preset)">{{ i18n.t(preset.name) }}</button>
       }
     </div>
   </section>
 
   <section class="card" aria-labelledby="generation-title">
-    <h2 id="generation-title">Generation</h2>
+    <h2 id="generation-title">{{ i18n.t('settings.generation') }}</h2>
     <div class="grid">
       <label class="range">
-        <span>Temperature <output>{{ form.controls.temperature.value | number: '1.2-2' }}</output></span>
+        <span>{{ i18n.t('settings.temperature') }} <output>{{ form.controls.temperature.value | number: '1.2-2' : i18n.locale() }}</output></span>
         <input type="range" min="0" max="2" step="0.05" formControlName="temperature" />
-        <small>Lower is more focused and repeatable; helpdesk answers work best around 0.1–0.3.</small>
+        <small>{{ i18n.t('settings.temperatureHint') }}</small>
       </label>
       <label class="range">
-        <span>Top-p <output>{{ form.controls.topP.value | number: '1.2-2' }}</output></span>
+        <span>{{ i18n.t('settings.topP') }} <output>{{ form.controls.topP.value | number: '1.2-2' : i18n.locale() }}</output></span>
         <input type="range" min="0.05" max="1" step="0.05" formControlName="topP" />
-        <small>Samples only from the most likely tokens covering this probability.</small>
+        <small>{{ i18n.t('settings.topPHint') }}</small>
       </label>
       <label>
-        <span>Context window (tokens)</span>
+        <span>{{ i18n.t('settings.contextWindow') }}</span>
         <input type="number" min="1024" max="131072" step="1024" formControlName="contextWindow" />
-        <small>How much conversation and tool output the model sees. Larger uses more RAM and is slower.</small>
+        <small>{{ i18n.t('settings.contextWindowHint') }}</small>
       </label>
       <label>
-        <span>Max output tokens</span>
+        <span>{{ i18n.t('settings.maxOutput') }}</span>
         <input type="number" min="64" max="32768" step="64" formControlName="maxOutputTokens" />
-        <small>Upper bound per model call.</small>
+        <small>{{ i18n.t('settings.maxOutputHint') }}</small>
       </label>
       <label class="toggle">
         <input type="checkbox" formControlName="thinking" />
         <span>
-          Thinking (reasoning) mode
+          {{ i18n.t('settings.thinking') }}
           @if (selectedModel() && !selectedModel()!.supportsThinking) {
-            <em class="warn">not supported by this model</em>
+            <em class="warn">{{ i18n.t('settings.thinkingUnsupported') }}</em>
           }
         </span>
-        <small>Better on hard questions but about 15× slower on CPU.</small>
+        <small>{{ i18n.t('settings.thinkingHint') }}</small>
       </label>
     </div>
   </section>
 
   <section class="card" aria-labelledby="agent-title">
-    <h2 id="agent-title">Agent &amp; retrieval</h2>
+    <h2 id="agent-title">{{ i18n.t('settings.agent') }}</h2>
     <div class="grid">
       <label>
-        <span>Max steps per request</span>
+        <span>{{ i18n.t('settings.maxSteps') }}</span>
         <input type="number" min="1" max="20" formControlName="maxIterations" />
-        <small>Model calls allowed before the request is escalated to a human.</small>
+        <small>{{ i18n.t('settings.maxStepsHint') }}</small>
       </label>
       <label>
-        <span>Articles per search (top-K)</span>
+        <span>{{ i18n.t('settings.topK') }}</span>
         <input type="number" min="1" max="10" formControlName="ragTopK" />
       </label>
       <label class="range">
-        <span>Similarity threshold <output>{{ form.controls.ragSimilarityThreshold.value | number: '1.2-2' }}</output></span>
+        <span>{{ i18n.t('settings.threshold') }} <output>{{ form.controls.ragSimilarityThreshold.value | number: '1.2-2' : i18n.locale() }}</output></span>
         <input type="range" min="0" max="1" step="0.05" formControlName="ragSimilarityThreshold" />
-        <small>Articles below this score count as "not relevant", so the agent rephrases or admits it has no answer.</small>
+        <small>{{ i18n.t('settings.thresholdHint') }}</small>
       </label>
       <label class="toggle">
         <input type="checkbox" formControlName="hybridSearch" />
-        <span>Hybrid search</span>
-        <small>Combine keyword and semantic ranking. Finds articles for short or product-specific questions that embeddings alone score too low.</small>
+        <span>{{ i18n.t('settings.hybrid') }}</span>
+        <small>{{ i18n.t('settings.hybridHint') }}</small>
       </label>
       <label class="toggle">
         <input type="checkbox" formControlName="selfCheck" />
-        <span>Self-check</span>
-        <small>Before answering, compare the draft with the retrieved articles and add missing key facts; before a ticket, check the articles say one is needed. One extra model call each.</small>
+        <span>{{ i18n.t('settings.selfCheck') }}</span>
+        <small>{{ i18n.t('settings.selfCheckHint') }}</small>
       </label>
       <label class="toggle">
         <input type="checkbox" formControlName="groundingCheck" />
-        <span>Grounding check</span>
-        <small>If the model answers without using any tool, remind it once to search the knowledge base first. Small local models often answer from general knowledge; costs one extra model call in those cases.</small>
+        <span>{{ i18n.t('settings.grounding') }}</span>
+        <small>{{ i18n.t('settings.groundingHint') }}</small>
       </label>
     </div>
   </section>
 
   <section class="card" aria-labelledby="tools-title">
-    <h2 id="tools-title">Tools</h2>
+    <h2 id="tools-title">{{ i18n.t('settings.tools') }}</h2>
     <table formGroupName="tools">
       <thead>
         <tr>
-          <th scope="col">Tool</th>
-          <th scope="col">Enabled</th>
-          <th scope="col">Needs approval</th>
+          <th scope="col">{{ i18n.t('settings.colTool') }}</th>
+          <th scope="col">{{ i18n.t('settings.colEnabled') }}</th>
+          <th scope="col">{{ i18n.t('settings.colApproval') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -148,17 +148,17 @@
               <th scope="row">
                 <code>{{ tool.name }}</code>
                 @if (tool.external) {
-                  <span class="badge" title="Provided by an external MCP server">MCP</span>
+                  <span class="badge" [title]="i18n.t('settings.mcpHint')">MCP</span>
                 }
                 <small>{{ tool.description }}</small>
               </th>
-              <td><input type="checkbox" formControlName="enabled" [attr.aria-label]="'Enable ' + tool.name" /></td>
+              <td><input type="checkbox" formControlName="enabled" [attr.aria-label]="i18n.t('settings.enable', { tool: tool.name })" /></td>
               <td>
-                <input type="checkbox" formControlName="approval" [attr.aria-label]="'Require approval for ' + tool.name" />
+                <input type="checkbox" formControlName="approval" [attr.aria-label]="i18n.t('settings.requireApproval', { tool: tool.name })" />
                 @if (tool.external) {
-                  <em class="muted">always, external system</em>
+                  <em class="muted">{{ i18n.t('settings.alwaysExternal') }}</em>
                 } @else if (tool.approvalByDefault && !toolControls(tool.name).controls.approval.value) {
-                  <em class="warn">runs without review</em>
+                  <em class="warn">{{ i18n.t('settings.noReview') }}</em>
                 }
               </td>
             </tr>
@@ -169,22 +169,22 @@
   </section>
 
   <section class="card" aria-labelledby="prompt-title">
-    <h2 id="prompt-title">System prompt</h2>
-    <label for="systemPrompt">Override (leave empty to use the built-in helpdesk prompt)</label>
-    <textarea id="systemPrompt" rows="8" formControlName="systemPrompt" placeholder="You are DeskPilot, the IT helpdesk agent…"></textarea>
+    <h2 id="prompt-title">{{ i18n.t('settings.systemPrompt') }}</h2>
+    <label for="systemPrompt">{{ i18n.t('settings.promptOverride') }}</label>
+    <textarea id="systemPrompt" rows="8" formControlName="systemPrompt" [placeholder]="i18n.t('settings.promptPlaceholder')"></textarea>
     @if (form.controls.systemPrompt.hasError('maxlength')) {
-      <small class="warn">At most 8000 characters.</small>
+      <small class="warn">{{ i18n.t('settings.promptTooLong') }}</small>
     }
   </section>
 
   @if (auth.isAdmin()) {
   <footer class="save-bar">
     @if (form.dirty) {
-      <span class="muted">Unsaved changes</span>
-      <button type="button" class="button" (click)="discard()">Discard</button>
+      <span class="muted">{{ i18n.t('settings.unsaved') }}</span>
+      <button type="button" class="button" (click)="discard()">{{ i18n.t('settings.discard') }}</button>
     }
     <button type="submit" class="button primary" [disabled]="form.invalid || !form.dirty || store.saving()">
-      {{ store.saving() ? 'Saving…' : 'Save settings' }}
+      {{ store.saving() ? i18n.t('settings.saving') : i18n.t('settings.save') }}
     </button>
   </footer>
   }

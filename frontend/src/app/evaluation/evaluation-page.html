@@ -1,27 +1,24 @@
 <header class="page-header">
   <div>
-    <h1>Evaluation</h1>
-    <p class="muted">
-      Run {{ scenarios.value().length }} scripted helpdesk scenarios through the real agent and score the answers,
-      to compare models and settings on the same requests. Runs are kept out of the dashboard.
-    </p>
+    <h1>{{ i18n.t('evaluation.title') }}</h1>
+    <p class="muted">{{ i18n.t('evaluation.subtitle', { count: scenarios.value().length }) }}</p>
   </div>
 </header>
 
 <section class="card start" aria-labelledby="start-title">
-  <h2 id="start-title">New evaluation</h2>
+  <h2 id="start-title">{{ i18n.t('evaluation.new') }}</h2>
   <div class="start-form">
     <label>
-      <span>Model</span>
+      <span>{{ i18n.t('evaluation.model') }}</span>
       <select [value]="model()" (change)="model.set($any($event.target).value)" [disabled]="!!running()">
         @for (option of toolModels(); track option.name) {
           <option [value]="option.name">{{ option.name }} @if (option.parameterSize) { · {{ option.parameterSize }} }</option>
         } @empty {
-          <option value="" disabled>{{ models.isLoading() ? 'Loading models…' : 'No tool-capable model installed' }}</option>
+          <option value="" disabled>{{ models.isLoading() ? i18n.t('evaluation.loadingModels') : i18n.t('evaluation.noModel') }}</option>
         }
       </select>
     </label>
-    <div class="categories" role="group" aria-label="Scenario categories (none selected = all)">
+    <div class="categories" role="group" [attr.aria-label]="i18n.t('evaluation.categories')">
       @for (category of categories(); track category) {
         <button type="button" class="chip" [class.selected]="selectedCategories().has(category)"
                 [attr.aria-pressed]="selectedCategories().has(category)" (click)="toggleCategory(category)">
@@ -31,38 +28,35 @@
     </div>
     <button type="button" class="button primary" (click)="start()"
             [disabled]="!model() || starting() || !!running() || scenarioCount() === 0">
-      Run {{ scenarioCount() }} scenarios
+      {{ i18n.t('evaluation.run', { count: scenarioCount() }) }}
     </button>
   </div>
-  <p class="hint">
-    Uses the current settings with the chosen model. On a CPU a scenario takes 10–60 s, so a full run takes 10–25 minutes;
-    the agent stays usable but slower meanwhile. Ticket requests are checked at the approval step and never created.
-  </p>
+  <p class="hint">{{ i18n.t('evaluation.hint') }}</p>
 </section>
 
 @if (running(); as current) {
   <section class="card progress-card" role="status" aria-live="polite">
     <div class="progress-head">
       <strong>{{ current.model }}</strong>
-      <span>{{ current.completed }} / {{ current.scenarioCount }} scenarios · {{ current.passed }} passed</span>
-      <button type="button" class="button danger" (click)="cancel(current)">Cancel</button>
+      <span>{{ i18n.t('evaluation.progress', { completed: current.completed, total: current.scenarioCount, passed: current.passed }) }}</span>
+      <button type="button" class="button danger" (click)="cancel(current)">{{ i18n.t('common.cancel') }}</button>
     </div>
     <progress [value]="current.completed" [max]="current.scenarioCount"></progress>
   </section>
 }
 
 <section class="card" aria-labelledby="compare-title">
-  <h2 id="compare-title">Results</h2>
+  <h2 id="compare-title">{{ i18n.t('evaluation.results') }}</h2>
   @if (evaluations.value().length > 0) {
     <div class="table-wrap">
       <table class="compare">
         <thead>
           <tr>
-            <th scope="col">Started</th>
-            <th scope="col">Model</th>
-            <th scope="col">Status</th>
-            <th scope="col">Pass rate</th>
-            <th scope="col">Avg latency</th>
+            <th scope="col">{{ i18n.t('evaluation.colStarted') }}</th>
+            <th scope="col">{{ i18n.t('evaluation.colModel') }}</th>
+            <th scope="col">{{ i18n.t('evaluation.colStatus') }}</th>
+            <th scope="col">{{ i18n.t('evaluation.colPassRate') }}</th>
+            <th scope="col">{{ i18n.t('evaluation.colLatency') }}</th>
             <th scope="col">p95</th>
             @for (category of comparedCategories(); track category) {
               <th scope="col">{{ category }}</th>
@@ -74,20 +68,20 @@
             <tr [class.selected]="selectedId() === evaluation.id" (click)="selectedId.set(evaluation.id)">
               <td>
                 <button type="button" class="link-button" (click)="selectedId.set(evaluation.id)">
-                  {{ evaluation.startedAt | date: 'short' }}
+                  {{ evaluation.startedAt | date: 'short' : undefined : i18n.locale() }}
                 </button>
               </td>
               <td><code>{{ evaluation.model }}</code></td>
-              <td><span class="status" [attr.data-status]="evaluation.status">{{ evaluation.status.toLowerCase() }}</span></td>
+              <td><span class="status" [attr.data-status]="evaluation.status">{{ i18n.t(statusLabel(evaluation.status)) }}</span></td>
               <td>
                 <span class="rate">
                   <span class="bar" [style.width.%]="evaluation.passRate * 100"></span>
-                  <span>{{ evaluation.passRate | percent: '1.0-0' }}</span>
+                  <span>{{ evaluation.passRate | percent: '1.0-0' : i18n.locale() }}</span>
                 </span>
                 <small class="muted">{{ evaluation.passed }}/{{ evaluation.completed }}</small>
               </td>
-              <td>{{ evaluation.avgLatencyMillis | duration }}</td>
-              <td>{{ evaluation.p95LatencyMillis | duration }}</td>
+              <td>{{ evaluation.avgLatencyMillis | duration: i18n.lang() }}</td>
+              <td>{{ evaluation.p95LatencyMillis | duration: i18n.lang() }}</td>
               @for (category of comparedCategories(); track category) {
                 <td>{{ categoryScore(evaluation, category) }}</td>
               }
@@ -97,7 +91,7 @@
       </table>
     </div>
   } @else if (!evaluations.isLoading()) {
-    <p class="muted">No evaluation yet. Pick a model and run the scenarios.</p>
+    <p class="muted">{{ i18n.t('evaluation.none') }}</p>
   }
 </section>
 
@@ -105,10 +99,10 @@
   @let evaluation = detail.value();
   <section class="card" aria-labelledby="detail-title">
     <div class="detail-head">
-      <h2 id="detail-title">{{ evaluation.model }} · {{ evaluation.startedAt | date: 'medium' }}</h2>
+      <h2 id="detail-title">{{ evaluation.model }} · {{ evaluation.startedAt | date: 'medium' : undefined : i18n.locale() }}</h2>
       <label class="toggle">
         <input type="checkbox" [checked]="showOnlyFailures()" (change)="showOnlyFailures.set($any($event.target).checked)" />
-        Only failures
+        {{ i18n.t('evaluation.onlyFailures') }}
       </label>
     </div>
     @if (evaluation.error) {
@@ -118,13 +112,13 @@
       @for (result of visibleResults(); track result.scenarioId) {
         <li [class.failed]="!result.passed">
           <div class="result-head">
-            <span class="mark" [attr.aria-label]="result.passed ? 'passed' : 'failed'">{{ result.passed ? '✓' : '✗' }}</span>
+            <span class="mark" [attr.aria-label]="result.passed ? i18n.t('evaluation.passed') : i18n.t('evaluation.failed')">{{ result.passed ? '✓' : '✗' }}</span>
             <strong>{{ result.scenarioId }}</strong>
             <span class="chip small">{{ result.category }}</span>
             <span class="muted">{{ result.outcome.toLowerCase() }}
-              @if (result.outcome !== result.expectedOutcome) { (expected {{ result.expectedOutcome.toLowerCase() }}) }
+              @if (result.outcome !== result.expectedOutcome) { {{ i18n.t('evaluation.expected', { outcome: result.expectedOutcome.toLowerCase() }) }} }
             </span>
-            <span class="muted right">{{ result.latencyMillis | duration }} · {{ result.iterations }} calls · {{ result.tokens | number }} tokens</span>
+            <span class="muted right">{{ i18n.t('evaluation.resultMeta', { duration: result.latencyMillis | duration: i18n.lang(), calls: result.iterations, tokens: (result.tokens | number: undefined : i18n.locale()) ?? '' }) }}</span>
           </div>
           <p class="question">{{ result.question }}</p>
           @if (result.failures.length > 0) {
@@ -136,17 +130,17 @@
           }
           <details>
             <summary>
-              Answer
-              @if (result.tools.length > 0) { · tools: {{ result.tools.join(', ') }} }
+              {{ i18n.t('evaluation.answer') }}
+              @if (result.tools.length > 0) { {{ i18n.t('evaluation.tools', { tools: result.tools.join(', ') }) }} }
             </summary>
             <p class="answer">{{ result.answer ?? '—' }}</p>
             @if (result.runId) {
-              <a [routerLink]="['/runs', result.runId]">Full trace</a>
+              <a [routerLink]="['/runs', result.runId]">{{ i18n.t('evaluation.fullTrace') }}</a>
             }
           </details>
         </li>
       } @empty {
-        <li class="muted">{{ evaluation.status === 'RUNNING' ? 'The first scenario is running…' : 'Nothing to show.' }}</li>
+        <li class="muted">{{ evaluation.status === 'RUNNING' ? i18n.t('evaluation.firstRunning') : i18n.t('evaluation.nothing') }}</li>
       }
     </ol>
   </section>

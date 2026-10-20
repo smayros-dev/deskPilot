@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { RouterLink } from '@angular/router';
 
 import { AgentApi } from '../core/agent-api';
+import { I18n } from '../core/i18n';
 import { ModelInfo } from '../core/models';
 import { SettingsStore } from '../core/settings-store';
 
@@ -13,7 +14,7 @@ import { SettingsStore } from '../core/settings-store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <label class="field">
-      <span>Model</span>
+      <span>{{ i18n.t('modelSwitcher.model') }}</span>
       <select
         [value]="store.chatModel() ?? ''"
         [disabled]="disabled() || store.saving() || toolModels().length === 0"
@@ -24,7 +25,7 @@ import { SettingsStore } from '../core/settings-store';
         }
       </select>
     </label>
-    <a routerLink="/settings" class="settings-link" aria-label="All agent settings" title="All agent settings">⚙</a>
+    <a routerLink="/settings" class="settings-link" [attr.aria-label]="i18n.t('modelSwitcher.allSettings')" [title]="i18n.t('modelSwitcher.allSettings')">⚙</a>
   `,
   styles: `
     :host { display: inline-flex; align-items: center; gap: 0.4rem; }
@@ -37,6 +38,7 @@ export class ModelSwitcher {
   readonly disabled = input(false);
 
   protected readonly store = inject(SettingsStore);
+  protected readonly i18n = inject(I18n);
   private readonly api = inject(AgentApi);
   private readonly models = httpResource<ModelInfo[]>(() => this.api.url('/models'), { defaultValue: [] });
 

@@ -3,8 +3,9 @@ import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../core/auth';
 import { ChatStore } from '../core/chat-store';
-import { SettingsStore } from '../core/settings-store';
+import { I18n, TranslationKey } from '../core/i18n';
 import { ApprovalDecision, Run } from '../core/models';
+import { SettingsStore } from '../core/settings-store';
 import { RunTrace } from '../runs/run-trace';
 import { Answer } from '../shared/answer';
 import { AutoScroll } from '../shared/auto-scroll';
@@ -16,13 +17,7 @@ import { ChatInput, ChatSubmission } from './chat-input';
 import { ConversationList } from './conversation-list';
 import { ModelSwitcher } from './model-switcher';
 
-const EXAMPLES = [
-  'My VPN disconnects every few minutes, what should I do?',
-  'How do I add the printer PRN-3-02?',
-  'I lost my phone with the authenticator app on it.',
-  'Please open a ticket: my laptop screen is cracked and I need a replacement.',
-  'Remember that I work on a MacBook.',
-];
+const EXAMPLES: TranslationKey[] = ['chat.example1', 'chat.example2', 'chat.example3', 'chat.example4', 'chat.example5'];
 
 @Component({
   selector: 'app-chat-page',
@@ -34,6 +29,7 @@ const EXAMPLES = [
 export class ChatPage implements OnInit {
   protected readonly store = inject(ChatStore);
   protected readonly auth = inject(AuthService);
+  protected readonly i18n = inject(I18n);
   private readonly settings = inject(SettingsStore);
   /** Screenshots can be attached once an admin has chosen a vision model in Settings. */
   protected readonly allowImages = computed(() => !!this.settings.settings()?.visionModel);

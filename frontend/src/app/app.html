@@ -1,7 +1,7 @@
-<a class="skip-link" href="#main">Skip to content</a>
+<a class="skip-link" href="#main">{{ i18n.t('app.skip') }}</a>
 
 @if (loading.active()) {
-  <div class="progress" role="progressbar" aria-label="Loading"></div>
+  <div class="progress" role="progressbar" [attr.aria-label]="i18n.t('app.loading')"></div>
 }
 
 <header class="topbar">
@@ -9,14 +9,14 @@
     <span class="logo" aria-hidden="true">◆</span>
     DeskPilot
   </a>
-  <nav aria-label="Main">
+  <nav [attr.aria-label]="i18n.t('app.mainNav')">
     <ul>
       @for (link of visibleLinks(); track link.path) {
         <li>
           <a [routerLink]="link.path" routerLinkActive="active" ariaCurrentWhenActive="page">
-            {{ link.label }}
+            {{ i18n.t(link.label) }}
             @if (link.path === '/approvals' && events.pendingApprovals(); as pending) {
-              <span class="badge" [attr.aria-label]="pending + ' waiting'">{{ pending }}</span>
+              <span class="badge" [attr.aria-label]="i18n.t('app.waiting', { count: pending })">{{ pending }}</span>
             }
           </a>
         </li>
@@ -29,10 +29,18 @@
       <span class="user" [title]="auth.username()">{{ auth.displayName() }}</span>
       @for (role of auth.roles(); track role) {
         @if (role === 'reviewer' || role === 'admin') {
-          <span class="role">{{ role }}</span>
+          <span class="role">{{ roleLabel(role) }}</span>
         }
       }
-      <button type="button" class="link-button" (click)="auth.logout()">Sign out</button>
+      <label class="language">
+        <span class="visually-hidden">{{ i18n.t('app.language') }}</span>
+        <select [value]="i18n.lang()" (change)="setLang($any($event.target).value)" [attr.aria-label]="i18n.t('app.language')">
+          @for (language of i18n.languages; track language.code) {
+            <option [value]="language.code" [selected]="language.code === i18n.lang()" [attr.lang]="language.code">{{ language.label }}</option>
+          }
+        </select>
+      </label>
+      <button type="button" class="link-button" (click)="auth.logout()">{{ i18n.t('app.signOut') }}</button>
     </div>
   }
 </header>
@@ -40,9 +48,9 @@
 <main id="main" tabindex="-1">
   @if (auth.error(); as error) {
     <section class="card auth-error" role="alert">
-      <h1>Sign-in unavailable</h1>
+      <h1>{{ i18n.t('app.signInUnavailable') }}</h1>
       <p>{{ error }}</p>
-      <p class="muted">Start the backend (it starts Keycloak through Docker Compose), then reload this page.</p>
+      <p class="muted">{{ i18n.t('app.signInHelp') }}</p>
     </section>
   } @else if (auth.isAuthenticated()) {
     <router-outlet />

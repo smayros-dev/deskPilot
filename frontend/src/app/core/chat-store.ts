@@ -7,6 +7,7 @@ import { AgentApi } from './agent-api';
 import { SILENT_ERRORS } from './api-config';
 import { AuthService } from './auth';
 import { EventsService } from './events';
+import { I18n } from './i18n';
 import { ApprovalDecision, ImageAttachment, Run, RunFeedback, RunStep, Session } from './models';
 import { Notifications } from './notifications';
 import { RunEvent } from './run-stream';
@@ -24,6 +25,7 @@ export class ChatStore {
   private readonly api = inject(AgentApi);
   private readonly auth = inject(AuthService);
   private readonly notifications = inject(Notifications);
+  private readonly i18n = inject(I18n);
   private readonly events = inject(EventsService);
 
   private readonly _session = signal<Session | null>(null);
@@ -133,7 +135,7 @@ export class ChatStore {
     let ok = true;
     this._sending.set(true);
     this._liveSteps.set([]);
-    this._activity.set('Starting…');
+    this._activity.set(this.i18n.t('chat.activityStarting'));
     try {
       await lastValueFrom(events.pipe(tap((event) => (ok = this.apply(event) && ok))), { defaultValue: null });
       return ok;
@@ -151,16 +153,16 @@ export class ChatStore {
         this.upsert(event.run);
         return true;
       case 'thinking':
-        this._activity.set(event.iteration === 1 ? 'Model is thinking' : `Model is thinking (call ${event.iteration})`);
+        this._activity.set(event.iteration === 1 ? this.i18n.t('chat.activityThinking') : this.i18n.t('chat.activityThinkingCall', { n: event.iteration }));
         return true;
       case 'step':
         this._liveSteps.update((steps) => [...steps, event.step]);
         if (event.step.type === 'TOOL_CALL') {
-          this._activity.set(`Running ${event.step.name}`);
+          this._activity.set(this.i18n.t('chat.activityRunning', { tool: event.step.name ?? '' }));
         }
         return true;
       case 'error':
-        this.notifications.error(event.problem.detail ?? event.problem.title ?? 'The request failed.');
+        this.notifications.error(event.problem.detail ?? event.problem.title ?? this.i18n.t('chat.requestFailed'));
         return false;
     }
   }

@@ -3,6 +3,7 @@ import { Injectable, InjectionToken, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { API_CONFIG } from '../core/api-config';
+import { Translate, translateEn } from '../core/i18n';
 import { KnowledgeDocument } from '../core/models';
 
 /** Same limits as the backend (DocumentIngestionService, spring.servlet.multipart). */
@@ -15,17 +16,17 @@ export const DOCUMENTS_POLL_MS = new InjectionToken<number>('DOCUMENTS_POLL_MS',
   factory: () => 2000,
 });
 
-/** @returns why the file cannot be uploaded, or null when it can */
-export function documentProblem(file: File): string | null {
+/** @returns why the file cannot be uploaded (in the language of `t`, English by default), or null when it can */
+export function documentProblem(file: File, t: Translate = translateEn): string | null {
   const extension = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : '';
   if (!DOCUMENT_EXTENSIONS.includes(extension)) {
-    return `“${file.name}” is not supported: upload a PDF, Markdown (.md), text (.txt) or HTML file.`;
+    return t('documents.unsupported', { name: file.name });
   }
   if (file.size === 0) {
-    return `“${file.name}” is empty.`;
+    return t('documents.empty', { name: file.name });
   }
   if (file.size > MAX_DOCUMENT_BYTES) {
-    return `“${file.name}” is larger than 10 MB.`;
+    return t('documents.tooLarge', { name: file.name });
   }
   return null;
 }

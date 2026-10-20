@@ -1,14 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 
+import { I18n } from '../core/i18n';
 import { RunStatus } from '../core/models';
 
-const LABELS: Record<RunStatus, string> = {
-  RUNNING: 'Running',
-  AWAITING_APPROVAL: 'Awaiting approval',
-  COMPLETED: 'Completed',
-  ESCALATED: 'Escalated',
-  FAILED: 'Failed',
-};
 
 @Component({
   selector: 'app-status-badge',
@@ -33,5 +27,6 @@ const LABELS: Record<RunStatus, string> = {
 })
 export class StatusBadge {
   readonly status = input.required<RunStatus>();
-  protected readonly label = computed(() => LABELS[this.status()]);
+  private readonly i18n = inject(I18n);
+  protected readonly label = computed(() => this.i18n.t(`status.${this.status()}`));
 }

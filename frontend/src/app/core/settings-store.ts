@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 import { AgentApi } from './agent-api';
+import { I18n } from './i18n';
 import { AgentSettings } from './models';
 import { Notifications } from './notifications';
 
@@ -10,6 +11,7 @@ import { Notifications } from './notifications';
 export class SettingsStore {
   private readonly api = inject(AgentApi);
   private readonly notifications = inject(Notifications);
+  private readonly i18n = inject(I18n);
 
   private readonly _settings = signal<AgentSettings | null>(null);
   private readonly _saving = signal(false);
@@ -33,7 +35,7 @@ export class SettingsStore {
     try {
       const saved = await firstValueFrom(this.api.updateSettings(settings));
       this._settings.set(saved);
-      this.notifications.info('Settings saved. They apply from the next message.');
+      this.notifications.info(this.i18n.t('settings.saved'));
       return saved;
     } catch {
       return null;
@@ -54,7 +56,7 @@ export class SettingsStore {
     try {
       const defaults = await firstValueFrom(this.api.resetSettings());
       this._settings.set(defaults);
-      this.notifications.info('Settings reset to the application defaults.');
+      this.notifications.info(this.i18n.t('settings.resetDone'));
       return defaults;
     } catch {
       return null;
