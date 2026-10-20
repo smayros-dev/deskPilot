@@ -30,6 +30,23 @@ public interface RunFeedbackRepository extends JpaRepository<RunFeedback, Long> 
         long getDown();
     }
 
+    interface VariantFeedback {
+        String getVariant();
+
+        long getUp();
+
+        long getDown();
+    }
+
+    /** Ratings of an experiment's runs per variant. */
+    @Query("""
+            select r.variant as variant,
+                   sum(case when f.rating = pl.piomin.services.deskpilot.model.FeedbackRating.UP then 1 else 0 end) as up,
+                   sum(case when f.rating = pl.piomin.services.deskpilot.model.FeedbackRating.DOWN then 1 else 0 end) as down
+            from RunFeedback f, AgentRun r where r.id = f.runId and r.experimentId = :experimentId
+            group by r.variant""")
+    List<VariantFeedback> totalsByVariant(String experimentId);
+
     /** Ratings per model of the rated run, most rated first. */
     @Query("""
             select coalesce(r.model, 'unknown') as model,

@@ -2,13 +2,16 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import { FormControl, FormGroup, FormRecord, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AgentApi } from '../core/agent-api';
 import { AuthService } from '../core/auth';
 import { I18n, TranslationKey } from '../core/i18n';
 import { AgentSettings, ToolInfo } from '../core/models';
+import { ExperimentsApi, PromptVersion } from '../core/experiments';
 import { ModelOptions } from '../core/model-options';
+import { Notifications } from '../core/notifications';
 import { SettingsStore } from '../core/settings-store';
 import { isCloudProvider, modelChoice, parseModelChoice } from '../core/cloud';
 import { ProvidersPanel } from './providers-panel';
@@ -49,6 +52,15 @@ export class SettingsPage {
   protected readonly options = inject(ModelOptions);
   protected readonly models = this.options.local;
   protected readonly tools = httpResource<ToolInfo[]>(() => this.api.url('/tools'), { defaultValue: [] });
+  private readonly experimentsApi = inject(ExperimentsApi);
+  private readonly notifications = inject(Notifications);
+  /** Saved prompt versions (12m), admins only. */
+  protected readonly prompts = httpResource<PromptVersion[]>(
+    () => (this.auth.isAdmin() ? this.experimentsApi.promptsUrl : undefined),
+    { defaultValue: [] },
+  );
+  protected readonly versionName = signal('');
+  protected readonly savingVersion = signal(false);
 
   protected readonly form = this.fb.group({
     chatModel: ['', Validators.required],
@@ -167,6 +179,35 @@ export class SettingsPage {
     const defaults = await this.store.reset();
     if (defaults) {
       this.patch(defaults, this.tools.value());
+    }
+  }
+
+  /** Puts a saved prompt version into the prompt field (saved with the other settings). */
+  protected loadPrompt(select: HTMLSelectElement): void {
+    const prompt = this.prompts.value().find((p) => String(p.id) === select.value);
+    if (prompt) {
+      this.form.controls.systemPrompt.setValue(prompt.content);
+      this.form.controls.systemPrompt.markAsDirty();
+    }
+    select.value = '';
+  }
+
+  protected async savePromptVersion(): Promise<void> {
+    const name = this.versionName().trim();
+    const content = this.form.controls.systemPrompt.value.trim();
+    if (!name || !content) {
+      return;
+    }
+    this.savingVersion.set(true);
+    try {
+      await firstValueFrom(this.experimentsApi.createPrompt(name, content));
+      this.notifications.info(this.i18n.t('prompts.saved', { name }));
+      this.versionName.set('');
+      this.prompts.reload();
+    } catch {
+      // Toast shown by the error interceptor.
+    } finally {
+      this.savingVersion.set(false);
     }
   }
 

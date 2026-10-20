@@ -198,6 +198,31 @@
     @if (form.controls.systemPrompt.hasError('maxlength')) {
       <small class="warn">{{ i18n.t('settings.promptTooLong') }}</small>
     }
+    @if (auth.isAdmin()) {
+      <div class="prompt-versions">
+        <label>
+          <span>{{ i18n.t('prompts.load') }}</span>
+          <select id="loadPrompt" (change)="loadPrompt($any($event.target))">
+            <option value="">{{ i18n.t('prompts.loadPlaceholder') }}</option>
+            @for (prompt of prompts.value(); track prompt.id) {
+              <option [value]="'' + prompt.id">{{ prompt.name }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          <span>{{ i18n.t('prompts.name') }}</span>
+          <input id="promptVersionName" type="text" maxlength="100" [value]="versionName()"
+                 (input)="versionName.set($any($event.target).value)" />
+        </label>
+        <button type="button" class="button" (click)="savePromptVersion()"
+                [disabled]="savingVersion() || !versionName().trim() || !value().systemPrompt?.trim()">
+          {{ i18n.t('prompts.saveAs') }}
+        </button>
+      </div>
+      @if (!value().systemPrompt?.trim()) {
+        <small class="muted">{{ i18n.t('prompts.emptyPrompt') }}</small>
+      }
+    }
   </section>
 
   @if (auth.isAdmin()) {

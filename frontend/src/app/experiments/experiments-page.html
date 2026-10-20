@@ -1,0 +1,172 @@
+<header class="page-header">
+  <div>
+    <h1>{{ i18n.t('experiments.title') }}</h1>
+    <p class="muted">{{ i18n.t('experiments.subtitle') }}</p>
+  </div>
+</header>
+
+<ng-template #results let-experiment>
+  <div class="table-wrap">
+    <table class="compare">
+      <thead>
+        <tr>
+          <th scope="col">{{ i18n.t('experiments.colVariant') }}</th>
+          <th scope="col">{{ i18n.t('experiments.colModel') }}</th>
+          <th scope="col">{{ i18n.t('experiments.colPrompt') }}</th>
+          <th scope="col">{{ i18n.t('experiments.colRuns') }}</th>
+          <th scope="col">{{ i18n.t('experiments.colSuccess') }}</th>
+          <th scope="col">{{ i18n.t('experiments.colEscalation') }}</th>
+          <th scope="col">{{ i18n.t('experiments.colLatency') }}</th>
+          <th scope="col">{{ i18n.t('experiments.colP95') }}</th>
+          <th scope="col">{{ i18n.t('experiments.colFeedback') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (variant of experiment.variants; track variant.variant) {
+          <tr [class.leader]="leader(experiment) === variant.variant">
+            <th scope="row">
+              {{ variant.variant }}
+              @if (leader(experiment) === variant.variant) { <span class="chip small">{{ i18n.t('experiments.leading') }}</span> }
+            </th>
+            <td>{{ modelLabel(variant.provider, variant.model) }}</td>
+            <td>{{ variant.promptVersionName ?? i18n.t('experiments.settingsPrompt') }}</td>
+            <td>{{ variant.finished }} / {{ variant.runs }}</td>
+            <td>{{ variant.successRate | percent: '1.0-0' : i18n.locale() }}</td>
+            <td>{{ variant.escalationRate | percent: '1.0-0' : i18n.locale() }}</td>
+            <td>{{ variant.avgLatencyMillis | duration: i18n.lang() }}</td>
+            <td>{{ variant.p95LatencyMillis | duration: i18n.lang() }}</td>
+            <td>
+              👍 {{ variant.up }} · 👎 {{ variant.down }}
+              @if (variant.up + variant.down > 0) {
+                ({{ variant.satisfactionRate | percent: '1.0-0' : i18n.locale() }})
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</ng-template>
+
+@if (running(); as current) {
+  <section class="card running" aria-labelledby="running-title">
+    <div class="head">
+      <h2 id="running-title">{{ current.name }}</h2>
+      <span class="status" data-status="RUNNING">{{ i18n.t('experiments.running') }}</span>
+      <span class="muted">
+        {{ i18n.t('experiments.split', { a: 100 - current.bPercent, b: current.bPercent }) }} ·
+        {{ i18n.t('experiments.startedBy', { by: current.startedBy }) }} {{ current.startedAt | date: 'short' : undefined : i18n.locale() }}
+      </span>
+      <button type="button" class="button" (click)="experiments.reload()">{{ i18n.t('common.refresh') }}</button>
+      <button type="button" class="button danger" (click)="stop(current)">{{ i18n.t('experiments.stop') }}</button>
+    </div>
+    <ng-container *ngTemplateOutlet="results; context: { $implicit: current }" />
+  </section>
+} @else {
+  <section class="card" aria-labelledby="new-title">
+    <h2 id="new-title">{{ i18n.t('experiments.new') }}</h2>
+    <div class="new-form">
+      <label class="name">
+        <span>{{ i18n.t('experiments.name') }}</span>
+        <input type="text" maxlength="100" [value]="name()" (input)="name.set($any($event.target).value)"
+               [placeholder]="i18n.t('experiments.namePlaceholder')" />
+      </label>
+      @for (arm of ['A', 'B']; track arm) {
+        <fieldset class="variant">
+          <legend>{{ i18n.t('experiments.variant', { variant: arm }) }}</legend>
+          <label>
+            <span>{{ i18n.t('experiments.colModel') }}</span>
+            <select [attr.data-variant]="arm"
+                    [value]="arm === 'A' ? modelA() : modelB()"
+                    (change)="(arm === 'A' ? modelA : modelB).set($any($event.target).value)">
+              @for (group of groups(); track group.provider) {
+                <optgroup [label]="group.cloud ? '☁ ' + group.label : group.label">
+                  @for (option of group.options; track option.value) {
+                    <option [value]="option.value" [selected]="option.value === (arm === 'A' ? modelA() : modelB())">{{ option.label }}</option>
+                  }
+                </optgroup>
+              }
+            </select>
+          </label>
+          <label>
+            <span>{{ i18n.t('experiments.colPrompt') }}</span>
+            <select [attr.data-prompt]="arm"
+                    [value]="arm === 'A' ? promptA() : promptB()"
+                    (change)="(arm === 'A' ? promptA : promptB).set($any($event.target).value)">
+              <option value="">{{ i18n.t('experiments.settingsPrompt') }}</option>
+              @for (prompt of prompts.value(); track prompt.id) {
+                <option [value]="'' + prompt.id">{{ prompt.name }}</option>
+              }
+            </select>
+          </label>
+        </fieldset>
+      }
+      <label class="percent">
+        <span>{{ i18n.t('experiments.bPercent') }}</span>
+        <input type="number" min="1" max="99" [value]="bPercent()" (input)="bPercent.set(+$any($event.target).value)" />
+      </label>
+      <button type="button" class="button primary" [disabled]="!canStart()" (click)="start()">
+        {{ i18n.t('experiments.start') }}
+      </button>
+    </div>
+    @if (identical()) {
+      <p class="hint warn">{{ i18n.t('experiments.identical') }}</p>
+    }
+    <p class="hint">{{ i18n.t('experiments.hint') }}</p>
+  </section>
+}
+
+<section class="card" aria-labelledby="past-title">
+  <h2 id="past-title">{{ i18n.t('experiments.past') }}</h2>
+  @for (experiment of past(); track experiment.id) {
+    <article class="past">
+      <div class="head">
+        <strong>{{ experiment.name }}</strong>
+        <span class="muted">
+          {{ experiment.startedAt | date: 'short' : undefined : i18n.locale() }} → {{ experiment.stoppedAt | date: 'short' : undefined : i18n.locale() }}
+          · {{ i18n.t('experiments.split', { a: 100 - experiment.bPercent, b: experiment.bPercent }) }}
+        </span>
+      </div>
+      <ng-container *ngTemplateOutlet="results; context: { $implicit: experiment }" />
+    </article>
+  } @empty {
+    <p class="muted">{{ experiments.isLoading() ? i18n.t('common.loading') : i18n.t('experiments.none') }}</p>
+  }
+</section>
+
+<section class="card" aria-labelledby="prompts-title">
+  <h2 id="prompts-title">{{ i18n.t('prompts.title') }}</h2>
+  <p class="hint">{{ i18n.t('prompts.intro') }}</p>
+  <ul class="prompts">
+    @for (prompt of prompts.value(); track prompt.id) {
+      <li>
+        <details>
+          <summary>
+            <strong>{{ prompt.name }}</strong>
+            <span class="muted">· {{ prompt.createdBy }} · {{ prompt.createdAt | date: 'short' : undefined : i18n.locale() }}
+              · {{ i18n.t('prompts.chars', { count: prompt.content.length }) }}</span>
+          </summary>
+          <pre>{{ prompt.content }}</pre>
+        </details>
+        <button type="button" class="button danger small" (click)="deletePrompt(prompt)"
+                [attr.aria-label]="i18n.t('prompts.delete', { name: prompt.name })">{{ i18n.t('common.delete') }}</button>
+      </li>
+    } @empty {
+      <li class="muted">{{ i18n.t('prompts.none') }}</li>
+    }
+  </ul>
+  <div class="prompt-form">
+    <label>
+      <span>{{ i18n.t('prompts.name') }}</span>
+      <input type="text" maxlength="100" [value]="promptName()" (input)="promptName.set($any($event.target).value)" />
+    </label>
+    <label>
+      <span>{{ i18n.t('prompts.content') }}</span>
+      <textarea rows="6" maxlength="8000" [value]="promptContent()" (input)="promptContent.set($any($event.target).value)"></textarea>
+    </label>
+    <button type="button" class="button" (click)="savePrompt()"
+            [disabled]="savingPrompt() || !promptName().trim() || !promptContent().trim()">
+      {{ i18n.t('prompts.save') }}
+    </button>
+  </div>
+</section>

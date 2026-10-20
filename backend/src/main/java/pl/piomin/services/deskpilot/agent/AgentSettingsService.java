@@ -66,19 +66,7 @@ public class AgentSettingsService {
      */
     @Transactional
     public AgentSettings update(AgentSettings.Values values) {
-        if (CloudProviderService.isCloud(values.chatProvider())) {
-            CloudProviderService.CloudModel model = cloudModel(values.chatProvider(), values.chatModel());
-            if (!model.supportsTools()) {
-                throw new IllegalArgumentException("Model '" + model.id() + "' does not support tool calling");
-            }
-        } else {
-            ModelCatalog.ModelInfo model = modelCatalog.find(values.chatModel())
-                    .orElseThrow(() -> new IllegalArgumentException("Model '" + values.chatModel()
-                            + "' is not installed in Ollama. Run: ollama pull " + values.chatModel()));
-            if (!model.supportsTools()) {
-                throw new IllegalArgumentException("Model '" + model.name() + "' does not support tool calling");
-            }
-        }
+        validateChatModel(values.chatProvider(), values.chatModel());
         if (values.visionModel() != null && !values.visionModel().isBlank() && CloudProviderService.isCloud(values.visionProvider())) {
             if (!cloudModel(values.visionProvider(), values.visionModel().strip()).supportsVision()) {
                 throw new IllegalArgumentException("Model '" + values.visionModel() + "' cannot read images (no vision capability)");
@@ -102,6 +90,28 @@ public class AgentSettingsService {
         AgentSettings settings = load();
         settings.apply(values);
         return settings;
+    }
+
+    /**
+     * Checks that a model can serve as the agent's chat model: installed in Ollama or offered by an available cloud
+     * provider, and able to call tools.
+     *
+     * @throws IllegalArgumentException otherwise
+     */
+    public void validateChatModel(String provider, String chatModel) {
+        if (CloudProviderService.isCloud(provider)) {
+            CloudProviderService.CloudModel model = cloudModel(provider, chatModel);
+            if (!model.supportsTools()) {
+                throw new IllegalArgumentException("Model '" + model.id() + "' does not support tool calling");
+            }
+        } else {
+            ModelCatalog.ModelInfo model = modelCatalog.find(chatModel)
+                    .orElseThrow(() -> new IllegalArgumentException("Model '" + chatModel
+                            + "' is not installed in Ollama. Run: ollama pull " + chatModel));
+            if (!model.supportsTools()) {
+                throw new IllegalArgumentException("Model '" + model.name() + "' does not support tool calling");
+            }
+        }
     }
 
     /** The model must be offered by an enabled cloud provider that has a key. */

@@ -7,6 +7,7 @@ import { errorInterceptor } from '../core/interceptors';
 import { Role } from '../core/auth';
 import { provideFakeAuth } from '../core/testing';
 import { ProviderStatus } from '../core/cloud';
+import { PromptVersion } from '../core/experiments';
 import { AgentSettings, ModelInfo, ToolInfo } from '../core/models';
 import { SettingsPage } from './settings-page';
 
@@ -31,6 +32,10 @@ const SETTINGS: AgentSettings = {
   systemPrompt: null,
   updatedAt: '2026-10-19T10:00:00Z',
 };
+
+const PROMPTS: PromptVersion[] = [
+  { id: 7, name: 'concise-v2', content: 'Answer in three sentences.', createdBy: 'admin', createdAt: '2026-10-20T09:00:00Z' },
+];
 
 const MODELS: ModelInfo[] = [
   { name: 'qwen3:8b', sizeBytes: 5.2e9, parameterSize: '8.2B', family: 'qwen3', capabilities: ['completion', 'tools', 'thinking'], supportsTools: true, supportsThinking: true, supportsVision: false, chatModel: true },
@@ -78,6 +83,7 @@ const MISTRAL: ProviderStatus = {
     http.expectOne('/api/models').flush(MODELS);
     http.expectOne('/api/tools').flush(TOOLS);
     if (roles.includes('admin')) {
+      http.expectOne('/api/prompts').flush(PROMPTS);
       http.expectOne('/api/providers').flush(providers);
       // Cloud model lists are requested once the provider list has arrived.
       for (let i = 0; i < 3; i++) {
@@ -121,6 +127,32 @@ const MISTRAL: ProviderStatus = {
     expect(req.request.body.chatModel).toBe('mistral-small-latest');
     expect(req.request.body.visionProvider).toBeNull();
     req.flush({ ...req.request.body, updatedAt: '2026-10-20T11:00:00Z' });
+  });
+
+  it('loads a saved prompt version into the prompt and saves the prompt as a new version', async () => {
+    const { fixture, element } = await render();
+    const load = element.querySelector<HTMLSelectElement>('#loadPrompt')!;
+    load.value = '7';
+    load.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+
+    expect(element.querySelector<HTMLTextAreaElement>('#systemPrompt')!.value).toBe('Answer in three sentences.');
+    expect(fixture.componentInstance.hasUnsavedChanges()).toBe(true);
+
+    const name = element.querySelector<HTMLInputElement>('#promptVersionName')!;
+    name.value = 'concise-v3';
+    name.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    Array.from(element.querySelectorAll<HTMLButtonElement>('.prompt-versions button')).find((b) => b.textContent?.includes('Save as'))!.click();
+
+    const req = http.expectOne({ method: 'POST', url: '/api/prompts' });
+    expect(req.request.body).toEqual({ name: 'concise-v3', content: 'Answer in three sentences.' });
+    req.flush({ ...PROMPTS[0], id: 8, name: 'concise-v3' });
+    for (let i = 0; i < 3; i++) {
+      await Promise.resolve();
+      TestBed.tick();
+    }
+    http.expectOne('/api/prompts').flush([...PROMPTS, { ...PROMPTS[0], id: 8, name: 'concise-v3' }]);
   });
 
   it('fills the form from the saved settings and starts pristine', async () => {

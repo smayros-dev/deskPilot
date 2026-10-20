@@ -53,6 +53,13 @@ public class AgentRun {
     private long promptTokens;
     private long completionTokens;
 
+    /** Experiment the run's conversation was assigned to (12m), with its variant "A" or "B"; null outside experiments. */
+    @Column(length = 36)
+    private String experimentId;
+
+    @Column(length = 1)
+    private String variant;
+
     /** Time spent working (model + tools), excluding time waiting for a human decision. */
     private long activeMillis;
 
@@ -80,6 +87,11 @@ public class AgentRun {
         this.model = model;
         this.status = RunStatus.RUNNING;
         this.createdAt = Instant.now();
+    }
+
+    public void joinExperiment(String experimentId, String variant) {
+        this.experimentId = experimentId;
+        this.variant = variant;
     }
 
     public void recordModelCall(long promptTokens, long completionTokens) {
@@ -179,5 +191,13 @@ public class AgentRun {
 
     public RunSource getSource() {
         return source;
+    }
+
+    public String getExperimentId() {
+        return experimentId;
+    }
+
+    public String getVariant() {
+        return variant;
     }
 }
