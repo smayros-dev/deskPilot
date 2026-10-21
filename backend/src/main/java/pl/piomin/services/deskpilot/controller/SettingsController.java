@@ -12,10 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pl.piomin.services.deskpilot.agent.AgentSettingsService;
 import pl.piomin.services.deskpilot.agent.ModelCatalog;
-import pl.piomin.services.deskpilot.agent.specialist.SpecialistCatalog;
 import pl.piomin.services.deskpilot.agent.tool.ToolRegistry;
 import pl.piomin.services.deskpilot.dto.AgentSettingsDto;
-import pl.piomin.services.deskpilot.dto.SpecialistInfo;
 import pl.piomin.services.deskpilot.dto.ToolInfo;
 import pl.piomin.services.deskpilot.model.AuditAction;
 import pl.piomin.services.deskpilot.service.AuditService;
@@ -29,15 +27,13 @@ public class SettingsController {
     private final ModelCatalog modelCatalog;
     private final ToolRegistry toolRegistry;
     private final AuditService auditService;
-    private final SpecialistCatalog specialists;
 
     public SettingsController(AgentSettingsService settingsService, ModelCatalog modelCatalog, ToolRegistry toolRegistry,
-                              AuditService auditService, SpecialistCatalog specialists) {
+                              AuditService auditService) {
         this.settingsService = settingsService;
         this.modelCatalog = modelCatalog;
         this.toolRegistry = toolRegistry;
         this.auditService = auditService;
-        this.specialists = specialists;
     }
 
     @GetMapping("/settings")
@@ -70,15 +66,6 @@ public class SettingsController {
     @GetMapping("/models")
     public List<ModelCatalog.ModelInfo> models() {
         return modelCatalog.list();
-    }
-
-    /** Specialist agents the supervisor routes messages to when the Settings toggle is on (12f). */
-    @GetMapping("/specialists")
-    public List<SpecialistInfo> specialists() {
-        return specialists.all().stream()
-                .map(s -> new SpecialistInfo(s.id(), s.name(), s.description(), s.keywords(),
-                        toolRegistry.names().stream().filter(s::allowsTool).sorted().toList(), s.examples().size()))
-                .toList();
     }
 
     @GetMapping("/tools")
