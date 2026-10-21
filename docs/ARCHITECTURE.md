@@ -42,6 +42,7 @@ flowchart LR
         UC15(["Prompt versions and A/B experiments"])
         UC16(["Read and export the audit trail"])
         UC17(["Watch dashboards and alerts"])
+        UC18(["Edit specialists and try the routing"])
     end
 
     KC[["Keycloak (OIDC)"]]
@@ -52,7 +53,7 @@ flowchart LR
 
     U --> UC1 & UC2 & UC3 & UC4 & UC5 & UC6
     R --> UC7 & UC8 & UC9 & UC10
-    A --> UC11 & UC12 & UC13 & UC14 & UC15 & UC16 & UC17
+    A --> UC11 & UC12 & UC13 & UC14 & UC15 & UC16 & UC17 & UC18
     R -. "is a" .-> U
     A -. "is a" .-> R
 
@@ -63,6 +64,7 @@ flowchart LR
     UC7 --- MAIL
     UC1 --- MCP
     UC17 --- GRAF
+    GRAF --- MAIL
     DeskPilot --- KC
 ```
 
@@ -78,12 +80,12 @@ Notes:
 ```mermaid
 flowchart LR
     subgraph Browser["Angular 22 SPA (zoneless, signals)"]
-        Pages["Pages: chat, approvals, runs, dashboard, tickets,<br/>knowledge, memories, settings, evaluation,<br/>experiments, audit"]
-        Core["core: AuthService (OIDC PKCE), AgentApi,<br/>SettingsStore, ModelOptions, LiveEvents (SSE), I18n"]
+        Pages["Pages: chat, approvals, runs, dashboard, tickets,<br/>knowledge, memories, settings, evaluation,<br/>experiments, specialists, audit"]
+        Core["core: AuthService (OIDC PKCE), AgentApi,<br/>SettingsStore, ModelOptions, LiveEvents (SSE), I18n,<br/>HealthPill (actuator health)"]
     end
 
     subgraph Backend["Spring Boot 4 backend"]
-        Controllers["REST controllers<br/>Session, Run, Settings, Provider, Evaluation,<br/>Experiment, Prompt, KnowledgeGap, Audit, Privacy…"]
+        Controllers["REST controllers<br/>Session, Run, Settings, Provider, Evaluation,<br/>Experiment, Prompt, Specialist, KnowledgeGap,<br/>Audit, Privacy…"]
         Security["SecurityConfig<br/>JWT resource server, roles"]
         Orchestrator["AgentOrchestrator<br/>ReAct loop"]
         Gateway["ModelGateway"]
@@ -91,14 +93,14 @@ flowchart LR
         Cloud["CloudProviderService<br/>+ SecretCipher"]
         Tools["ToolRegistry<br/>KB, tickets, memory, escalation, MCP"]
         Guard["GuardrailService<br/>+ ModerationService"]
-        Services["Services: RunService, KnowledgeBaseService,<br/>DocumentIngestion, KnowledgeGapService,<br/>ExperimentService, Audit, Privacy, Metrics"]
+        Services["Services: RunService, KnowledgeBaseService,<br/>DocumentIngestion, KnowledgeGapService,<br/>ExperimentService, SpecialistService,<br/>Audit, Privacy, Metrics"]
         Notify["NotificationService"]
         Live["LiveEventHub (SSE)"]
         McpServer["MCP server tools"]
     end
 
     subgraph Infra["Infrastructure (backend/compose.yaml)"]
-        PG[("PostgreSQL + pgvector")]
+        PG[("PostgreSQL + pgvector<br/>host port 5433")]
         KC["Keycloak"]
         Ollama["Ollama<br/>qwen3:8b, nomic-embed-text, gemma4:26b"]
         Jaeger["Jaeger"]
@@ -127,15 +129,21 @@ flowchart LR
     McpServer --> Services
     Backend -- "OTLP traces" --> Jaeger
     Backend -. "OTLP metrics (optional)" .-> LGTM
+    LGTM -. "alert e-mails" .-> Mailpit
 ```
 
 The model behind every call is chosen at runtime: `ModelGateway` sends a call to the local Ollama `ChatModel`
 (wrapped by `ResilientChatModel`) or to a cloud client built by `CloudProviderService`, depending on the provider in
 `AgentConfig`. Settings are stored in the database (`agent_settings`) and apply from the next request.
 
+The status pill in the header polls `/actuator/health` every 30 s (10 s timeout) and names what is missing: the model
+(the `ollama` component is down), the database (`db` is down; actuator answers 503 with the report) or the backend
+itself (no answer). Grafana alerts (optional `grafana` profile) are e-mailed through Mailpit and, when
+`GRAFANA_ALERT_WEBHOOK_URL` is set, posted to Slack, Teams or a generic webhook.
+
 ## Domain model
 
-JPA entities in `model/` (tables created by Flyway migrations V1–V20). Entities reference each other **by id** (for
+JPA entities in `model/` (tables created by Flyway migrations V1–V22; V22 is a Java migration that also seeds the specialists). Entities reference each other **by id** (for
 example `AgentRun.sessionId`, `AgentStep.runId`); there are no JPA associations, so the links below are logical
 references, not mapped relations.
 
@@ -285,6 +293,21 @@ classDiagram
         String bModel
         Long bPromptId
         int bPercent
+        String startedBy
+        String stoppedBy
+        String stopReason
+    }
+    class SpecialistDefinition {
+        String id
+        String name
+        String description
+        String keywords
+        String tools
+        String prompt
+        String examples
+        boolean enabled
+        int sortOrder
+        String updatedBy
     }
     class Evaluation {
         String id
@@ -320,6 +343,7 @@ classDiagram
     AgentRun "1" --> "0..1" RunFeedback : rating
     AgentRun "*" --> "0..1" Experiment : experimentId, variant
     Experiment "*" --> "0..2" PromptVersion : aPromptId, bPromptId
+    AgentRun "*" --> "0..1" SpecialistDefinition : specialist
     KnowledgeDocument "1" --> "1" KnowledgeDocumentFile : original file
     KnowledgeDocument "1" --> "*" KnowledgeArticle : chunks
     KnowledgeGap "1" --> "*" KnowledgeGapQuestion : gapId
@@ -419,13 +443,14 @@ classDiagram
     }
 ```
 
-`AuditAction` (26 values) groups: approvals (`APPROVAL_APPROVED`, `APPROVAL_REJECTED`), settings (`SETTINGS_CHANGED`,
+`AuditAction` (30 values) groups: approvals (`APPROVAL_APPROVED`, `APPROVAL_REJECTED`), settings (`SETTINGS_CHANGED`,
 `SETTINGS_RESET`), documents (`DOCUMENT_UPLOADED`, `DOCUMENT_REINDEXED`, `DOCUMENT_DELETED`), evaluations
 (`EVALUATION_STARTED`, `EVALUATION_CANCELLED`), privacy (`CONVERSATION_DELETED`, `MEMORY_DELETED`, `MEMORIES_DELETED`,
 `USER_DATA_EXPORTED`, `USER_DATA_DELETED`, `RETENTION_CLEANUP`), cloud providers (`PROVIDER_UPDATED`,
 `PROVIDER_KEY_SET`, `PROVIDER_KEY_REMOVED`), experiments (`PROMPT_VERSION_SAVED`, `PROMPT_VERSION_DELETED`,
 `EXPERIMENT_STARTED`, `EXPERIMENT_STOPPED`) and knowledge gaps (`KNOWLEDGE_GAPS_DETECTED`, `KNOWLEDGE_GAP_DRAFTED`,
-`KNOWLEDGE_GAP_PUBLISHED`, `KNOWLEDGE_GAP_DISMISSED`).
+`KNOWLEDGE_GAP_PUBLISHED`, `KNOWLEDGE_GAP_DISMISSED`) and specialists (`SPECIALIST_CREATED`, `SPECIALIST_UPDATED`,
+`SPECIALIST_DELETED`, `SPECIALISTS_RESTORED`).
 
 ## Agent core
 
@@ -469,11 +494,25 @@ classDiagram
     }
     class ExperimentService {
         assign(sessionId, settings)
+        results(id)
+        recordProviderFailure()
+    }
+    class ProportionTest {
+        compare() z-test or Fisher
     }
     class SpecialistRouter {
         route()
+        preview(message)
     }
-    class SpecialistCatalog
+    class SpecialistCatalog {
+        specialists() cached
+        invalidate()
+    }
+    class SpecialistService {
+        create() update() delete()
+        restoreDefaults()
+    }
+    class SpecialistRepository
     class SelfCheck
     class VisionReader
     class ConversationSummarizer
@@ -531,6 +570,11 @@ classDiagram
     VisionReader --> ModelGateway
     ConversationSummarizer --> ModelGateway
     SpecialistRouter --> SpecialistCatalog
+    SpecialistCatalog --> SpecialistRepository
+    SpecialistService --> SpecialistRepository
+    SpecialistService --> SpecialistCatalog : invalidate after commit
+    SpecialistService --> ToolRegistry : validate tools
+    ExperimentService --> ProportionTest
     SpecialistRouter --> ModelGateway
     GuardrailService --> ModerationService
     AgentSettingsService --> ToolRegistry
@@ -647,7 +691,9 @@ Publishing needs a draft (otherwise 409); acting on a published or dismissed gap
 ## Interactive diagrams
 
 Interactive versions (zoom, focus, dark/light theme, export to PNG/SVG) are standalone HTML pages. Open them locally
-in a browser; GitHub shows HTML files as source.
+in a browser; GitHub shows HTML files as source. They were traced from commit `957ea30` (1.0.23): they show the
+agent and its specialists as they work, but not the later admin pages (editable specialists, experiment auto-stop);
+the Mermaid diagrams above are up to date (1.0.27).
 
 | Diagram | File |
 |---|---|

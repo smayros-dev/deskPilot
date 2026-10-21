@@ -70,25 +70,40 @@ flowchart LR
 
 ```
 backend/                       Spring Boot app (pl.piomin.services.deskpilot)
-  agent/                       orchestrator, settings, model catalog, chat options
-  agent/tool/                  @Tool classes: knowledge base, tickets, memory, escalation
-  guardrail/                   input filter and output redaction
+  agent/                       orchestrator (ReAct loop), settings, model gateway, circuit breaker, self-check, vision
+  agent/tool/                  @Tool classes: knowledge base, tickets, memory, escalation, MCP client tools
+  agent/specialist/            specialist router and catalog (specialists stored in the database)
+  cloud/                       Mistral / Gemini providers, encrypted API keys
+  eval/                        evaluation runner and scenarios
+  guardrail/                   input filter, moderation, output redaction, rate limits
+  mcp/                         MCP server tools (read-only knowledge base)
+  notifications/               e-mail / webhook notifications
   security/                    JWT resource server, roles (user / reviewer / admin)
   controller/ service/ model/  REST API, services, JPA entities
-  src/main/resources/          application.yml, Flyway migrations, system prompt, KB articles
-  compose.yaml                 development containers: Postgres + pgvector, Keycloak, Jaeger (started automatically)
-  Dockerfile                   layered Spring Boot image (JRE 21, non-root)
+  src/main/resources/          application.yml, Flyway migrations, system prompt, KB articles, default specialists
+  src/main/java/db/migration/  Java Flyway migrations (V22 seeds the specialists)
+  compose.yaml                 development containers: Postgres + pgvector (port 5433), Keycloak, Jaeger, Mailpit,
+                               optional Grafana (profile grafana); started automatically by Spring Boot
+  grafana/                     provisioned Grafana dashboard, alert rules, contact points
   keycloak/                    realm with roles, SPA client and demo users
+  Dockerfile                   layered Spring Boot image (JRE 21, non-root)
 frontend/                      Angular app
   src/app/chat/                chat, approval cards, model switcher
   src/app/approvals/           reviewers' approval queue
   src/app/runs/                run trace and details
   src/app/dashboard/           success metrics
-  src/app/helpdesk/            tickets, knowledge base, memories
-  src/app/settings/            runtime agent settings
+  src/app/helpdesk/            tickets, knowledge base (documents, knowledge gaps), memories
+  src/app/settings/            runtime agent settings, cloud providers
+  src/app/evaluation/          evaluation runs and comparison
+  src/app/experiments/         prompt versions and A/B experiments
+  src/app/specialists/         specialist editor and routing preview
+  src/app/audit/               audit trail
+  src/app/core/                auth, API clients, live events, i18n (EN/FR/AR)
   Dockerfile, nginx.conf       production build served by nginx, proxying the API
+e2e/                           Playwright end-to-end tests and a scripted fake Ollama
+docs/                          ARCHITECTURE.md (Mermaid diagrams) and interactive Archify diagrams
 compose.yaml                   the whole stack in containers
-.github/workflows/ci.yml       build, tests and Docker images on every push
+.github/workflows/ci.yml       build, tests, end-to-end tests and Docker images on every push
 steps.md                       implementation plan and progress
 ```
 
@@ -121,14 +136,33 @@ The Keycloak realm (`backend/keycloak/deskpilot-realm.json`) is imported on firs
 | User / password | Roles | Can |
 |---|---|---|
 | `alice` / `alice` | user | Chat, see own tickets and memories, read settings |
-| `bob` / `bob` | user, reviewer | Also approve or reject agent actions on the **Approvals** page, see all tickets |
-| `admin` / `admin` | user, reviewer, admin | Also change the agent settings and switch the model |
+| `bob` / `bob` | user, reviewer | Also approve or reject agent actions on the **Approvals** page, see all tickets, handle knowledge gaps and negative feedback |
+| `admin` / `admin` | user, reviewer, admin | Also change the settings and the model, cloud providers, documents, evaluations, experiments, specialists and the audit trail |
 
 Keycloak's own console is at http://localhost:8180 (admin / admin). E-mails sent in development are in Mailpit at http://localhost:8026 (if the development containers were already running, start Mailpit once with `docker compose up -d` in `backend/`). Traces are in Jaeger at http://localhost:16686 (service `deskpilot`, one trace per agent run, with the model and tool calls as spans).
 
 > Spring Boot only runs `docker compose up` when none of the project's containers are running. If Postgres was
 > already up from an earlier version, start Keycloak once with `docker compose up -d` in `backend/`.
 Check `http://localhost:8080/actuator/health`. The `ollama` component reports DOWN if Ollama isn't running or a model is missing.
+
+### Troubleshooting
+
+The status pill in the header says what is missing (hover it for the hint):
+
+| Pill | Cause | Fix |
+|---|---|---|
+| **Model offline** | Ollama does not answer, or a model is missing | `ollama serve`; `ollama pull qwen3:8b` and `nomic-embed-text` |
+| **Database unavailable** | The backend cannot reach PostgreSQL | `docker compose up -d` in `backend/`; restart the backend if Postgres came back on another port |
+| **Backend unreachable** | The backend does not answer (stopped, starting, or stuck) | Start it with `./mvnw spring-boot:run` in `backend/` |
+
+- Postgres listens on host port **5433** (`DESKPILOT_PG_PORT`). Before 1.0.26 the port was random and changed when
+  Docker restarted, which left a running backend unable to reach its database.
+- Development data lives in the Docker volume `deskpilot_deskpilot-pgdata`. Resetting Docker / Rancher Desktop or
+  running `docker compose down -v` deletes it; back it up with
+  `docker exec deskpilot-postgres-1 pg_dump -U deskpilot deskpilot > deskpilot.sql`.
+- A loaded `qwen3:8b` takes about 6.5 GB. On a machine without a Windows page file, builds or tests running at the same
+  time can fail with "out of memory"; unload the model with `ollama stop qwen3:8b` (it reloads on the next message) or
+  enable a page file.
 
 ## Configuration
 
@@ -175,7 +209,9 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 | `/approvals` | Reviewers only: every run waiting for a decision, from all users |
 | `/runs/:id` | Full trace of one run (thoughts, tool calls, results, approvals, tokens, timing) |
 | `/dashboard` | Success metrics: task success, latency (avg/p95), tool accuracy, escalations, approvals, tokens |
-| `/helpdesk/tickets` · `/knowledge` · `/memories` | Tickets (own, or all for reviewers), KB articles, long-term memories of the signed-in user |
+| `/helpdesk/tickets` · `/knowledge` · `/memories` | Tickets (own, or all for reviewers), KB articles (admins upload documents; reviewers handle knowledge gaps), long-term memories of the signed-in user |
+| `/evaluation` | Admins: run the scenario catalogue against a model and compare scores |
+| `/audit` | Admins: audit trail with filters and CSV export |
 | `/specialists` | Admins: edit specialist agents, try the routing of a message, restore the defaults |
 | `/experiments` | Admins: prompt versions, start/stop A/B experiments, results per variant |
 | `/settings` | Agent configuration (read-only unless admin): cloud providers (admins), model (local or cloud), temperature, top-p, context window, max tokens, thinking, max steps, RAG, tools & approvals, system prompt |
@@ -331,6 +367,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.28** — Documentation brought up to date: project layout, roles, pages, a troubleshooting section (status pill, Postgres port, data volume and backup, memory), and `docs/ARCHITECTURE.md` with the editable specialists, experiment auto-stop, health status and alert flow.
 - **1.0.27** — Specialists stored in the database (V22, seeded from the built-in set) and editable on an admin Specialists page with a routing preview; changes apply to the next message without a restart; audit entries for every change; end-to-end test of editing a specialist.
 - **1.0.26** — Fix: the status pill no longer says "Model offline" for every problem; it tells apart the model (Ollama), the database and an unreachable backend, with a hint for each, and gives up after 10 s instead of waiting for a stuck backend. The development Postgres now has a fixed host port (5433) instead of a random one that changed on every Docker restart.
 - **1.0.25** — Grafana alerts e-mailed through Mailpit and optionally to a Slack/Teams webhook; experiments: variant badge on answers and runs, automatic stop with a reason when a provider breaks (V21), significance verdict per metric; Playwright end-to-end tests with a fake Ollama, run in CI.
