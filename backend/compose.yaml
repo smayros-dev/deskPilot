@@ -8,8 +8,9 @@ services:
       POSTGRES_USER: deskpilot
       POSTGRES_PASSWORD: deskpilot
     ports:
-      # Random host port: avoids clashing with other local Postgres instances; Spring Boot discovers it.
-      - "5432"
+      # Fixed host port (5433, so a local Postgres on 5432 can keep running): a random port changed on every Docker
+      # restart and left a running backend pointing at the old one. Override with DESKPILOT_PG_PORT.
+      - "${DESKPILOT_PG_PORT:-5433}:5432"
     volumes:
       - deskpilot-pgdata:/var/lib/postgresql/data
     labels:

@@ -138,6 +138,7 @@ Most agent behaviour (model, sampling, context window, tools, approvals, prompt)
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `DESKPILOT_PG_PORT` | `5433` | Host port of the development Postgres (`backend/compose.yaml`); fixed so a Docker restart does not strand a running backend |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server |
 | `AGENT_CHAT_MODEL` | `qwen3:8b` | Chat/tool-calling model |
 | `AGENT_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model for RAG |
@@ -327,6 +328,7 @@ Errors are RFC 9457 Problem Details (400 validation, 404, 409 conflicting state,
 
 ## Changelog
 
+- **1.0.26** — Fix: the status pill no longer says "Model offline" for every problem; it tells apart the model (Ollama), the database and an unreachable backend, with a hint for each, and gives up after 10 s instead of waiting for a stuck backend. The development Postgres now has a fixed host port (5433) instead of a random one that changed on every Docker restart.
 - **1.0.25** — Grafana alerts e-mailed through Mailpit and optionally to a Slack/Teams webhook; experiments: variant badge on answers and runs, automatic stop with a reason when a provider breaks (V21), significance verdict per metric; Playwright end-to-end tests with a fake Ollama, run in CI.
 - **1.0.24** — Documentation: `docs/ARCHITECTURE.md` with use-case, class, component, sequence and state diagrams (Mermaid) and interactive Archify diagrams of the architecture, the chat → approval sequence, the run lifecycle and the agent loop.
 - **1.0.23** — Measured with the evaluation: specialist agents on by default (25/25 vs 24/25), routing similarity threshold 0.7; knowledge-gap thresholds tuned on real embeddings (grouping 0.55, covered 0.65).
