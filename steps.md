@@ -176,6 +176,7 @@ order of the recommended path below. Value / effort are rough estimates for this
 - [x] **13d — Experiment follow-ups ✅:** variant badge on runs, automatic stop with a reason when a provider breaks, significance test per metric (1.0.25).
 - [x] **13e — End-to-end tests ✅ (scripted fake Ollama; self-check and specialists off in that profile):** Playwright suite over the whole stack, run in CI (1.0.25).
 - [ ] **13f — Cloud model measured:** evaluation of a Mistral/Gemini model against qwen3:8b (needs a key).
-- [ ] **13g — Specialists editable from the UI** instead of a classpath file.
+- [x] **13g — Specialists editable from the UI ✅ (cache per instance; JSON kept as built-in defaults):** specialists in the database (V22), admin page with routing preview, audit, e2e test (1.0.27).
+- [ ] **13j — Lazy-load the FR/AR dictionaries:** the initial bundle is 512 kB, over the 500 kB warning budget.
 - [ ] **13h — Several backend instances:** shared rate limits, SSE fan-out and circuit-breaker state (e.g. Redis or Postgres LISTEN/NOTIFY).
 - [ ] **13i — Backups and real identities:** database backups, production Keycloak realm without demo users.
