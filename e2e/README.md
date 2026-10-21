@@ -9,6 +9,7 @@ scripted stand-in for Ollama (search the knowledge base, then answer with a cita
 |---|---|
 | `login-and-roles` | alice, bob and admin sign in through Keycloak; each sees the pages of their role; alice is sent back from Approvals/Evaluation and sees the settings read-only; admin can edit them |
 | `chat-and-approval` | a VPN question is answered with a cited knowledge-base article; a ticket request waits for approval, bob approves it on the Approvals page, alice's chat shows the confirmation and her Tickets page lists the ticket |
+| `specialists` | admin adds a keyword to a specialist on the Specialists page and the route preview picks it at once; restoring the built-in specialists undoes it; alice cannot open the page |
 | `languages` | French and Arabic translate the UI, Arabic switches to right-to-left, the choice survives a reload |
 
 ## Run locally

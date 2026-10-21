@@ -1,0 +1,198 @@
+<header class="page-header">
+  <div>
+    <h1>{{ i18n.t('specialists.title') }}</h1>
+    <p class="muted">{{ i18n.t('specialists.subtitle') }}</p>
+  </div>
+</header>
+
+<section class="card try" aria-labelledby="try-title">
+  <h2 id="try-title">{{ i18n.t('specialists.tryTitle') }}</h2>
+  <form class="try-form" (submit)="$event.preventDefault(); tryRouting()">
+    <label class="visually-hidden" for="try-message">{{ i18n.t('specialists.tryLabel') }}</label>
+    <input id="try-message" type="text" maxlength="4000" [placeholder]="i18n.t('specialists.tryPlaceholder')"
+           [value]="message()" (input)="message.set($any($event.target).value)" />
+    <button type="submit" class="button primary" [disabled]="!message().trim() || previewing()">
+      {{ i18n.t('specialists.tryButton') }}
+    </button>
+  </form>
+  @if (preview(); as result) {
+    <div class="result" role="status">
+      <p>
+        🧭 <strong data-testid="preview-specialist">{{ result.name }}</strong>
+        · {{ i18n.t(methodKey(result)) }}
+        @if (result.confidence !== null) { · {{ result.confidence | percent: '1.0-0' : i18n.locale() }} }
+      </p>
+      <p class="muted detail">{{ result.detail }}</p>
+      @if (previewRows().length) {
+        <table class="scores">
+          <thead>
+            <tr>
+              <th scope="col">{{ i18n.t('specialists.colSpecialist') }}</th>
+              <th scope="col">{{ i18n.t('specialists.colKeywordHits') }}</th>
+              <th scope="col">{{ i18n.t('specialists.colSimilarity') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of previewRows(); track row.id) {
+              <tr [class.chosen]="row.id === result.specialist">
+                <td>{{ row.name }}</td>
+                <td>{{ row.keywords.join(', ') || '–' }}</td>
+                <td>{{ row.similarity === null ? '–' : (row.similarity | number: '1.2-2' : i18n.locale()) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+</section>
+
+<section class="card" aria-labelledby="list-title">
+  <div class="head">
+    <h2 id="list-title">{{ i18n.t('specialists.listTitle') }}</h2>
+    <button type="button" class="button primary" (click)="create()">{{ i18n.t('specialists.new') }}</button>
+    <button type="button" class="button" (click)="restoreDefaults()">{{ i18n.t('specialists.restore') }}</button>
+  </div>
+  <div class="table-wrap">
+    <table class="list">
+      <thead>
+        <tr>
+          <th scope="col">{{ i18n.t('specialists.colSpecialist') }}</th>
+          <th scope="col">{{ i18n.t('specialists.colKeywords') }}</th>
+          <th scope="col">{{ i18n.t('specialists.colTools') }}</th>
+          <th scope="col">{{ i18n.t('specialists.colExamples') }}</th>
+          <th scope="col">{{ i18n.t('specialists.colUpdated') }}</th>
+          <th scope="col"><span class="visually-hidden">{{ i18n.t('specialists.colActions') }}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (specialist of editable(); track specialist.id) {
+          <tr [class.disabled]="!specialist.enabled" [attr.data-id]="specialist.id">
+            <td>
+              <strong>{{ specialist.name }}</strong> <code>{{ specialist.id }}</code>
+              @if (!specialist.enabled) { <span class="chip small">{{ i18n.t('specialists.disabled') }}</span> }
+              <div class="muted">{{ specialist.description }}</div>
+            </td>
+            <td class="keywords">{{ specialist.keywords.join(', ') }}</td>
+            <td>{{ toolSummary(specialist) }}</td>
+            <td>{{ specialist.examples }}</td>
+            <td class="muted">
+              @if (specialist.updatedAt) {
+                {{ specialist.updatedBy }} · {{ specialist.updatedAt | date: 'short' : undefined : i18n.locale() }}
+              }
+            </td>
+            <td class="actions">
+              <button type="button" class="button small" (click)="edit(specialist)">{{ i18n.t('specialists.edit') }}</button>
+              <button type="button" class="button small danger" (click)="remove(specialist)">{{ i18n.t('specialists.delete') }}</button>
+            </td>
+          </tr>
+        } @empty {
+          <tr><td colspan="6" class="muted">{{ specialists.isLoading() ? i18n.t('common.loading') : i18n.t('specialists.none') }}</td></tr>
+        }
+        @if (general(); as fallback) {
+          <tr class="general">
+            <td><strong>{{ fallback.name }}</strong> <code>{{ fallback.id }}</code><div class="muted">{{ i18n.t('specialists.generalHint') }}</div></td>
+            <td>–</td>
+            <td>{{ i18n.t('specialists.allTools') }}</td>
+            <td>–</td>
+            <td></td>
+            <td></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+@if (editing(); as id) {
+  <section class="card editor" aria-labelledby="editor-title">
+    <h2 id="editor-title">{{ id === 'new' ? i18n.t('specialists.newTitle') : i18n.t('specialists.editTitle', { name: form.controls.name.value }) }}</h2>
+    <form [formGroup]="form" (ngSubmit)="save()" class="editor-form">
+      <div class="row">
+        <label>
+          <span>{{ i18n.t('specialists.id') }}</span>
+          <input formControlName="id" maxlength="40" autocomplete="off" spellcheck="false" />
+          <small class="muted">{{ i18n.t('specialists.idHint') }}</small>
+        </label>
+        <label>
+          <span>{{ i18n.t('specialists.name') }}</span>
+          <input formControlName="name" maxlength="100" />
+        </label>
+        <label class="narrow">
+          <span>{{ i18n.t('specialists.sortOrder') }}</span>
+          <input type="number" formControlName="sortOrder" min="0" max="10000" />
+        </label>
+        <label class="check">
+          <input type="checkbox" formControlName="enabled" />
+          {{ i18n.t('specialists.enabled') }}
+        </label>
+      </div>
+
+      <label>
+        <span>{{ i18n.t('specialists.description') }}</span>
+        <input formControlName="description" maxlength="500" />
+        <small class="muted">{{ i18n.t('specialists.descriptionHint') }}</small>
+      </label>
+
+      <label>
+        <span>{{ i18n.t('specialists.keywords') }}</span>
+        <textarea formControlName="keywords" rows="3" spellcheck="false"></textarea>
+        <small class="muted">{{ i18n.t('specialists.keywordsHint') }}</small>
+      </label>
+
+      <label>
+        <span>{{ i18n.t('specialists.prompt') }}</span>
+        <textarea formControlName="prompt" rows="5" maxlength="4000"></textarea>
+      </label>
+
+      <fieldset>
+        <legend>{{ i18n.t('specialists.examples') }}</legend>
+        <p class="muted hint">{{ i18n.t('specialists.examplesHint') }}</p>
+        <div formArrayName="examples" class="examples">
+          @for (example of examples.controls; track example; let i = $index) {
+            <div class="example" [formGroupName]="i">
+              <input formControlName="question" maxlength="300" [placeholder]="i18n.t('specialists.question')"
+                     [attr.aria-label]="i18n.t('specialists.question') + ' ' + (i + 1)" />
+              <input formControlName="approach" maxlength="500" [placeholder]="i18n.t('specialists.approach')"
+                     [attr.aria-label]="i18n.t('specialists.approach') + ' ' + (i + 1)" />
+              <button type="button" class="button small" (click)="removeExample(i)"
+                      [attr.aria-label]="i18n.t('specialists.removeExample', { n: i + 1 })">✕</button>
+            </div>
+          }
+        </div>
+        <button type="button" class="button small" (click)="addExample()">{{ i18n.t('specialists.addExample') }}</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>{{ i18n.t('specialists.tools') }}</legend>
+        <label class="check">
+          <input type="checkbox" formControlName="allTools" />
+          {{ i18n.t('specialists.allTools') }}
+        </label>
+        @if (!form.controls.allTools.value) {
+          <div class="tools" formGroupName="tools">
+            @for (tool of localTools(); track tool.name) {
+              <label class="check" [title]="tool.description">
+                <input type="checkbox" [formControlName]="tool.name" />
+                <code>{{ tool.name }}</code>
+              </label>
+            }
+          </div>
+          <label>
+            <span>{{ i18n.t('specialists.extraTools') }}</span>
+            <input formControlName="extraTools" spellcheck="false" placeholder="mcp_*" />
+            <small class="muted">{{ i18n.t('specialists.extraToolsHint') }}</small>
+          </label>
+        }
+      </fieldset>
+
+      <div class="buttons">
+        <button type="submit" class="button primary" [disabled]="saving()">{{ i18n.t('specialists.save') }}</button>
+        <button type="button" class="button" (click)="close()">{{ i18n.t('specialists.cancel') }}</button>
+        @if (form.invalid && form.touched) {
+          <span class="error" role="alert">{{ i18n.t('specialists.invalid') }}</span>
+        }
+      </div>
+    </form>
+  </section>
+}

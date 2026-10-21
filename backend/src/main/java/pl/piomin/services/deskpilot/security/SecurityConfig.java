@@ -45,6 +45,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/providers", "/api/providers/**").hasRole(ADMIN)
                         .requestMatchers("/api/experiments", "/api/experiments/**", "/api/prompts", "/api/prompts/**").hasRole(ADMIN)
                         .requestMatchers("/api/knowledge-gaps", "/api/knowledge-gaps/**").hasAnyRole(REVIEWER, ADMIN)
+                        // Everyone may list the specialists; editing them and trying the routing is for admins (13g).
+                        .requestMatchers(HttpMethod.GET, "/api/specialists").hasRole(USER)
+                        .requestMatchers("/api/specialists", "/api/specialists/**").hasRole(ADMIN)
                         .requestMatchers("/api/audit", "/api/audit/**").hasRole(ADMIN)
                         .requestMatchers("/api/knowledge-base/documents", "/api/knowledge-base/documents/**").hasRole(ADMIN)
                         .requestMatchers("/actuator/**").hasRole(ADMIN)

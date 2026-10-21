@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -34,6 +35,9 @@ import pl.piomin.services.deskpilot.config.SpecialistProperties;
  *     <li>otherwise the general agent.</li>
  * </ol>
  * Routing never fails a run: if the embedding or the model call fails, the next method is tried.
+ * <p>
+ * The specialists are read from the catalog on every message, so an edit on the Specialists page (13g) applies to the
+ * next message; only the changed specialist's description and examples are embedded again.
  */
 @Component
 public class SpecialistRouter {
@@ -63,9 +67,22 @@ public class SpecialistRouter {
     private final EmbeddingModel embeddingModel;
     private final ModelGateway modelGateway;
     private final SpecialistProperties properties;
-    private final Map<String, List<Pattern>> keywordPatterns;
+    private final Map<String, Pattern> keywordPatterns = new ConcurrentHashMap<>();
     /** Embeddings of each specialist's description and example questions, computed on first use. */
-    private volatile Map<String, List<float[]>> exampleVectors;
+    private final Map<String, Vectors> exampleVectors = new ConcurrentHashMap<>();
+
+    /** @param texts what was embedded, so a changed description or example is embedded again */
+    private record Vectors(List<String> texts, List<float[]> vectors) {
+    }
+
+    /**
+     * Why a message would be routed where it is, for tuning keywords on the Specialists page (13g).
+     *
+     * @param keywords     matched keywords per specialist
+     * @param similarities closest description or example per specialist; empty when the embedding model is down
+     */
+    public record Preview(Routing routing, Map<String, List<String>> keywords, Map<String, Double> similarities) {
+    }
 
     public SpecialistRouter(SpecialistCatalog catalog, EmbeddingModel embeddingModel, ModelGateway modelGateway,
                             SpecialistProperties properties) {
@@ -73,11 +90,6 @@ public class SpecialistRouter {
         this.embeddingModel = embeddingModel;
         this.modelGateway = modelGateway;
         this.properties = properties;
-        this.keywordPatterns = catalog.specialists().stream().collect(Collectors.toMap(Specialist::id,
-                s -> s.keywords().stream()
-                        .map(k -> Pattern.compile("(?<![\\p{L}\\p{N}])" + Pattern.quote(normalize(k))))
-                        .toList(),
-                (a, b) -> a, LinkedHashMap::new));
     }
 
     /**
@@ -116,16 +128,35 @@ public class SpecialistRouter {
                 leaders.size() > 1 ? "keywords of several specialists: " + String.join(", ", leaders) : "no specialist matched");
     }
 
+    /**
+     * Like {@link #route}, for a message outside a conversation, with the keyword hits and similarities of every
+     * specialist. The model is only asked when model fallback is on and nothing else decides, as in a real run.
+     */
+    public Preview preview(String message, AgentConfig config) {
+        Routing routing = route(message, null, config);
+        Map<String, Double> similarities = new LinkedHashMap<>();
+        Map<String, List<float[]>> vectors = exampleVectors();
+        if (!vectors.isEmpty()) {
+            try {
+                float[] question = embeddingModel.embed(EMBEDDING_PREFIX + message);
+                vectors.forEach((id, list) -> similarities.put(id,
+                        list.stream().mapToDouble(v -> cosine(question, v)).max().orElse(0)));
+            } catch (RuntimeException e) {
+                LOG.warn("Similarities skipped: {}", e.getMessage());
+            }
+        }
+        return new Preview(routing, keywordHits(message), similarities);
+    }
+
     /** Matched keywords per specialist, only for specialists with at least one. */
     Map<String, List<String>> keywordHits(String message) {
         String text = normalize(message);
         Map<String, List<String>> hits = new LinkedHashMap<>();
         for (Specialist specialist : catalog.specialists()) {
-            List<Pattern> patterns = keywordPatterns.get(specialist.id());
             List<String> matched = new ArrayList<>();
-            for (int i = 0; i < patterns.size(); i++) {
-                if (patterns.get(i).matcher(text).find()) {
-                    matched.add(specialist.keywords().get(i));
+            for (String keyword : specialist.keywords()) {
+                if (keywordPattern(keyword).matcher(text).find()) {
+                    matched.add(keyword);
                 }
             }
             if (!matched.isEmpty()) {
@@ -173,30 +204,36 @@ public class SpecialistRouter {
         return Optional.of(Routing.of(specialist(top.id()), Method.MEANING, top.similarity(), reason + detail));
     }
 
+    /**
+     * Embeddings of each enabled specialist's description and example questions. A specialist is embedded again only
+     * when these texts changed; vectors of deleted or disabled specialists are dropped.
+     */
     private Map<String, List<float[]>> exampleVectors() {
-        Map<String, List<float[]>> vectors = exampleVectors;
-        if (vectors != null) {
-            return vectors;
-        }
-        synchronized (this) {
-            if (exampleVectors == null) {
-                try {
-                    Map<String, List<float[]>> computed = new LinkedHashMap<>();
-                    for (Specialist specialist : catalog.specialists()) {
-                        List<String> texts = new ArrayList<>();
-                        texts.add(EMBEDDING_PREFIX + specialist.description());
-                        specialist.examples().forEach(e -> texts.add(EMBEDDING_PREFIX + e.question()));
-                        computed.put(specialist.id(), embeddingModel.embed(texts));
-                    }
-                    exampleVectors = computed;
-                } catch (RuntimeException e) {
-                    // Embedding model unavailable: route without meaning this time and try again next message.
-                    LOG.warn("Could not embed the specialists' examples: {}", e.getMessage());
-                    return Map.of();
+        Map<String, List<float[]>> vectors = new LinkedHashMap<>();
+        try {
+            for (Specialist specialist : catalog.specialists()) {
+                List<String> texts = new ArrayList<>();
+                texts.add(EMBEDDING_PREFIX + specialist.description());
+                specialist.examples().forEach(e -> texts.add(EMBEDDING_PREFIX + e.question()));
+                Vectors cached = exampleVectors.get(specialist.id());
+                if (cached == null || !cached.texts().equals(texts)) {
+                    cached = new Vectors(texts, embeddingModel.embed(texts));
+                    exampleVectors.put(specialist.id(), cached);
                 }
+                vectors.put(specialist.id(), cached.vectors());
             }
-            return exampleVectors;
+        } catch (RuntimeException e) {
+            // Embedding model unavailable: route without meaning this time and try again next message.
+            LOG.warn("Could not embed the specialists' examples: {}", e.getMessage());
+            return Map.of();
         }
+        exampleVectors.keySet().retainAll(vectors.keySet());
+        return vectors;
+    }
+
+    private Pattern keywordPattern(String keyword) {
+        return keywordPatterns.computeIfAbsent(keyword,
+                k -> Pattern.compile("(?<![\\p{L}\\p{N}])" + Pattern.quote(normalize(k))));
     }
 
     /** Asks the chat model to name the specialist; only used when the cheaper methods are inconclusive. */

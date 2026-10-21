@@ -36,6 +36,12 @@ export const routes: Routes = [
     loadComponent: () => import('./experiments/experiments-page').then((m) => m.ExperimentsPage),
   },
   {
+    path: 'specialists',
+    title: 'title.specialists',
+    canMatch: [hasRole('admin')],
+    loadComponent: () => import('./specialists/specialists-page').then((m) => m.SpecialistsPage),
+  },
+  {
     path: 'audit',
     title: 'title.audit',
     canMatch: [hasRole('admin')],

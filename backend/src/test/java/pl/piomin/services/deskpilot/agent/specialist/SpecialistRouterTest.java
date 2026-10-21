@@ -1,5 +1,6 @@
 package pl.piomin.services.deskpilot.agent.specialist;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
@@ -15,7 +16,6 @@ import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
-import org.springframework.core.io.ClassPathResource;
 import pl.piomin.services.deskpilot.agent.AgentConfig;
 import pl.piomin.services.deskpilot.agent.ModelGateway;
 import pl.piomin.services.deskpilot.agent.TestAgentConfigs;
@@ -40,7 +40,7 @@ class SpecialistRouterTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        catalog = new SpecialistCatalog(JsonMapper.builder().build(), new ClassPathResource("specialists/specialists.json"));
+        catalog = new SpecialistCatalog(() -> SpecialistDefaults.load(JsonMapper.builder().build()));
         modelGateway = mock(ModelGateway.class);
     }
 
@@ -129,6 +129,35 @@ class SpecialistRouterTest {
         assertThat(Specialist.GENERAL.promptAddition()).isEmpty();
         assertThat(catalog.all()).extracting(Specialist::id)
                 .containsExactly("network", "accounts", "hardware", "software", "general");
+    }
+
+    @Test
+    void anEditedSpecialistIsUsedAtOnceAndOnlyItIsEmbeddedAgain() {
+        List<Specialist> definitions = new ArrayList<>(SpecialistDefaults.load(JsonMapper.builder().build()));
+        SpecialistCatalog editable = new SpecialistCatalog(() -> List.copyOf(definitions));
+        List<String> embedded = new ArrayList<>();
+        SpecialistRouter router = new SpecialistRouter(editable, new ScriptedEmbeddings(text -> {
+            embedded.add(text);
+            return new float[] {1, 0};
+        }), modelGateway, new SpecialistProperties(true, 0.6, 0.03, false));
+        router.preview("What is a good recipe for lasagna?", CONFIG);
+        String networkDescription = definitions.getFirst().description();
+        assertThat(embedded).contains(networkDescription);
+
+        int hardware = definitions.indexOf(editable.find("hardware").orElseThrow());
+        Specialist old = definitions.get(hardware);
+        definitions.set(hardware, new Specialist(old.id(), old.name(), "Printers, toner and docking stations.",
+                List.of("toner"), old.tools(), old.prompt(), old.examples()));
+        editable.invalidate();
+        embedded.clear();
+        SpecialistRouter.Preview preview = router.preview("I need new toner", CONFIG);
+
+        assertThat(preview.routing().specialist().id()).isEqualTo("hardware");
+        assertThat(preview.routing().method()).isEqualTo(SpecialistRouter.Method.KEYWORDS);
+        assertThat(preview.keywords()).containsEntry("hardware", List.of("toner"));
+        assertThat(preview.similarities()).containsKeys("network", "accounts", "hardware", "software");
+        assertThat(embedded).contains("Printers, toner and docking stations.", "I need new toner")
+                .doesNotContain(networkDescription);
     }
 
     private SpecialistRouter router(Function<String, float[]> embed, boolean modelFallback) {
